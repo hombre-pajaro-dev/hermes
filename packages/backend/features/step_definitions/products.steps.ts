@@ -1,4 +1,4 @@
-import { When, Then } from '@cucumber/cucumber';
+import { Given, When, Then } from '@cucumber/cucumber';
 import { expect } from 'chai';
 import { PosWorld } from '../support/world';
 
@@ -56,4 +56,38 @@ Then('the product has a units field', function (this: PosWorld) {
 Then('the product units is {int}', function (this: PosWorld, units: number) {
   const body = this.response.body as { units: number };
   expect(body.units).to.equal(units);
+});
+
+When('I update the price of {string} to {float}', async function (this: PosWorld, name: string, price: number) {
+  const productRes = await this.agent.get(`/api/products?name=${encodeURIComponent(name)}`);
+  const product = productRes.body as { id: number };
+  this.response = await this.agent.patch(`/api/products/${product.id}/price`).send({ price });
+});
+
+Then('no ledger entry is created for the price change', async function (this: PosWorld) {
+  const res = await this.agent.get('/api/ledger');
+  const entries = res.body as { entry_type: string }[];
+  const hasPriceEntry = entries.some(e => e.entry_type === 'price_change');
+  expect(hasPriceEntry).to.be.false;
+});
+
+When('I update the cost of {string} to {float}', async function (this: PosWorld, name: string, cost: number) {
+  const productRes = await this.agent.get(`/api/products?name=${encodeURIComponent(name)}`);
+  const product = productRes.body as { id: number };
+  this.response = await this.agent.patch(`/api/products/${product.id}/cost`).send({ cost });
+});
+
+Then('no ledger entry is created for the cost change', async function (this: PosWorld) {
+  const res = await this.agent.get('/api/ledger');
+  const entries = res.body as { entry_type: string }[];
+  expect(entries.some(e => e.entry_type === 'cost_change')).to.be.false;
+});
+
+Given('a product {string} is added to an open tab', async function (this: PosWorld, name: string) {
+  const tabRes = await this.agent.post('/api/tabs').send({ name: 'Test Tab' });
+  const tabId = tabRes.body.id as number;
+  const productRes = await this.agent.get(`/api/products?name=${encodeURIComponent(name)}`);
+  const product = productRes.body as { id: number };
+  await this.agent.post(`/api/tabs/${tabId}/items`).send({ items: [{ product_id: product.id, quantity: 1 }] });
+  this.context.openTabId = tabId;
 });

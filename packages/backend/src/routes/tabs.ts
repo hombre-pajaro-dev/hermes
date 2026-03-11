@@ -19,10 +19,10 @@ router.get('/summary', (_req, res) => {
 router.post('/', requireOpenRegister, (req, res) => {
   const db = getDb();
   const sessionId = (req as typeof req & { sessionId: number }).sessionId;
-  const { name = '' } = req.body;
+  const { name = '', at_cost = false } = req.body;
   const result = db.prepare(
-    "INSERT INTO tabs (session_id, name, status, total, created_at) VALUES (?, ?, 'open', 0, datetime('now'))"
-  ).run(sessionId, name);
+    "INSERT INTO tabs (session_id, name, status, at_cost, total, created_at) VALUES (?, ?, 'open', ?, 0, datetime('now'))"
+  ).run(sessionId, name, at_cost ? 1 : 0);
   const tab = db.prepare('SELECT * FROM tabs WHERE id = ?').get(result.lastInsertRowid);
   res.status(201).json(tab);
 });
@@ -37,7 +37,7 @@ router.get('/:id', (req, res) => {
 
 router.post('/:id/items', (req, res) => {
   const db = getDb();
-  const tab = db.prepare('SELECT * FROM tabs WHERE id = ?').get(req.params.id) as { id: number; status: string; total: number } | undefined;
+  const tab = db.prepare('SELECT * FROM tabs WHERE id = ?').get(req.params.id) as { id: number; status: string; at_cost: number; total: number } | undefined;
   if (!tab) return res.status(404).json({ error: 'Tab not found' });
   if (tab.status !== 'open') return res.status(409).json({ error: 'Tab is not open' });
 
@@ -49,11 +49,17 @@ router.post('/:id/items', (req, res) => {
     for (const item of items) {
       const product = db.prepare('SELECT * FROM products WHERE id = ?').get(item.product_id) as { id: number; price: number; cost: number } | undefined;
       if (!product) throw new Error(`Product ${item.product_id} not found`);
-      const subtotal = product.price * item.quantity;
+      const unitPrice = tab.at_cost ? product.cost : product.price;
+      const subtotal = unitPrice * item.quantity;
       additionalTotal += subtotal;
-      db.prepare(
-        'INSERT INTO tab_items (tab_id, product_id, quantity, unit_price, unit_cost, subtotal) VALUES (?, ?, ?, ?, ?, ?)'
-      ).run(tab.id, item.product_id, item.quantity, product.price, product.cost, subtotal);
+      const existing = db.prepare('SELECT id FROM tab_items WHERE tab_id = ? AND product_id = ?').get(tab.id, item.product_id) as { id: number } | undefined;
+      if (existing) {
+        db.prepare('UPDATE tab_items SET quantity = quantity + ?, subtotal = subtotal + ? WHERE id = ?')
+          .run(item.quantity, subtotal, existing.id);
+      } else {
+        db.prepare('INSERT INTO tab_items (tab_id, product_id, quantity, unit_price, unit_cost, subtotal) VALUES (?, ?, ?, ?, ?, ?)')
+          .run(tab.id, item.product_id, item.quantity, unitPrice, product.cost, subtotal);
+      }
     }
     db.prepare('UPDATE tabs SET total = total + ? WHERE id = ?').run(additionalTotal, tab.id);
   });

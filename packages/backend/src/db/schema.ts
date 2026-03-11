@@ -50,6 +50,7 @@ export function applySchema(db: Database.Database): void {
       session_id     INTEGER NOT NULL REFERENCES register_sessions(id),
       name           TEXT    NOT NULL DEFAULT '',
       status         TEXT    NOT NULL DEFAULT 'open',
+      at_cost        INTEGER NOT NULL DEFAULT 0,
       total          REAL    NOT NULL DEFAULT 0,
       payment_method TEXT,
       created_at     TEXT    NOT NULL DEFAULT (datetime('now')),
@@ -119,4 +120,7 @@ export function applySchema(db: Database.Database): void {
     INSERT OR IGNORE INTO accounts (name, label) VALUES ('credit_card', 'Credit Card');
     INSERT OR IGNORE INTO accounts (name, label) VALUES ('payroll', 'Payroll');
   `);
+
+  // Migrations for existing databases
+  try { db.exec(`ALTER TABLE tabs ADD COLUMN at_cost INTEGER NOT NULL DEFAULT 0`); } catch { /* column already exists */ }
 }

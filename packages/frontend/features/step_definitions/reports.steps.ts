@@ -1,0 +1,43 @@
+import { When, Then } from '@cucumber/cucumber';
+import { expect } from 'chai';
+import { PosWorld } from '../support/world';
+
+Then('I see the sales by item section', async function (this: PosWorld) {
+  await this.page.waitForSelector('[data-testid="sales-by-item"]', { timeout: 5000 });
+  expect(await this.page.locator('[data-testid="sales-by-item"]').isVisible()).to.be.true;
+});
+
+When('I switch to the Daily tab', async function (this: PosWorld) {
+  await this.page.click('.tabs-nav__item:nth-child(2)');
+  await this.page.waitForLoadState('networkidle');
+});
+
+When('I switch to the Range tab', async function (this: PosWorld) {
+  await this.page.click('.tabs-nav__item:nth-child(3)');
+  await this.page.waitForLoadState('networkidle');
+});
+
+When('I switch to the Brief tab', async function (this: PosWorld) {
+  await this.page.click('.tabs-nav__item:nth-child(4)');
+  await this.page.waitForLoadState('networkidle');
+});
+
+When('I click Fetch', async function (this: PosWorld) {
+  await this.page.click('button:has-text("Fetch")');
+  await this.page.waitForLoadState('networkidle');
+});
+
+Then('I see the daily total section', async function (this: PosWorld) {
+  await this.page.waitForSelector('[data-testid="daily-total"]', { timeout: 8000 });
+  expect(await this.page.locator('[data-testid="daily-total"]').isVisible()).to.be.true;
+});
+
+Then('I see the range report section', async function (this: PosWorld) {
+  await this.page.waitForSelector('[data-testid="daily-range"]', { timeout: 8000 });
+  expect(await this.page.locator('[data-testid="daily-range"]').isVisible()).to.be.true;
+});
+
+Then('I see the close brief section', async function (this: PosWorld) {
+  await this.page.waitForSelector('[data-testid="close-brief"]', { timeout: 8000 });
+  expect(await this.page.locator('[data-testid="close-brief"]').isVisible()).to.be.true;
+});
