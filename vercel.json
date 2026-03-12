@@ -1,8 +1,19 @@
 {
   "version": 2,
-  "buildCommand": "pnpm --filter frontend build",
-  "outputDirectory": "packages/frontend/dist",
-  "rewrites": [
-    { "source": "/api/:path*", "destination": "/api/index.ts" }
+  "builds": [
+    {
+      "src": "packages/frontend/package.json",
+      "use": "@vercel/static-build",
+      "config": { "distDir": "dist" }
+    },
+    {
+      "src": "api/index.ts",
+      "use": "@vercel/node"
+    }
+  ],
+  "routes": [
+    { "src": "/api/(.*)", "dest": "/api/index.ts" },
+    { "handle": "filesystem" },
+    { "src": "/(.*)", "dest": "/index.html" }
   ]
 }
