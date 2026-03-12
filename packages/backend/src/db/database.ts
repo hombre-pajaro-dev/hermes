@@ -5,7 +5,9 @@ let db: Database.Database | null = null;
 
 export function getDb(): Database.Database {
   if (!db) {
-    const path = process.env.NODE_ENV === 'test' ? ':memory:' : './hermes.db';
+    const path = process.env.NODE_ENV === 'test'
+      ? ':memory:'
+      : (process.env.DB_PATH ?? (process.env.VERCEL ? '/tmp/hermes.db' : './hermes.db'));
     db = new Database(path);
     applySchema(db);
   }
