@@ -77,6 +77,18 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+### Closed tabs: pagination and paid timestamp
+
+- Closed tabs list is now paginated — 10 entries per page with `← Prev` / `Next →` controls and a "Page X of Y" indicator (controls only rendered when there is more than one page)
+- Section title shows the total closed tab count (e.g. `Closed Tabs (47)`)
+- Each closed tab entry now shows:
+  - Date and time paid (e.g. `Paid 2026-03-11 at 23:42`)
+  - Payment method (cash / credit card) below the total
+- Page resets to 1 after a tab is paid so the newly closed tab is visible immediately
+- `paid_at` field added to the `Tab` TypeScript interface
+
+---
+
 ## Earlier
 
 ### Added

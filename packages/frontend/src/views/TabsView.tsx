@@ -13,9 +13,14 @@ export default function TabsView() {
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [view, setView] = useState<'list' | 'new' | 'detail'>('list');
+  const [closedPage, setClosedPage] = useState(0);
+  const PAGE_SIZE = 10;
 
-  async function loadTabs() {
-    try { setTabs(await api.getTabs()); } catch { /* ignore */ }
+  async function loadTabs(resetPage = false) {
+    try {
+      setTabs(await api.getTabs());
+      if (resetPage) setClosedPage(0);
+    } catch { /* ignore */ }
   }
 
   useEffect(() => {
@@ -62,13 +67,15 @@ export default function TabsView() {
       await api.payTab(selectedTab.id, payMethod, payMethod === 'cash' ? Number(cashReceived) : undefined);
       setSelectedTab(null);
       setView('list');
-      await loadTabs();
+      await loadTabs(true);
       setSuccess('Tab paid!');
     } catch (e: unknown) { setError((e as Error).message); }
   }
 
   const openTabs = tabs.filter(t => t.status === 'open');
   const closedTabs = tabs.filter(t => t.status !== 'open');
+  const closedPageCount = Math.ceil(closedTabs.length / PAGE_SIZE);
+  const closedPagedTabs = closedTabs.slice(closedPage * PAGE_SIZE, (closedPage + 1) * PAGE_SIZE);
 
   return (
     <div>
@@ -107,20 +114,45 @@ export default function TabsView() {
 
           {closedTabs.length > 0 && (
             <>
-              <p className="section-title">Closed Tabs</p>
+              <p className="section-title">Closed Tabs ({closedTabs.length})</p>
               <div className="card">
-                {closedTabs.map(t => (
+                {closedPagedTabs.map(t => (
                   <div className="list-item" key={t.id}>
                     <div className="list-item__main">
                       <div className="list-item__name">{t.name || `Tab #${t.id}`}</div>
+                      {t.paid_at && (
+                        <div className="list-item__sub">
+                          Paid {t.paid_at.slice(0, 10)} at {t.paid_at.slice(11, 16)}
+                        </div>
+                      )}
                     </div>
-                    <div className="list-item__right">
+                    <div className="list-item__right" style={{ textAlign: 'right' }}>
                       <span className="badge badge--paid">PAID</span>
-                      <div style={{ fontWeight: 700 }}>${t.total.toFixed(2)}</div>
+                      <div style={{ fontWeight: 700, marginTop: 2 }}>${t.total.toFixed(2)}</div>
+                      {t.payment_method && (
+                        <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', textTransform: 'capitalize' }}>{t.payment_method.replace('_', ' ')}</div>
+                      )}
                     </div>
                   </div>
                 ))}
               </div>
+              {closedPageCount > 1 && (
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 0' }}>
+                  <button
+                    className="btn btn--sm btn--ghost"
+                    onClick={() => setClosedPage(p => Math.max(0, p - 1))}
+                    disabled={closedPage === 0}
+                  >← Prev</button>
+                  <span style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
+                    Page {closedPage + 1} of {closedPageCount}
+                  </span>
+                  <button
+                    className="btn btn--sm btn--ghost"
+                    onClick={() => setClosedPage(p => Math.min(closedPageCount - 1, p + 1))}
+                    disabled={closedPage >= closedPageCount - 1}
+                  >Next →</button>
+                </div>
+              )}
             </>
           )}
         </div>

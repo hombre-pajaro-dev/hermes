@@ -66,7 +66,7 @@ export interface RegisterSession { id: number; status: string; opening_cash: num
 export interface Cashout { id: number; session_id: number; amount: number; reason: string; created_at: string; }
 export interface OrderItem { product_id: number; quantity: number; }
 export interface Order { id: number; status: string; total: number; payment_method?: string; amount_received?: number; change_due?: number; items?: unknown[]; }
-export interface Tab { id: number; name: string; status: string; at_cost: number; total: number; payment_method?: string; created_at: string; }
+export interface Tab { id: number; name: string; status: string; at_cost: number; total: number; payment_method?: string; created_at: string; paid_at?: string; }
 export interface TabItem { id: number; product_id: number; quantity: number; unit_price: number; subtotal: number; }
 export interface TabsSummary { open_count: number; total_amount: number; }
 export interface LedgerEntry { id: number; entry_type: string; account?: string; amount: number; description: string; created_at: string; }

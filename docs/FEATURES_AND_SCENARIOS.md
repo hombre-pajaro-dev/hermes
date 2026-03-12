@@ -20,15 +20,18 @@ This document lists all **features** and **scenarios** covered by the BDD test s
 
 ## 2. Tabs (Long-lasting orders)
 
-**Feature:** As an employee, I want to open tabs for customers and add items so that the customer can pay at the end of the session.
+**Feature:** As an employee, I want to open tabs for customers and add items so that the customer can pay at the end of the session. Multiple tabs can be open simultaneously. Tabs may optionally be created as at-cost (staff) tabs.
 
 | # | Scenario | Description |
 |---|----------|-------------|
-| 1 | Open a new tab and add items | Create tab; add products with quantities; tab total and line count are correct. |
+| 1 | Open a new tab and add items | Create tab; add products; same product added twice is grouped into one line with combined quantity; tab total is correct. |
 | 2 | View open tabs summary | Create tab and add items; summary shows open count and total amount. |
-| 3 | Pay a tab with cash | Add items to tab; pay tab with cash and amount received; tab closes; ledger records payment. |
+| 3 | Pay a tab with cash | Add items to tab; pay tab with cash and amount received; tab closes; ledger records payment; `paid_at` timestamp recorded. |
 | 4 | Pay a tab with card | Add items to tab; pay tab with card; tab closes. |
-| 5 | Cannot close register while tabs are open | With at least one open tab; closing register is rejected; error mentions tabs/long-lasting orders. |
+| 5 | Cannot close register while tabs are open | With at least one open tab; closing register is rejected. |
+| 6 | Open multiple tabs simultaneously | Multiple tabs can be open at the same time; each is managed independently. |
+| 7 | Create an at-cost (staff) tab | Create tab with `at_cost: true`; items added are priced at `product.cost` instead of `product.price`; `at_cost` flag cannot be changed after creation. |
+| 8 | Closed tabs are paginated | Closed tabs list returns 10 per page; `paid_at` timestamp and payment method shown per entry. |
 
 ---
 
@@ -107,21 +110,30 @@ This document lists all **features** and **scenarios** covered by the BDD test s
 | 1 | List products | Fetch products; response is array; each product has id, name, description, cost, price, units. |
 | 2 | Get a single product | Fetch product by name; product has expected name, cost, price, units. |
 | 3 | Create a new product | Create product with name, description, cost, price, units; product is created with correct attributes. |
+| 4 | Modify the price of a product | Update price via `PATCH /api/products/:id/price`; new price returned; no ledger entry created. |
+| 5 | Cannot set price to zero or below | Attempt to set price ≤ 0; request rejected with 400. |
+| 6 | Cannot modify price when product is in an open tab | Product in open tab; price update rejected with 409. |
+| 7 | Modify the cost of a product | Update cost via `PATCH /api/products/:id/cost`; new cost returned; no ledger entry created. |
+| 8 | Cannot set cost to zero or below | Attempt to set cost ≤ 0; request rejected with 400. |
+| 9 | Cannot modify cost when product is in an open tab | Product in open tab; cost update rejected with 409. |
 
 ---
 
 ## Running the BDD tests
 
-- **Run all scenarios:**  
-  `npm test`  
-  (uses `NODE_ENV=test` and a separate test database.)
+- **Run all scenarios:**
+  `pnpm test` (run from the relevant package directory)
+  Uses `NODE_ENV=test` and an in-memory SQLite database.
 
-- **Generate HTML report:**  
-  The Cucumber config writes an HTML report to `report/cucumber-report.html` after a run. Open that file in a browser for a viewable report.
+- **Run backend tests only:**
+  `cd packages/backend && pnpm test` — 40 scenarios, 197 steps
 
-- **Regenerate scenario list from feature files:**  
-  `npm run test:doc`  
-  (writes `docs/BDD_SCENARIOS.md` from the Gherkin feature files.)
+- **Run frontend tests only:**
+  `cd packages/frontend && pnpm test` — 30 scenarios, 156 steps
+  Requires both backend (`:3001`) and frontend (`:5173`) servers running.
+
+- **HTML report:**
+  Both packages write a Cucumber HTML report to `report/cucumber-report.html` after each run.
 
 ---
 
