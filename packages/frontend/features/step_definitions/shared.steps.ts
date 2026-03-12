@@ -13,6 +13,7 @@ const ROUTES: Record<string, string> = {
   'Inventory': '/inventory',
   'Ledger': '/ledger',
   'Reports': '/reports',
+  'Admin': '/admin',
 };
 
 Given('I am on the {word} page', async function (this: PosWorld, name: string) {

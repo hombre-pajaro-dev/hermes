@@ -20,6 +20,7 @@ Feature: Register
     When I fill in cashout amount as 50
     And I fill in cashout reason as "Safe drop"
     And I click Cash Out
+    And I confirm with PIN "1234"
     Then I see a success message
 
   Scenario: Close the register
@@ -27,6 +28,7 @@ Feature: Register
     And I am on the Register page
     When I fill in closing cash as 175
     And I click Close Register
+    And I confirm with PIN "1234"
     Then I see a success message
     And the register shows as closed
 

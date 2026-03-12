@@ -54,7 +54,6 @@ When('I fill in cashout reason as {string}', async function (this: PosWorld, rea
 
 When('I click Cash Out', async function (this: PosWorld) {
   await this.page.click('[data-testid="cashout-btn"]');
-  await this.page.waitForLoadState('networkidle');
 });
 
 When('I fill in closing cash as {int}', async function (this: PosWorld, amount: number) {
@@ -63,5 +62,4 @@ When('I fill in closing cash as {int}', async function (this: PosWorld, amount: 
 
 When('I click Close Register', async function (this: PosWorld) {
   await this.page.click('[data-testid="close-register-btn"]');
-  await this.page.waitForLoadState('networkidle');
 });

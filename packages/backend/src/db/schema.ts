@@ -119,8 +119,17 @@ export function applySchema(db: Database.Database): void {
     INSERT OR IGNORE INTO accounts (name, label) VALUES ('cash', 'Cash Drawer');
     INSERT OR IGNORE INTO accounts (name, label) VALUES ('credit_card', 'Credit Card');
     INSERT OR IGNORE INTO accounts (name, label) VALUES ('payroll', 'Payroll');
+
+    CREATE TABLE IF NOT EXISTS settings (
+      key   TEXT PRIMARY KEY,
+      value TEXT NOT NULL
+    );
+
+    INSERT OR IGNORE INTO settings (key, value) VALUES ('pin', '1234');
   `);
 
   // Migrations for existing databases
   try { db.exec(`ALTER TABLE tabs ADD COLUMN at_cost INTEGER NOT NULL DEFAULT 0`); } catch { /* column already exists */ }
+  try { db.exec(`CREATE TABLE IF NOT EXISTS settings (key TEXT PRIMARY KEY, value TEXT NOT NULL)`); } catch { /* ignore */ }
+  try { db.exec(`INSERT OR IGNORE INTO settings (key, value) VALUES ('pin', '1234')`); } catch { /* ignore */ }
 }

@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { api } from '../api/client';
 import type { Tab, TabItem, Product } from '../api/client';
+import PinModal from '../components/PinModal';
 
 export default function TabsView() {
   const [tabs, setTabs] = useState<Tab[]>([]);
@@ -14,6 +15,7 @@ export default function TabsView() {
   const [success, setSuccess] = useState('');
   const [view, setView] = useState<'list' | 'new' | 'detail'>('list');
   const [closedPage, setClosedPage] = useState(0);
+  const [showPinForTab, setShowPinForTab] = useState(false);
   const PAGE_SIZE = 10;
 
   async function loadTabs(resetPage = false) {
@@ -79,6 +81,18 @@ export default function TabsView() {
 
   return (
     <div>
+      {showPinForTab && (
+        <PinModal
+          title="Staff Tab — Enter PIN"
+          onConfirm={async (pin) => {
+            await api.verifyPin(pin);
+            setShowPinForTab(false);
+            await handleCreateTab();
+          }}
+          onCancel={() => setShowPinForTab(false)}
+        />
+      )}
+
       {error && <div className="error-banner" data-testid="error-banner">{error}</div>}
       {success && <div className="success-banner" data-testid="success-banner">{success}</div>}
 
@@ -178,7 +192,9 @@ export default function TabsView() {
               Sell at cost <span style={{ color: 'var(--text-secondary)', fontSize: '0.85rem' }}>(staff drink)</span>
             </span>
           </label>
-          <button data-testid="open-tab-btn" className="btn btn--primary" onClick={handleCreateTab} disabled={!tabName}>Open Tab</button>
+          <button data-testid="open-tab-btn" className="btn btn--primary"
+            onClick={() => atCost ? setShowPinForTab(true) : handleCreateTab()}
+            disabled={!tabName}>Open Tab</button>
         </div>
       )}
 

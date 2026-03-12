@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { api } from '../api/client';
 import type { RegisterSession } from '../api/client';
+import PinModal from '../components/PinModal';
 
 export default function RegisterView() {
   const [session, setSession] = useState<RegisterSession | null>(null);
@@ -11,6 +12,7 @@ export default function RegisterView() {
   const [closingCash, setClosingCash] = useState('');
   const [cashoutAmount, setCashoutAmount] = useState('');
   const [cashoutReason, setCashoutReason] = useState('');
+  const [pinTarget, setPinTarget] = useState<'cashout' | 'close' | null>(null);
 
   async function load() {
     try { setSession(await api.getSession()); }
@@ -49,6 +51,20 @@ export default function RegisterView() {
 
   return (
     <div>
+      {pinTarget && (
+        <PinModal
+          title={pinTarget === 'cashout' ? 'Cash Out — Enter PIN' : 'Close Register — Enter PIN'}
+          onConfirm={async (pin) => {
+            await api.verifyPin(pin);
+            const target = pinTarget;
+            setPinTarget(null);
+            if (target === 'cashout') await handleCashout();
+            else await handleClose();
+          }}
+          onCancel={() => setPinTarget(null)}
+        />
+      )}
+
       {error && <div className="error-banner" data-testid="error-banner">{error}</div>}
       {success && <div className="success-banner" data-testid="success-banner">{success}</div>}
 
@@ -96,7 +112,7 @@ export default function RegisterView() {
                 placeholder="Safe drop…" value={cashoutReason} onChange={e => setCashoutReason(e.target.value)} />
             </div>
             <button data-testid="cashout-btn" className="btn btn--ghost"
-              onClick={handleCashout} disabled={!cashoutAmount}>
+              onClick={() => setPinTarget('cashout')} disabled={!cashoutAmount}>
               Cash Out
             </button>
           </div>
@@ -109,7 +125,7 @@ export default function RegisterView() {
                 placeholder="0.00" value={closingCash} onChange={e => setClosingCash(e.target.value)} />
             </div>
             <button data-testid="close-register-btn" className="btn btn--danger"
-              onClick={handleClose} disabled={!closingCash}>
+              onClick={() => setPinTarget('close')} disabled={!closingCash}>
               Close Register
             </button>
           </div>

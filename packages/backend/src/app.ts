@@ -8,6 +8,7 @@ import ledgerRouter from './routes/ledger';
 import reportsRouter from './routes/reports';
 import restockRouter from './routes/restock';
 import inventoryRouter from './routes/inventory';
+import adminRouter from './routes/admin';
 import { resetDb } from './db/database';
 
 export function createApp() {
@@ -34,6 +35,7 @@ export function createApp() {
   app.use('/api/reports', reportsRouter);
   app.use('/api/restock', restockRouter);
   app.use('/api/inventory', inventoryRouter);
+  app.use('/api/admin', adminRouter);
 
   return app;
 }

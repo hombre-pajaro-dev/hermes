@@ -8,6 +8,7 @@ import RestockView from './views/RestockView';
 import InventoryView from './views/InventoryView';
 import LedgerView from './views/LedgerView';
 import ReportsView from './views/ReportsView';
+import AdminView from './views/AdminView';
 import './App.css';
 
 export default function App() {
@@ -24,6 +25,7 @@ export default function App() {
           <Route path="/inventory" element={<InventoryView />} />
           <Route path="/ledger" element={<LedgerView />} />
           <Route path="/reports" element={<ReportsView />} />
+          <Route path="/admin" element={<AdminView />} />
         </Routes>
       </Layout>
     </BrowserRouter>

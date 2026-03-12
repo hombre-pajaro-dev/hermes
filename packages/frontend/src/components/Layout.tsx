@@ -9,6 +9,7 @@ const NAV = [
   { to: '/inventory', label: 'Inventory', icon: '🔢' },
   { to: '/ledger', label: 'Ledger', icon: '📒' },
   { to: '/reports', label: 'Reports', icon: '📊' },
+  { to: '/admin', label: 'Admin', icon: '⚙️' },
 ];
 
 const TITLES: Record<string, string> = {
@@ -20,6 +21,7 @@ const TITLES: Record<string, string> = {
   '/inventory': 'Inventory',
   '/ledger': 'Ledger',
   '/reports': 'Reports',
+  '/admin': 'Admin',
 };
 
 export default function Layout({ children }: { children: React.ReactNode }) {

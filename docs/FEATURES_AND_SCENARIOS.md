@@ -119,6 +119,21 @@ This document lists all **features** and **scenarios** covered by the BDD test s
 
 ---
 
+## 9. Admin — PIN Security
+
+**Feature:** As an admin, I want to manage the security PIN and protect sensitive operations so that unauthorised staff cannot perform cash-outs, close the register, or open staff-cost tabs.
+
+| # | Scenario | Description |
+|---|----------|-------------|
+| 1 | Change the PIN successfully | On Admin page; enter correct current PIN and matching new PIN; success message shown; PIN updated. |
+| 2 | Cannot change PIN with incorrect current PIN | Enter wrong current PIN; request rejected; error shown. |
+| 3 | Cannot change PIN when new PINs do not match | Enter current PIN but mismatched new/confirm PINs; rejected with error before API call. |
+| 4 | Wrong PIN on cash out is rejected | Fill in cashout fields; click Cash Out; enter wrong PIN in modal; PIN error shown in modal. |
+| 5 | Wrong PIN on close register is rejected | Fill in closing cash; click Close Register; enter wrong PIN; PIN error shown in modal. |
+| 6 | Wrong PIN on at-cost tab is rejected | Navigate to Tabs; fill new at-cost tab form; click Open Tab; enter wrong PIN; PIN error shown. |
+
+---
+
 ## Running the BDD tests
 
 - **Run all scenarios:**
@@ -129,7 +144,7 @@ This document lists all **features** and **scenarios** covered by the BDD test s
   `cd packages/backend && pnpm test` — 40 scenarios, 197 steps
 
 - **Run frontend tests only:**
-  `cd packages/frontend && pnpm test` — 30 scenarios, 156 steps
+  `cd packages/frontend && pnpm test` — 36 scenarios, 194 steps
   Requires both backend (`:3001`) and frontend (`:5173`) servers running.
 
 - **HTML report:**
@@ -149,3 +164,4 @@ This document lists all **features** and **scenarios** covered by the BDD test s
 | Restock | `features/restock.feature` |
 | Inventory adjustment | `features/inventory_adjustment.feature` |
 | Products | `features/products.feature` |
+| Admin — PIN Security | `features/admin.feature` |

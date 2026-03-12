@@ -5,8 +5,13 @@ async function req<T>(path: string, options?: RequestInit): Promise<T> {
     headers: { 'Content-Type': 'application/json' },
     ...options,
   });
-  const data = await res.json();
-  if (!res.ok) throw new Error(data.error ?? 'Request failed');
+  let data: { error?: string } | undefined;
+  try {
+    data = await res.json();
+  } catch {
+    throw new Error(res.ok ? 'Unexpected response from server' : `Server error (${res.status}) — please check the connection`);
+  }
+  if (!res.ok) throw new Error(data?.error ?? 'Request failed');
   return data as T;
 }
 
@@ -58,6 +63,10 @@ export const api = {
   // Inventory
   adjustInventory: (adjustments: { product_id: number; physical_count: number }[]) =>
     req<AdjustResult>('/inventory/adjust', { method: 'POST', body: JSON.stringify({ adjustments }) }),
+
+  // Admin
+  verifyPin: (pin: string) => req<{ ok: true }>('/admin/pin/verify', { method: 'POST', body: JSON.stringify({ pin }) }),
+  changePin: (current_pin: string, new_pin: string) => req<{ ok: true }>('/admin/pin/change', { method: 'POST', body: JSON.stringify({ current_pin, new_pin }) }),
 };
 
 // Types

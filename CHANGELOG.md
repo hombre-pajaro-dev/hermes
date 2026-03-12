@@ -8,6 +8,32 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+### Admin — PIN Security
+
+#### PIN-protected operations
+- Cash-outs from the register now require a PIN before execution
+- Closing the register now requires a PIN before execution
+- Opening a tab with "Sell at cost (staff drink)" selected now requires a PIN before the tab is created
+- Entering an incorrect PIN shows a clear error message inside the PIN dialog; the modal stays open so the user can retry or cancel
+
+#### Admin page
+- New `/admin` section accessible from the bottom navigation bar (⚙️ Admin)
+- Administrators can change the system PIN by entering the current PIN and confirming a new one (minimum 4 characters)
+- Default PIN on first run is `1234`
+- Error shown when the current PIN is wrong or the new PINs do not match
+
+#### Backend
+- New `settings` table in the database to store key/value system configuration
+- `POST /api/admin/pin/verify` — validates a PIN, returns 401 with `{ error: 'Invalid PIN' }` on failure
+- `POST /api/admin/pin/change` — changes the PIN; requires correct `current_pin` and a `new_pin` of at least 4 characters
+- Migration ensures existing databases receive the `settings` table and default PIN on restart
+
+#### Error handling improvement
+- API client now handles non-JSON server responses gracefully — instead of the cryptic browser exception "The string did not match the expected pattern.", errors like `Server error (404) — please check the connection` are shown
+- BDD scenarios: 6 new frontend scenarios covering PIN change (success, wrong current PIN, mismatched new PINs) and PIN protection on cashout, register close, and at-cost tab creation
+
+---
+
 ### Products
 
 #### Cost modification
