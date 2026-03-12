@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "buildCommand": "pnpm rebuild better-sqlite3",
+  "buildCommand": "pnpm --filter backend rebuild better-sqlite3",
   "functions": {
     "api/index.ts": {
       "includeFiles": "node_modules/.pnpm/better-sqlite3@12.6.2/node_modules/better-sqlite3/build/**"
