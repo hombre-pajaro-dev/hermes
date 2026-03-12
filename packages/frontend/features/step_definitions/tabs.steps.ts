@@ -2,8 +2,10 @@ import { Given, When, Then } from '@cucumber/cucumber';
 import { expect } from 'chai';
 import { PosWorld } from '../support/world';
 
+const API = process.env.TEST_API_URL ?? 'http://localhost:3001';
+
 Given('there is an open tab via the API named {string}', async function (this: PosWorld, name: string) {
-  const base = 'http://localhost:3001/api';
+  const base = `${API}/api`;
   const sessionRes = await fetch(`${base}/register/session`);
   const session = await sessionRes.json() as { id?: number } | null;
   if (!session?.id) {

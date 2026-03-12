@@ -5,7 +5,7 @@ export class PosWorld extends World {
   browser!: Browser;
   context!: BrowserContext;
   page!: Page;
-  baseUrl = 'http://localhost:5173';
+  baseUrl = process.env.TEST_BASE_URL ?? 'http://localhost:5173';
   data: Record<string, unknown> = {};
 
   constructor(options: IWorldOptions) {

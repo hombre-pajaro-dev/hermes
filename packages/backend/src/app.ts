@@ -8,11 +8,19 @@ import ledgerRouter from './routes/ledger';
 import reportsRouter from './routes/reports';
 import restockRouter from './routes/restock';
 import inventoryRouter from './routes/inventory';
+import { resetDb } from './db/database';
 
 export function createApp() {
   const app = express();
   app.use(cors({ origin: '*' }));
   app.use(express.json());
+
+  if (process.env.NODE_ENV === 'test') {
+    app.post('/api/test/reset', (_req, res) => {
+      resetDb();
+      res.json({ ok: true });
+    });
+  }
 
   app.get('/api/health', (_req, res) => {
     res.json({ status: 'ok' });

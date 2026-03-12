@@ -3,6 +3,7 @@
   "private": true,
   "scripts": {
     "dev": "tsx watch src/index.ts",
+    "test:server": "PORT=3002 NODE_ENV=test tsx src/index.ts",
     "build": "tsc",
     "start": "node dist/index.js",
     "test": "NODE_ENV=test cucumber-js --config cucumber.js",

@@ -2,6 +2,8 @@ import { Given, When, Then } from '@cucumber/cucumber';
 import { expect } from 'chai';
 import { PosWorld } from '../support/world';
 
+const API = process.env.TEST_API_URL ?? 'http://localhost:3001';
+
 Then('I see a list of products', async function (this: PosWorld) {
   const list = this.page.locator('[data-testid="products-list"]');
   await list.waitFor({ timeout: 5000 });
@@ -43,13 +45,13 @@ When('I click Create Product', async function (this: PosWorld) {
 });
 
 Then('I see the product {string} in the list', async function (this: PosWorld, name: string) {
-  await this.page.waitForSelector('[data-testid="products-list"]');
+  await this.page.waitForSelector(`[data-testid="product-name"]:text("${name}")`, { timeout: 8000 });
   const names = await this.page.locator('[data-testid="product-name"]').allTextContents();
   expect(names).to.include(name);
 });
 
 When('I click the Edit price button for {string}', async function (this: PosWorld, name: string) {
-  const res = await fetch(`http://localhost:3001/api/products?name=${encodeURIComponent(name)}`);
+  const res = await fetch(`${API}/api/products?name=${encodeURIComponent(name)}`);
   const product = await res.json() as { id: number };
   this.data.editProductId = product.id;
   await this.page.waitForSelector(`[data-testid="edit-price-${product.id}"]`, { timeout: 5000 });
@@ -78,7 +80,7 @@ Then('the product {string} shows price {float}', async function (this: PosWorld,
   }
 
   // Verify backend updated correctly
-  const apiRes = await fetch(`http://localhost:3001/api/products?name=${encodeURIComponent(name)}`);
+  const apiRes = await fetch(`${API}/api/products?name=${encodeURIComponent(name)}`);
   const apiProduct = await apiRes.json() as { price: number };
   expect(apiProduct.price, `API price not updated: expected ${price}, got ${apiProduct.price}`).to.be.closeTo(price, 0.01);
 
@@ -101,13 +103,13 @@ Then('the product {string} shows price {float}', async function (this: PosWorld,
 });
 
 Then('no ledger entry is added for the price change', async function (this: PosWorld) {
-  const res = await fetch('http://localhost:3001/api/ledger');
+  const res = await fetch(`${API}/api/ledger`);
   const entries = await res.json() as { entry_type: string }[];
   expect(entries.some(e => e.entry_type === 'price_change')).to.be.false;
 });
 
 Given('"Espresso" is in an open tab via the API', async function (this: PosWorld) {
-  const base = 'http://localhost:3001/api';
+  const base = `${API}/api`;
   const sessionRes = await fetch(`${base}/register/session`);
   const session = await sessionRes.json() as { id?: number } | null;
   if (!session?.id) {
@@ -122,7 +124,7 @@ Given('"Espresso" is in an open tab via the API', async function (this: PosWorld
 });
 
 Then('the price edit for {string} is locked', async function (this: PosWorld, name: string) {
-  const res = await fetch(`http://localhost:3001/api/products?name=${encodeURIComponent(name)}`);
+  const res = await fetch(`${API}/api/products?name=${encodeURIComponent(name)}`);
   const product = await res.json() as { id: number };
   await this.page.reload();
   await this.page.waitForLoadState('networkidle');
@@ -132,7 +134,7 @@ Then('the price edit for {string} is locked', async function (this: PosWorld, na
 });
 
 When('I click the Edit cost button for {string}', async function (this: PosWorld, name: string) {
-  const res = await fetch(`http://localhost:3001/api/products?name=${encodeURIComponent(name)}`);
+  const res = await fetch(`${API}/api/products?name=${encodeURIComponent(name)}`);
   const product = await res.json() as { id: number };
   this.data.editProductId = product.id;
   await this.page.waitForSelector(`[data-testid="edit-cost-${product.id}"]`, { timeout: 5000 });
@@ -159,7 +161,7 @@ Then('the product {string} shows cost {float}', async function (this: PosWorld, 
     throw new Error(`Cost save showed error: ${msg}`);
   }
 
-  const apiRes = await fetch(`http://localhost:3001/api/products?name=${encodeURIComponent(name)}`);
+  const apiRes = await fetch(`${API}/api/products?name=${encodeURIComponent(name)}`);
   const apiProduct = await apiRes.json() as { cost: number };
   expect(apiProduct.cost, `API cost not updated: expected ${cost}, got ${apiProduct.cost}`).to.be.closeTo(cost, 0.01);
 
@@ -181,13 +183,13 @@ Then('the product {string} shows cost {float}', async function (this: PosWorld, 
 });
 
 Then('no ledger entry is added for the cost change', async function (this: PosWorld) {
-  const res = await fetch('http://localhost:3001/api/ledger');
+  const res = await fetch(`${API}/api/ledger`);
   const entries = await res.json() as { entry_type: string }[];
   expect(entries.some(e => e.entry_type === 'cost_change')).to.be.false;
 });
 
 Then('the cost edit for {string} is locked', async function (this: PosWorld, name: string) {
-  const res = await fetch(`http://localhost:3001/api/products?name=${encodeURIComponent(name)}`);
+  const res = await fetch(`${API}/api/products?name=${encodeURIComponent(name)}`);
   const product = await res.json() as { id: number };
   await this.page.reload();
   await this.page.waitForLoadState('networkidle');
