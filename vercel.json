@@ -1,6 +1,9 @@
 {
   "version": 2,
   "buildCommand": "pnpm --filter frontend run vercel-build",
+  "functions": {
+    "api/index.ts": {}
+  },
   "rewrites": [
     { "source": "/api/:path*", "destination": "/api/index.ts" }
   ]
