@@ -1,5 +1,6 @@
 {
   "name": "new-hermes-mercury",
+  "version": "0.1.0",
   "private": true,
   "scripts": {
     "dev": "concurrently \"pnpm --filter backend dev\" \"pnpm --filter frontend dev\"",

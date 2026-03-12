@@ -1,10 +1,11 @@
 {
   "name": "backend",
+  "version": "0.1.0",
   "private": true,
   "scripts": {
     "dev": "tsx watch src/index.ts",
     "test:server": "PORT=3002 NODE_ENV=test tsx src/index.ts",
-    "build": "tsc",
+    "build": "tsc -p tsconfig.build.json",
     "start": "node dist/index.js",
     "test": "NODE_ENV=test cucumber-js --config cucumber.js",
     "test:doc": "NODE_ENV=test tsx src/scripts/generate-bdd-doc.ts"
