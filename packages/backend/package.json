@@ -11,13 +11,11 @@
     "test:doc": "NODE_ENV=test tsx src/scripts/generate-bdd-doc.ts"
   },
   "dependencies": {
-    "better-sqlite3": "^12.6.2",
     "cors": "^2.8.5",
     "express": "^4.21.2"
   },
   "devDependencies": {
     "@cucumber/cucumber": "^12.7.0",
-    "@types/better-sqlite3": "^7.6.13",
     "@types/chai": "^5.2.3",
     "@types/cors": "^2.8.17",
     "@types/express": "^5.0.0",

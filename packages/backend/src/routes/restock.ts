@@ -10,7 +10,8 @@ router.post('/', requireOpenRegister, (req, res) => {
   const { items } = req.body as { items: { product_id: number; quantity: number }[] };
   if (!items || items.length === 0) return res.status(400).json({ error: 'items are required' });
 
-  const doRestock = db.transaction(() => {
+  try {
+    db.exec('BEGIN');
     const orderResult = db.prepare(
       "INSERT INTO restock_orders (session_id, created_at) VALUES (?, datetime('now'))"
     ).run(sessionId);
@@ -30,13 +31,10 @@ router.post('/', requireOpenRegister, (req, res) => {
       "INSERT INTO ledger_entries (entry_type, account, amount, description, ref_id, ref_type) VALUES ('restock', NULL, 0, 'Restock order', ?, 'restock')"
     ).run(restockId);
 
-    return { id: restockId, session_id: sessionId, items: resultItems };
-  });
-
-  try {
-    const result = doRestock();
-    res.status(201).json(result);
+    db.exec('COMMIT');
+    res.status(201).json({ id: restockId, session_id: sessionId, items: resultItems });
   } catch (err: unknown) {
+    db.exec('ROLLBACK');
     res.status(404).json({ error: (err as Error).message });
   }
 });

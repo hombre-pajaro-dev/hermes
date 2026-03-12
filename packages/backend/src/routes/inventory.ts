@@ -10,7 +10,8 @@ router.post('/adjust', requireOpenRegister, (req, res) => {
   const { adjustments } = req.body as { adjustments: { product_id: number; physical_count: number }[] };
   if (!adjustments || adjustments.length === 0) return res.status(400).json({ error: 'adjustments are required' });
 
-  const doAdjust = db.transaction(() => {
+  try {
+    db.exec('BEGIN');
     const results = [];
     for (const adj of adjustments) {
       const product = db.prepare('SELECT * FROM products WHERE id = ?').get(adj.product_id) as { id: number; name: string; units: number; cost: number } | undefined;
@@ -33,13 +34,10 @@ router.post('/adjust', requireOpenRegister, (req, res) => {
         new_units: adj.physical_count,
       });
     }
-    return results;
-  });
-
-  try {
-    const result = doAdjust();
-    res.status(201).json({ adjustments: result });
+    db.exec('COMMIT');
+    res.status(201).json({ adjustments: results });
   } catch (err: unknown) {
+    db.exec('ROLLBACK');
     res.status(404).json({ error: (err as Error).message });
   }
 });

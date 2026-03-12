@@ -44,7 +44,8 @@ router.post('/:id/items', (req, res) => {
   const { items } = req.body as { items: { product_id: number; quantity: number }[] };
   if (!items || items.length === 0) return res.status(400).json({ error: 'items are required' });
 
-  const addItems = db.transaction(() => {
+  try {
+    db.exec('BEGIN');
     let additionalTotal = 0;
     for (const item of items) {
       const product = db.prepare('SELECT * FROM products WHERE id = ?').get(item.product_id) as { id: number; price: number; cost: number } | undefined;
@@ -62,11 +63,9 @@ router.post('/:id/items', (req, res) => {
       }
     }
     db.prepare('UPDATE tabs SET total = total + ? WHERE id = ?').run(additionalTotal, tab.id);
-  });
-
-  try {
-    addItems();
+    db.exec('COMMIT');
   } catch (err: unknown) {
+    db.exec('ROLLBACK');
     return res.status(404).json({ error: (err as Error).message });
   }
 

@@ -3,8 +3,10 @@ import { getDb } from '../db/database';
 
 const router = Router();
 
+interface RegisterSession { id: number; status: string; opening_cash: number; closing_cash?: number; opened_at: string; closed_at?: string; }
+
 function getOpenSession() {
-  return getDb().prepare("SELECT * FROM register_sessions WHERE status = 'open' LIMIT 1").get() as Record<string, unknown> | undefined;
+  return getDb().prepare("SELECT * FROM register_sessions WHERE status = 'open' LIMIT 1").get() as RegisterSession | undefined;
 }
 
 router.get('/session', (_req, res) => {

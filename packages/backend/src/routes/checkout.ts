@@ -22,7 +22,9 @@ router.post('/orders', requireOpenRegister, (req, res) => {
     }
   }
 
-  const createOrder = db.transaction(() => {
+  db.exec('BEGIN');
+  let order;
+  try {
     const orderResult = db.prepare(
       "INSERT INTO orders (session_id, status, created_at) VALUES (?, 'pending', datetime('now'))"
     ).run(sessionId);
@@ -43,11 +45,13 @@ router.post('/orders', requireOpenRegister, (req, res) => {
     }
 
     db.prepare('UPDATE orders SET total = ? WHERE id = ?').run(total, orderId);
-    const order = db.prepare('SELECT * FROM orders WHERE id = ?').get(orderId) as Record<string, unknown>;
-    return { ...order, items: insertedItems };
-  });
-
-  const order = createOrder();
+    const orderRow = db.prepare('SELECT * FROM orders WHERE id = ?').get(orderId) as Record<string, unknown>;
+    order = { ...orderRow, items: insertedItems };
+    db.exec('COMMIT');
+  } catch (e) {
+    db.exec('ROLLBACK');
+    throw e;
+  }
   res.status(201).json(order);
 });
 
