@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
-    "vercel-build": "tsc -b && vite build --outDir ../../dist --emptyOutDir",
+    "vercel-build": "tsc -b && vite build",
     "lint": "eslint .",
     "preview": "vite preview",
     "test": "concurrently --kill-others --success first -n be,fe,cu \"pnpm -C ../backend test:server\" \"VITE_API_PORT=3002 vite --port 5174 --strictPort\" \"wait-on http://localhost:3002/api/health http://localhost:5174 && TEST_API_URL=http://localhost:3002 TEST_BASE_URL=http://localhost:5174 NODE_ENV=test cucumber-js --config cucumber.cjs\"",
