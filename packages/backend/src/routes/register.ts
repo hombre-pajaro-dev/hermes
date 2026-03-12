@@ -3,86 +3,87 @@ import { getDb } from '../db/database';
 
 const router = Router();
 
-interface RegisterSession { id: number; status: string; opening_cash: number; closing_cash?: number; opened_at: string; closed_at?: string; }
-
-function getOpenSession() {
-  return getDb().prepare("SELECT * FROM register_sessions WHERE status = 'open' LIMIT 1").get() as RegisterSession | undefined;
+async function getOpenSession() {
+  const db = await getDb();
+  const { rows } = await db.query("SELECT * FROM register_sessions WHERE status = 'open' LIMIT 1");
+  return rows[0] as { id: number; status: string; opening_cash: number; closing_cash?: number; opened_at: string; closed_at?: string } | undefined;
 }
 
-router.get('/session', (_req, res) => {
-  const session = getOpenSession();
+router.get('/session', async (_req, res) => {
+  const session = await getOpenSession();
   res.json(session ?? null);
 });
 
-router.post('/open', (req, res) => {
-  const db = getDb();
-  const existing = getOpenSession();
-  if (existing) {
-    return res.status(409).json({ error: 'Register is already open' });
-  }
+router.post('/open', async (req, res) => {
+  const existing = await getOpenSession();
+  if (existing) return res.status(409).json({ error: 'Register is already open' });
   const { opening_cash } = req.body;
-  if (opening_cash == null) {
-    return res.status(400).json({ error: 'opening_cash is required' });
-  }
-  const result = db.prepare(
-    "INSERT INTO register_sessions (opening_cash, status, opened_at) VALUES (?, 'open', datetime('now'))"
-  ).run(opening_cash);
-  const sessionId = result.lastInsertRowid as number;
-  db.prepare(
-    "INSERT INTO ledger_entries (entry_type, account, amount, description, ref_id, ref_type) VALUES ('register_open', 'cash', ?, 'Register opened', ?, 'session')"
-  ).run(opening_cash, sessionId);
-  const session = db.prepare('SELECT * FROM register_sessions WHERE id = ?').get(sessionId);
+  if (opening_cash == null) return res.status(400).json({ error: 'opening_cash is required' });
+  const db = await getDb();
+  const { rows } = await db.query(
+    "INSERT INTO register_sessions (opening_cash, status, opened_at) VALUES ($1, 'open', NOW()) RETURNING *",
+    [opening_cash]
+  );
+  const session = rows[0];
+  await db.query(
+    "INSERT INTO ledger_entries (entry_type, account, amount, description, ref_id, ref_type) VALUES ('register_open', 'cash', $1, 'Register opened', $2, 'session')",
+    [opening_cash, session.id]
+  );
   res.status(201).json(session);
 });
 
-router.post('/cashout', (req, res) => {
-  const db = getDb();
-  const session = getOpenSession();
+router.post('/cashout', async (req, res) => {
+  const session = await getOpenSession();
   if (!session) return res.status(403).json({ error: 'Register is not open' });
   const { amount, reason = '' } = req.body;
   if (amount == null) return res.status(400).json({ error: 'amount is required' });
-  const result = db.prepare(
-    "INSERT INTO cashouts (session_id, amount, reason, created_at) VALUES (?, ?, ?, datetime('now'))"
-  ).run(session.id, amount, reason);
-  const cashoutId = result.lastInsertRowid as number;
-  db.prepare(
-    "INSERT INTO ledger_entries (entry_type, account, amount, description, ref_id, ref_type) VALUES ('cashout', 'cash', ?, ?, ?, 'cashout')"
-  ).run(-amount, `Cashout: ${reason}`, cashoutId);
-  const cashout = db.prepare('SELECT * FROM cashouts WHERE id = ?').get(cashoutId);
+  const db = await getDb();
+  const { rows } = await db.query(
+    "INSERT INTO cashouts (session_id, amount, reason, created_at) VALUES ($1, $2, $3, NOW()) RETURNING *",
+    [session.id, amount, reason]
+  );
+  const cashout = rows[0];
+  await db.query(
+    "INSERT INTO ledger_entries (entry_type, account, amount, description, ref_id, ref_type) VALUES ('cashout', 'cash', $1, $2, $3, 'cashout')",
+    [-amount, `Cashout: ${reason}`, cashout.id]
+  );
   res.status(201).json(cashout);
 });
 
-router.post('/close', (req, res) => {
-  const db = getDb();
-  const session = getOpenSession();
+router.post('/close', async (req, res) => {
+  const session = await getOpenSession();
   if (!session) return res.status(403).json({ error: 'Register is not open' });
   const { closing_cash } = req.body;
   if (closing_cash == null) return res.status(400).json({ error: 'closing_cash is required' });
-  const openTabs = db.prepare("SELECT COUNT(*) as count FROM tabs WHERE session_id = ? AND status = 'open'").get(session.id) as { count: number };
-  if (openTabs.count > 0) {
-    return res.status(409).json({ error: 'Cannot close register while there are open tabs (long-lasting orders)' });
-  }
-  db.prepare(
-    "UPDATE register_sessions SET status = 'closed', closing_cash = ?, closed_at = datetime('now') WHERE id = ?"
-  ).run(closing_cash, session.id);
-  db.prepare(
-    "INSERT INTO ledger_entries (entry_type, account, amount, description, ref_id, ref_type) VALUES ('register_close', 'cash', ?, 'Register closed', ?, 'session')"
-  ).run(-closing_cash, session.id);
-  const updated = db.prepare('SELECT * FROM register_sessions WHERE id = ?').get(session.id);
-  res.json(updated);
+  const db = await getDb();
+  const { rows: openTabs } = await db.query(
+    "SELECT COUNT(*)::int as count FROM tabs WHERE session_id = $1 AND status = 'open'",
+    [session.id]
+  );
+  if (openTabs[0].count > 0) return res.status(409).json({ error: 'Cannot close register while there are open tabs (long-lasting orders)' });
+  await db.query(
+    "UPDATE register_sessions SET status = 'closed', closing_cash = $1, closed_at = NOW() WHERE id = $2",
+    [closing_cash, session.id]
+  );
+  await db.query(
+    "INSERT INTO ledger_entries (entry_type, account, amount, description, ref_id, ref_type) VALUES ('register_close', 'cash', $1, 'Register closed', $2, 'session')",
+    [-closing_cash, session.id]
+  );
+  const { rows } = await db.query('SELECT * FROM register_sessions WHERE id = $1', [session.id]);
+  res.json(rows[0]);
 });
 
-router.get('/close-brief', (req, res) => {
-  const db = getDb();
+router.get('/close-brief', async (req, res) => {
+  const db = await getDb();
   let sessionId: number;
   if (req.query.session_id) {
     sessionId = Number(req.query.session_id);
   } else {
-    const s = db.prepare("SELECT id FROM register_sessions ORDER BY id DESC LIMIT 1").get() as { id: number } | undefined;
-    if (!s) return res.status(404).json({ error: 'No session found' });
-    sessionId = s.id;
+    const { rows } = await db.query("SELECT id FROM register_sessions ORDER BY id DESC LIMIT 1");
+    if (!rows[0]) return res.status(404).json({ error: 'No session found' });
+    sessionId = rows[0].id;
   }
-  const byItem = db.prepare(`
+  const { rows: byItem } = await db.query<{ product_id: number; name: string; units_sold: number; revenue: number; cost: number; profit: number }>(`
     SELECT p.id as product_id, p.name,
            SUM(oi.quantity) as units_sold,
            SUM(oi.subtotal) as revenue,
@@ -91,8 +92,8 @@ router.get('/close-brief', (req, res) => {
     FROM order_items oi
     JOIN orders o ON o.id = oi.order_id
     JOIN products p ON p.id = oi.product_id
-    WHERE o.session_id = ? AND o.status = 'paid'
-    GROUP BY p.id
+    WHERE o.session_id = $1 AND o.status = 'paid'
+    GROUP BY p.id, p.name
     UNION ALL
     SELECT p.id, p.name,
            SUM(ti.quantity),
@@ -102,21 +103,20 @@ router.get('/close-brief', (req, res) => {
     FROM tab_items ti
     JOIN tabs t ON t.id = ti.tab_id
     JOIN products p ON p.id = ti.product_id
-    WHERE t.session_id = ? AND t.status = 'paid'
-    GROUP BY p.id
-  `).all(sessionId, sessionId) as { product_id: number; name: string; units_sold: number; revenue: number; cost: number; profit: number }[];
+    WHERE t.session_id = $1 AND t.status = 'paid'
+    GROUP BY p.id, p.name
+  `, [sessionId]);
 
-  // Merge by product_id
   const merged = new Map<number, typeof byItem[0]>();
   for (const row of byItem) {
     const existing = merged.get(row.product_id);
     if (existing) {
-      existing.units_sold += row.units_sold;
-      existing.revenue += row.revenue;
-      existing.cost += row.cost;
-      existing.profit += row.profit;
+      existing.units_sold = Number(existing.units_sold) + Number(row.units_sold);
+      existing.revenue = Number(existing.revenue) + Number(row.revenue);
+      existing.cost = Number(existing.cost) + Number(row.cost);
+      existing.profit = Number(existing.profit) + Number(row.profit);
     } else {
-      merged.set(row.product_id, { ...row });
+      merged.set(row.product_id, { ...row, units_sold: Number(row.units_sold), revenue: Number(row.revenue), cost: Number(row.cost), profit: Number(row.profit) });
     }
   }
   const items = Array.from(merged.values());
@@ -124,7 +124,6 @@ router.get('/close-brief', (req, res) => {
   const totalCost = items.reduce((s, i) => s + i.cost, 0);
   const mostSold = items.sort((a, b) => b.units_sold - a.units_sold)[0] ?? null;
   const mostProfitable = [...items].sort((a, b) => b.profit - a.profit)[0] ?? null;
-
   res.json({
     session_id: sessionId,
     revenue,

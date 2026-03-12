@@ -1,135 +1,139 @@
-import { DatabaseSync } from 'node:sqlite';
+import { Pool } from 'pg';
 
-export function applySchema(db: DatabaseSync): void {
-  db.exec('PRAGMA journal_mode = WAL');
-  db.exec('PRAGMA foreign_keys = ON');
-
-  db.exec(`
+export async function applySchema(db: Pool): Promise<void> {
+  await db.query(`
     CREATE TABLE IF NOT EXISTS products (
-      id          INTEGER PRIMARY KEY AUTOINCREMENT,
-      name        TEXT    NOT NULL UNIQUE,
-      description TEXT    NOT NULL DEFAULT '',
-      cost        REAL    NOT NULL,
-      price       REAL    NOT NULL,
-      units       REAL    NOT NULL DEFAULT 0
-    );
-
+      id          SERIAL PRIMARY KEY,
+      name        TEXT   NOT NULL UNIQUE,
+      description TEXT   NOT NULL DEFAULT '',
+      cost        DOUBLE PRECISION NOT NULL,
+      price       DOUBLE PRECISION NOT NULL,
+      units       DOUBLE PRECISION NOT NULL DEFAULT 0
+    )
+  `);
+  await db.query(`
     CREATE TABLE IF NOT EXISTS register_sessions (
-      id            INTEGER PRIMARY KEY AUTOINCREMENT,
-      opened_at     TEXT    NOT NULL DEFAULT (datetime('now')),
-      closed_at     TEXT,
-      opening_cash  REAL    NOT NULL DEFAULT 0,
-      closing_cash  REAL,
-      status        TEXT    NOT NULL DEFAULT 'open'
-    );
-
+      id            SERIAL PRIMARY KEY,
+      opened_at     TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      closed_at     TIMESTAMPTZ,
+      opening_cash  DOUBLE PRECISION NOT NULL DEFAULT 0,
+      closing_cash  DOUBLE PRECISION,
+      status        TEXT NOT NULL DEFAULT 'open'
+    )
+  `);
+  await db.query(`
     CREATE TABLE IF NOT EXISTS orders (
-      id              INTEGER PRIMARY KEY AUTOINCREMENT,
+      id              SERIAL PRIMARY KEY,
       session_id      INTEGER NOT NULL REFERENCES register_sessions(id),
-      status          TEXT    NOT NULL DEFAULT 'pending',
+      status          TEXT NOT NULL DEFAULT 'pending',
       payment_method  TEXT,
-      total           REAL    NOT NULL DEFAULT 0,
-      amount_received REAL,
-      change_due      REAL,
-      created_at      TEXT    NOT NULL DEFAULT (datetime('now')),
-      paid_at         TEXT
-    );
-
+      total           DOUBLE PRECISION NOT NULL DEFAULT 0,
+      amount_received DOUBLE PRECISION,
+      change_due      DOUBLE PRECISION,
+      created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      paid_at         TIMESTAMPTZ
+    )
+  `);
+  await db.query(`
     CREATE TABLE IF NOT EXISTS order_items (
-      id          INTEGER PRIMARY KEY AUTOINCREMENT,
+      id          SERIAL PRIMARY KEY,
       order_id    INTEGER NOT NULL REFERENCES orders(id),
       product_id  INTEGER NOT NULL REFERENCES products(id),
-      quantity    REAL    NOT NULL,
-      unit_price  REAL    NOT NULL,
-      unit_cost   REAL    NOT NULL,
-      subtotal    REAL    NOT NULL
-    );
-
+      quantity    DOUBLE PRECISION NOT NULL,
+      unit_price  DOUBLE PRECISION NOT NULL,
+      unit_cost   DOUBLE PRECISION NOT NULL,
+      subtotal    DOUBLE PRECISION NOT NULL
+    )
+  `);
+  await db.query(`
     CREATE TABLE IF NOT EXISTS tabs (
-      id             INTEGER PRIMARY KEY AUTOINCREMENT,
+      id             SERIAL PRIMARY KEY,
       session_id     INTEGER NOT NULL REFERENCES register_sessions(id),
-      name           TEXT    NOT NULL DEFAULT '',
-      status         TEXT    NOT NULL DEFAULT 'open',
+      name           TEXT NOT NULL DEFAULT '',
+      status         TEXT NOT NULL DEFAULT 'open',
       at_cost        INTEGER NOT NULL DEFAULT 0,
-      total          REAL    NOT NULL DEFAULT 0,
+      total          DOUBLE PRECISION NOT NULL DEFAULT 0,
       payment_method TEXT,
-      created_at     TEXT    NOT NULL DEFAULT (datetime('now')),
-      paid_at        TEXT
-    );
-
+      created_at     TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      paid_at        TIMESTAMPTZ
+    )
+  `);
+  await db.query(`
     CREATE TABLE IF NOT EXISTS tab_items (
-      id          INTEGER PRIMARY KEY AUTOINCREMENT,
+      id          SERIAL PRIMARY KEY,
       tab_id      INTEGER NOT NULL REFERENCES tabs(id),
       product_id  INTEGER NOT NULL REFERENCES products(id),
-      quantity    REAL    NOT NULL,
-      unit_price  REAL    NOT NULL,
-      unit_cost   REAL    NOT NULL,
-      subtotal    REAL    NOT NULL
-    );
-
+      quantity    DOUBLE PRECISION NOT NULL,
+      unit_price  DOUBLE PRECISION NOT NULL,
+      unit_cost   DOUBLE PRECISION NOT NULL,
+      subtotal    DOUBLE PRECISION NOT NULL
+    )
+  `);
+  await db.query(`
     CREATE TABLE IF NOT EXISTS cashouts (
-      id          INTEGER PRIMARY KEY AUTOINCREMENT,
+      id          SERIAL PRIMARY KEY,
       session_id  INTEGER NOT NULL REFERENCES register_sessions(id),
-      amount      REAL    NOT NULL,
-      reason      TEXT    NOT NULL DEFAULT '',
-      created_at  TEXT    NOT NULL DEFAULT (datetime('now'))
-    );
-
+      amount      DOUBLE PRECISION NOT NULL,
+      reason      TEXT NOT NULL DEFAULT '',
+      created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    )
+  `);
+  await db.query(`
     CREATE TABLE IF NOT EXISTS restock_orders (
-      id          INTEGER PRIMARY KEY AUTOINCREMENT,
+      id          SERIAL PRIMARY KEY,
       session_id  INTEGER NOT NULL REFERENCES register_sessions(id),
-      created_at  TEXT    NOT NULL DEFAULT (datetime('now'))
-    );
-
+      created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    )
+  `);
+  await db.query(`
     CREATE TABLE IF NOT EXISTS restock_items (
-      id               INTEGER PRIMARY KEY AUTOINCREMENT,
+      id               SERIAL PRIMARY KEY,
       restock_order_id INTEGER NOT NULL REFERENCES restock_orders(id),
       product_id       INTEGER NOT NULL REFERENCES products(id),
-      quantity         REAL    NOT NULL,
-      unit_cost        REAL    NOT NULL
-    );
-
+      quantity         DOUBLE PRECISION NOT NULL,
+      unit_cost        DOUBLE PRECISION NOT NULL
+    )
+  `);
+  await db.query(`
     CREATE TABLE IF NOT EXISTS inventory_adjustments (
-      id             INTEGER PRIMARY KEY AUTOINCREMENT,
+      id             SERIAL PRIMARY KEY,
       session_id     INTEGER NOT NULL REFERENCES register_sessions(id),
       product_id     INTEGER NOT NULL REFERENCES products(id),
-      previous_units REAL    NOT NULL,
-      physical_count REAL    NOT NULL,
-      delta          REAL    NOT NULL,
-      created_at     TEXT    NOT NULL DEFAULT (datetime('now'))
-    );
-
+      previous_units DOUBLE PRECISION NOT NULL,
+      physical_count DOUBLE PRECISION NOT NULL,
+      delta          DOUBLE PRECISION NOT NULL,
+      created_at     TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    )
+  `);
+  await db.query(`
     CREATE TABLE IF NOT EXISTS ledger_entries (
-      id          INTEGER PRIMARY KEY AUTOINCREMENT,
-      entry_type  TEXT    NOT NULL,
+      id          SERIAL PRIMARY KEY,
+      entry_type  TEXT NOT NULL,
       account     TEXT,
-      amount      REAL    NOT NULL DEFAULT 0,
-      description TEXT    NOT NULL DEFAULT '',
+      amount      DOUBLE PRECISION NOT NULL DEFAULT 0,
+      description TEXT NOT NULL DEFAULT '',
       ref_id      INTEGER,
       ref_type    TEXT,
-      created_at  TEXT    NOT NULL DEFAULT (datetime('now'))
-    );
-
+      created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    )
+  `);
+  await db.query(`
     CREATE TABLE IF NOT EXISTS accounts (
-      id    INTEGER PRIMARY KEY AUTOINCREMENT,
+      id    SERIAL PRIMARY KEY,
       name  TEXT NOT NULL UNIQUE,
       label TEXT NOT NULL
-    );
-
-    INSERT OR IGNORE INTO accounts (name, label) VALUES ('cash', 'Cash Drawer');
-    INSERT OR IGNORE INTO accounts (name, label) VALUES ('credit_card', 'Credit Card');
-    INSERT OR IGNORE INTO accounts (name, label) VALUES ('payroll', 'Payroll');
-
+    )
+  `);
+  await db.query(`
+    INSERT INTO accounts (name, label) VALUES
+    ('cash', 'Cash Drawer'), ('credit_card', 'Credit Card'), ('payroll', 'Payroll')
+    ON CONFLICT DO NOTHING
+  `);
+  await db.query(`
     CREATE TABLE IF NOT EXISTS settings (
       key   TEXT PRIMARY KEY,
       value TEXT NOT NULL
-    );
-
-    INSERT OR IGNORE INTO settings (key, value) VALUES ('pin', '1234');
+    )
   `);
-
-  // Migrations for existing databases
-  try { db.exec(`ALTER TABLE tabs ADD COLUMN at_cost INTEGER NOT NULL DEFAULT 0`); } catch { /* column already exists */ }
-  try { db.exec(`CREATE TABLE IF NOT EXISTS settings (key TEXT PRIMARY KEY, value TEXT NOT NULL)`); } catch { /* ignore */ }
-  try { db.exec(`INSERT OR IGNORE INTO settings (key, value) VALUES ('pin', '1234')`); } catch { /* ignore */ }
+  await db.query(`INSERT INTO settings (key, value) VALUES ('pin', '1234') ON CONFLICT DO NOTHING`);
 }

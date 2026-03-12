@@ -17,8 +17,8 @@ export function createApp() {
   app.use(express.json());
 
   if (process.env.NODE_ENV === 'test') {
-    app.post('/api/test/reset', (_req, res) => {
-      resetDb();
+    app.post('/api/test/reset', async (_req, res) => {
+      await resetDb();
       res.json({ ok: true });
     });
   }
