@@ -76,6 +76,47 @@ router.post('/:id/items', async (req, res) => {
   res.json({ ...updatedTab, item_count: itemCount, items: tabItems });
 });
 
+router.patch('/:id/items/:itemId', async (req, res) => {
+  const db = await getDb();
+  const { rows } = await db.query('SELECT * FROM tabs WHERE id = $1', [req.params.id]);
+  const tab = rows[0] as { id: number; status: string; total: number } | undefined;
+  if (!tab) return res.status(404).json({ error: 'Tab not found' });
+  if (tab.status !== 'open') return res.status(409).json({ error: 'Tab is not open' });
+
+  const { rows: itemRows } = await db.query('SELECT * FROM tab_items WHERE id = $1 AND tab_id = $2', [req.params.itemId, req.params.id]);
+  const item = itemRows[0] as { id: number; quantity: number; unit_price: number; subtotal: number } | undefined;
+  if (!item) return res.status(404).json({ error: 'Item not found' });
+
+  const { quantity } = req.body as { quantity: number };
+  if (quantity == null || isNaN(Number(quantity)) || Number(quantity) < 0) {
+    return res.status(400).json({ error: 'quantity must be >= 0' });
+  }
+
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    const oldSubtotal = Number(item.subtotal);
+    const newSubtotal = Number(quantity) === 0 ? 0 : Number(item.unit_price) * Number(quantity);
+    if (Number(quantity) === 0) {
+      await client.query('DELETE FROM tab_items WHERE id = $1', [item.id]);
+    } else {
+      await client.query('UPDATE tab_items SET quantity = $1, subtotal = $2 WHERE id = $3', [Number(quantity), newSubtotal, item.id]);
+    }
+    await client.query('UPDATE tabs SET total = GREATEST(0, total - $1 + $2) WHERE id = $3', [oldSubtotal, newSubtotal, tab.id]);
+    await client.query('COMMIT');
+  } catch (err: unknown) {
+    await client.query('ROLLBACK');
+    return res.status(500).json({ error: (err as Error).message });
+  } finally {
+    client.release();
+  }
+
+  const { rows: [updatedTab] } = await db.query('SELECT * FROM tabs WHERE id = $1', [tab.id]);
+  const { rows: tabItems } = await db.query('SELECT * FROM tab_items WHERE tab_id = $1', [tab.id]);
+  const itemCount = tabItems.reduce((sum: number, ti: { quantity: number }) => sum + Number(ti.quantity), 0);
+  res.json({ ...updatedTab, item_count: itemCount, items: tabItems });
+});
+
 router.post('/:id/pay', async (req, res) => {
   const db = await getDb();
   const { rows } = await db.query('SELECT * FROM tabs WHERE id = $1', [req.params.id]);

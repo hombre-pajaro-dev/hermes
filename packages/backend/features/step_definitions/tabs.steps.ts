@@ -22,6 +22,16 @@ When('I add items to the tab', async function (this: PosWorld, table: DataTable)
   this.response = await this.agent.post(`/api/tabs/${tabId}/items`).send({ items });
 });
 
+When('I update the tab item {string} to quantity {int}', async function (this: PosWorld, productName: string, quantity: number) {
+  const tabId = this.context.tabId as number;
+  const tabRes = await this.agent.get(`/api/tabs/${tabId}`);
+  const tab = tabRes.body as { items: { id: number; product_id: number }[] };
+  const product = await getProductByName(this.agent, productName);
+  const item = tab.items.find((i: { id: number; product_id: number }) => i.product_id === product.id);
+  if (!item) throw new Error(`Item for product ${productName} not found on tab`);
+  this.response = await this.agent.patch(`/api/tabs/${tabId}/items/${item.id}`).send({ quantity });
+});
+
 When('I request the tabs summary', async function (this: PosWorld) {
   this.response = await this.agent.get('/api/tabs/summary');
 });

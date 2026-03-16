@@ -21,3 +21,17 @@ Feature: Tabs (Long-lasting orders)
     When I view the tab "Table 3"
     And I pay the tab with card
     Then the tab is marked as paid
+
+  Scenario: Increase item quantity from the On the Tab section
+    Given there is an open tab via the API named "Table 5"
+    And I am on the Tabs page
+    When I view the tab "Table 5"
+    And I increase the quantity of "Espresso" on the tab
+    Then the tab total is greater than 0
+
+  Scenario: Remove an item by decreasing quantity to zero
+    Given there is an open tab via the API named "Table 6"
+    And I am on the Tabs page
+    When I view the tab "Table 6"
+    And I decrease the quantity of "Espresso" on the tab to zero
+    Then the tab items section is empty

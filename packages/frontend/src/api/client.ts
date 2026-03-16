@@ -41,6 +41,8 @@ export const api = {
   openTab: (name: string, at_cost?: boolean) => req<Tab>('/tabs', { method: 'POST', body: JSON.stringify({ name, at_cost }) }),
   getTab: (id: number) => req<Tab & { items: TabItem[] }>(`/tabs/${id}`),
   addTabItems: (id: number, items: OrderItem[]) => req<Tab & { items: TabItem[] }>(`/tabs/${id}/items`, { method: 'POST', body: JSON.stringify({ items }) }),
+  updateTabItem: (tabId: number, itemId: number, quantity: number) =>
+    req<Tab & { items: TabItem[] }>(`/tabs/${tabId}/items/${itemId}`, { method: 'PATCH', body: JSON.stringify({ quantity }) }),
   payTab: (id: number, payment_method: string, amount_received?: number) =>
     req<Tab>(`/tabs/${id}/pay`, { method: 'POST', body: JSON.stringify({ payment_method, amount_received }) }),
 

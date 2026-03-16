@@ -32,6 +32,8 @@ This document lists all **features** and **scenarios** covered by the BDD test s
 | 6 | Open multiple tabs simultaneously | Multiple tabs can be open at the same time; each is managed independently. |
 | 7 | Create an at-cost (staff) tab | Create tab with `at_cost: true`; items added are priced at `product.cost` instead of `product.price`; `at_cost` flag cannot be changed after creation. |
 | 8 | Closed tabs are paginated | Closed tabs list returns 10 per page; `paid_at` timestamp and payment method shown per entry. |
+| 9 | Update item quantity on a tab | Change quantity of an existing tab item via `PATCH /api/tabs/:id/items/:itemId`; tab total recalculates correctly. |
+| 10 | Remove an item by setting quantity to zero | Set item quantity to 0; item is deleted; tab total reflects the removal. |
 
 ---
 
@@ -141,10 +143,10 @@ This document lists all **features** and **scenarios** covered by the BDD test s
   Uses `NODE_ENV=test` and an in-memory SQLite database.
 
 - **Run backend tests only:**
-  `cd packages/backend && pnpm test` — 40 scenarios, 197 steps
+  `cd packages/backend && pnpm test` — 42 scenarios, 207 steps
 
 - **Run frontend tests only:**
-  `cd packages/frontend && pnpm test` — 36 scenarios, 194 steps
+  `cd packages/frontend && pnpm test` — 38 scenarios, 204 steps
   Requires both backend (`:3001`) and frontend (`:5173`) servers running.
 
 - **HTML report:**

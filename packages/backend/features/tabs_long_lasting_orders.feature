@@ -41,6 +41,25 @@ Feature: Tabs (Long-lasting orders)
     Then the tab status is "paid"
     And the tab payment method is "credit_card"
 
+  Scenario: Update item quantity on a tab
+    When I open a new tab named "Table 5"
+    And I add items to the tab
+      | product_name | quantity |
+      | Espresso     | 2        |
+    And I update the tab item "Espresso" to quantity 3
+    Then the tab total is 9.00
+    And the tab item count is 3
+
+  Scenario: Remove an item by setting quantity to zero
+    When I open a new tab named "Table 6"
+    And I add items to the tab
+      | product_name | quantity |
+      | Espresso     | 1        |
+      | Latte        | 1        |
+    And I update the tab item "Espresso" to quantity 0
+    Then the tab total is 5.00
+    And the tab item count is 1
+
   Scenario: Cannot close register while tabs are open
     When I open a new tab named "Table 9"
     And I add items to the tab

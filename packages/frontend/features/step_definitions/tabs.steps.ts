@@ -74,6 +74,26 @@ Then('the open tab count is at least {int}', async function (this: PosWorld, min
   expect(Number(text)).to.be.at.least(min);
 });
 
+When('I increase the quantity of {string} on the tab', async function (this: PosWorld, name: string) {
+  const slug = name.toLowerCase().replace(/\s+/g, '-');
+  await this.page.waitForSelector(`[data-testid="tab-item-increase-${slug}"]`, { timeout: 10000 });
+  await this.page.click(`[data-testid="tab-item-increase-${slug}"]`);
+  await this.page.waitForLoadState('networkidle');
+});
+
+When('I decrease the quantity of {string} on the tab to zero', async function (this: PosWorld, name: string) {
+  const slug = name.toLowerCase().replace(/\s+/g, '-');
+  await this.page.waitForSelector(`[data-testid="tab-item-decrease-${slug}"]`, { timeout: 10000 });
+  await this.page.click(`[data-testid="tab-item-decrease-${slug}"]`);
+  await this.page.waitForLoadState('networkidle');
+});
+
+Then('the tab items section is empty', async function (this: PosWorld) {
+  await this.page.waitForSelector('[data-testid="tab-items"]', { state: 'hidden', timeout: 8000 }).catch(() => {});
+  const visible = await this.page.locator('[data-testid="tab-items"]').isVisible().catch(() => false);
+  expect(visible).to.equal(false);
+});
+
 Then('the tab is marked as paid', async function (this: PosWorld) {
   await this.page.waitForSelector('[data-testid="success-banner"]', { timeout: 5000 });
 });

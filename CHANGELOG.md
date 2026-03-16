@@ -8,6 +8,23 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+### Tabs
+
+#### "On the Tab" section repositioned to top
+- The items already on the tab are now shown at the **top** of the tab detail view, immediately visible without scrolling
+- "Add Items" product picker moves below; payment section remains at the bottom
+
+#### Inline quantity editing on tab items
+- Each item in the "On the Tab" section now has **−** and **+** buttons to adjust quantity directly
+- Tapping **+** increments the quantity by 1; tapping **−** decrements it
+- Setting an item's quantity to 0 removes it from the tab entirely
+- Tab total updates in real time after each adjustment
+- Backend: new `PATCH /api/tabs/:id/items/:itemId` endpoint — accepts `{ quantity }`, recomputes subtotal and tab total atomically; returns updated tab with items
+- BDD scenarios: 2 new backend scenarios (update quantity, remove by setting to zero) and 2 new frontend scenarios (increase quantity, decrease to zero)
+
+---
+
+
 ### Admin — PIN Security
 
 #### PIN-protected operations

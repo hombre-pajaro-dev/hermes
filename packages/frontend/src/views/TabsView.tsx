@@ -62,6 +62,16 @@ export default function TabsView() {
     } catch (e: unknown) { setError((e as Error).message); }
   }
 
+  async function handleUpdateItemQuantity(itemId: number, quantity: number) {
+    if (!selectedTab) return;
+    setError('');
+    try {
+      const updated = await api.updateTabItem(selectedTab.id, itemId, quantity);
+      setSelectedTab(updated);
+      loadTabs();
+    } catch (e: unknown) { setError((e as Error).message); }
+  }
+
   async function handlePayTab() {
     if (!selectedTab) return;
     setError('');
@@ -222,6 +232,38 @@ export default function TabsView() {
 
           {selectedTab.status === 'open' && (
             <>
+              {selectedTab.items && selectedTab.items.length > 0 && (
+                <div className="card" data-testid="tab-items">
+                  <div className="card__title">On the Tab</div>
+                  {selectedTab.items.map(item => {
+                    const product = products.find(p => p.id === item.product_id);
+                    const slug = product?.name.toLowerCase().replace(/\s+/g, '-') ?? String(item.id);
+                    return (
+                      <div className="list-item" key={item.id}>
+                        <div className="list-item__main">
+                          <div className="list-item__name">{product?.name ?? `Product #${item.product_id}`}</div>
+                          <div className="list-item__sub">@ ${item.unit_price.toFixed(2)} each</div>
+                        </div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                          <button
+                            data-testid={`tab-item-decrease-${slug}`}
+                            className="btn btn--sm btn--ghost"
+                            onClick={() => handleUpdateItemQuantity(item.id, item.quantity - 1)}
+                          >−</button>
+                          <span data-testid={`tab-item-qty-${slug}`} style={{ fontWeight: 600, minWidth: 24, textAlign: 'center' }}>{item.quantity}</span>
+                          <button
+                            data-testid={`tab-item-increase-${slug}`}
+                            className="btn btn--sm btn--ghost"
+                            onClick={() => handleUpdateItemQuantity(item.id, item.quantity + 1)}
+                          >+</button>
+                          <span style={{ fontWeight: 600, minWidth: 50, textAlign: 'right' }}>${item.subtotal.toFixed(2)}</span>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+
               <div className="card">
                 <div className="card__title">Add Items</div>
                 {products.map(p => (
@@ -238,24 +280,6 @@ export default function TabsView() {
                   </div>
                 ))}
               </div>
-
-              {selectedTab.items && selectedTab.items.length > 0 && (
-                <div className="card" data-testid="tab-items">
-                  <div className="card__title">On the Tab</div>
-                  {selectedTab.items.map(item => {
-                    const product = products.find(p => p.id === item.product_id);
-                    return (
-                      <div className="list-item" key={item.id}>
-                        <div className="list-item__main">
-                          <div className="list-item__name">{product?.name ?? `Product #${item.product_id}`}</div>
-                          <div className="list-item__sub">× {item.quantity} @ ${item.unit_price.toFixed(2)}</div>
-                        </div>
-                        <div className="list-item__right" style={{ fontWeight: 600 }}>${item.subtotal.toFixed(2)}</div>
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
 
               <div className="card">
                 <div className="card__title">Pay Tab</div>
