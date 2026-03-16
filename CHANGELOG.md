@@ -10,9 +10,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ### Tabs
 
-#### "On the Tab" section repositioned to top
-- The items already on the tab are now shown at the **top** of the tab detail view, immediately visible without scrolling
-- "Add Items" product picker moves below; payment section remains at the bottom
+#### Tab detail view section order
+- **Pay Tab** is now at the top of the tab detail view for quick access
+- **On the Tab** (items list with quantity controls) appears directly below Pay Tab
+- **Add Items** product picker is at the bottom
 
 #### Inline quantity editing on tab items
 - Each item in the "On the Tab" section now has **−** and **+** buttons to adjust quantity directly

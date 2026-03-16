@@ -232,6 +232,25 @@ export default function TabsView() {
 
           {selectedTab.status === 'open' && (
             <>
+              <div className="card">
+                <div className="card__title">Pay Tab</div>
+                <div className="tabs-nav">
+                  <button className={`tabs-nav__item${payMethod === 'card' ? ' active' : ''}`} onClick={() => setPayMethod('card')}>Card</button>
+                  <button className={`tabs-nav__item${payMethod === 'cash' ? ' active' : ''}`} onClick={() => setPayMethod('cash')}>Cash</button>
+                </div>
+                {payMethod === 'cash' && (
+                  <div className="field">
+                    <label className="label">Amount Received ($)</label>
+                    <input data-testid="tab-cash-input" className="input" type="number" min="0" step="0.01"
+                      value={cashReceived} onChange={e => setCashReceived(e.target.value)} />
+                  </div>
+                )}
+                <button data-testid="pay-tab-btn" className="btn btn--success"
+                  onClick={handlePayTab} disabled={payMethod === 'cash' && !cashReceived}>
+                  Pay Tab (${selectedTab.total.toFixed(2)})
+                </button>
+              </div>
+
               {selectedTab.items && selectedTab.items.length > 0 && (
                 <div className="card" data-testid="tab-items">
                   <div className="card__title">On the Tab</div>
@@ -279,25 +298,6 @@ export default function TabsView() {
                       className="btn btn--sm btn--primary" onClick={() => handleAddProduct(p)}>+</button>
                   </div>
                 ))}
-              </div>
-
-              <div className="card">
-                <div className="card__title">Pay Tab</div>
-                <div className="tabs-nav">
-                  <button className={`tabs-nav__item${payMethod === 'card' ? ' active' : ''}`} onClick={() => setPayMethod('card')}>Card</button>
-                  <button className={`tabs-nav__item${payMethod === 'cash' ? ' active' : ''}`} onClick={() => setPayMethod('cash')}>Cash</button>
-                </div>
-                {payMethod === 'cash' && (
-                  <div className="field">
-                    <label className="label">Amount Received ($)</label>
-                    <input data-testid="tab-cash-input" className="input" type="number" min="0" step="0.01"
-                      value={cashReceived} onChange={e => setCashReceived(e.target.value)} />
-                  </div>
-                )}
-                <button data-testid="pay-tab-btn" className="btn btn--success"
-                  onClick={handlePayTab} disabled={payMethod === 'cash' && !cashReceived}>
-                  Pay Tab (${selectedTab.total.toFixed(2)})
-                </button>
               </div>
             </>
           )}
