@@ -32,6 +32,16 @@ When('I update the tab item {string} to quantity {int}', async function (this: P
   this.response = await this.agent.patch(`/api/tabs/${tabId}/items/${item.id}`).send({ quantity });
 });
 
+When('I try to add items to the tab exceeding stock', async function (this: PosWorld, table: DataTable) {
+  const rows = table.hashes() as { product_name: string; quantity: string }[];
+  const items = await Promise.all(rows.map(async r => {
+    const p = await getProductByName(this.agent, r.product_name);
+    return { product_id: p.id, quantity: Number(r.quantity) };
+  }));
+  const tabId = this.context.tabId as number;
+  this.response = await this.agent.post(`/api/tabs/${tabId}/items`).send({ items });
+});
+
 When('I request the tabs summary', async function (this: PosWorld) {
   this.response = await this.agent.get('/api/tabs/summary');
 });

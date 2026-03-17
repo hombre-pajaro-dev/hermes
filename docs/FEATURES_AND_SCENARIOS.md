@@ -34,6 +34,10 @@ This document lists all **features** and **scenarios** covered by the BDD test s
 | 8 | Closed tabs are paginated | Closed tabs list returns 10 per page; `paid_at` timestamp and payment method shown per entry. |
 | 9 | Update item quantity on a tab | Change quantity of an existing tab item via `PATCH /api/tabs/:id/items/:itemId`; tab total recalculates correctly. |
 | 10 | Remove an item by setting quantity to zero | Set item quantity to 0; item is deleted; tab total reflects the removal. |
+| 11 | Stock count visible in Add Items | Each product in the Add Items section shows available units; out-of-stock products show "out of stock" and the + button is disabled. |
+| 12 | Adding a product to a tab decrements its stock | Add items to tab; product units decrease by the quantity added. |
+| 12 | Removing units from a tab item restores the stock | Add items then reduce quantity; net stock change matches net quantity on the tab. |
+| 13 | Cannot add more items to a tab than available stock | Request quantity exceeding available units; rejected with 409. |
 
 ---
 

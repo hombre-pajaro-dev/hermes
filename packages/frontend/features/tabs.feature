@@ -22,6 +22,12 @@ Feature: Tabs (Long-lasting orders)
     And I pay the tab with card
     Then the tab is marked as paid
 
+  Scenario: Stock count is visible in the Add Items section
+    Given there is an open tab via the API named "Stock View Tab"
+    And I am on the Tabs page
+    When I view the tab "Stock View Tab"
+    Then the stock count for "Espresso" is visible in Add Items
+
   Scenario: Increase item quantity from the On the Tab section
     Given there is an open tab via the API named "Table 5"
     And I am on the Tabs page

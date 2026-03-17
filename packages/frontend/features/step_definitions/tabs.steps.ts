@@ -74,6 +74,13 @@ Then('the open tab count is at least {int}', async function (this: PosWorld, min
   expect(Number(text)).to.be.at.least(min);
 });
 
+Then('the stock count for {string} is visible in Add Items', async function (this: PosWorld, name: string) {
+  const slug = name.toLowerCase().replace(/\s+/g, '-');
+  await this.page.waitForSelector(`[data-testid="tab-product-stock-${slug}"]`, { timeout: 10000 });
+  const text = await this.page.locator(`[data-testid="tab-product-stock-${slug}"]`).textContent();
+  expect(text).to.match(/in stock|out of stock/);
+});
+
 When('I increase the quantity of {string} on the tab', async function (this: PosWorld, name: string) {
   const slug = name.toLowerCase().replace(/\s+/g, '-');
   await this.page.waitForSelector(`[data-testid="tab-item-increase-${slug}"]`, { timeout: 10000 });

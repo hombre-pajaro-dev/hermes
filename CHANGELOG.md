@@ -10,6 +10,24 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ### Tabs
 
+#### Per-item change feedback and live stock in Add Items
+- The **quantity** and **subtotal** of each line in "On the Tab" now animate with the same scale-and-colour bump whenever they change — adding, increasing, or decreasing a product triggers the animation on that specific row
+- Products are refreshed from the server every time a tab detail view is opened, so the stock counts in "Add Items" are always up-to-date even if another session added items
+
+#### Stock count in Add Items
+- Each product row in the **Add Items** section of the tab detail view now shows available stock (e.g. `· 97 in stock`)
+- Products with zero stock show **· out of stock** in red and have the **+** button disabled
+- Stock count refreshes immediately after every add or quantity change so the number stays accurate while the tab is open
+- BDD scenario: stock count is visible and shows "in stock" or "out of stock"
+
+#### Tab inventory tracking
+- Adding a product to a tab now decrements `products.units` immediately — inventory stays accurate while the tab is open
+- Removing units via the **−** button (or setting quantity to 0) restores the corresponding units back to inventory
+- Insufficient-stock requests are rejected with **409** before any change is made, matching the same rule checkout enforces
+- Payment does not change inventory a second time — the stock was already decremented when items were added
+- Backend: `POST /api/tabs/:id/items` — stock check + `UPDATE products SET units = units - qty` per item added; `PATCH /api/tabs/:id/items/:itemId` — `UPDATE products SET units = units - qtyDelta` (negative delta = restore)
+- BDD scenarios: 3 new backend scenarios (stock decremented on add, stock restored on quantity decrease, 409 on insufficient stock)
+
 #### Total change feedback
 - Adding or removing a product in Checkout and in a Tab now animates the total with a brief scale-and-colour bump so the user can see the value changed
 - The animation plays on the order total in the Checkout view and on both the tab header total and the Pay Tab button amount in the Tab detail view

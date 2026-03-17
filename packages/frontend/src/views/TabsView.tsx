@@ -31,11 +31,12 @@ export default function TabsView() {
   }, []);
 
   async function openTab(t: Tab) {
-    // Show the tab immediately with basic data, then load items in background
+    // Show the tab immediately with basic data, then load items + fresh stock in background
     setSelectedTab(t as Tab & { items?: TabItem[] });
     setError(''); setSuccess('');
     setCashReceived(''); setPayMethod('card');
     setView('detail');
+    api.getProducts().then(setProducts).catch(() => {});
     try {
       const full = await api.getTab(t.id);
       setSelectedTab(full);
@@ -52,24 +53,38 @@ export default function TabsView() {
     } catch (e: unknown) { setError((e as Error).message); }
   }
 
+  function adjustProductUnits(productId: number, delta: number) {
+    setProducts(prev => prev.map(p => p.id === productId ? { ...p, units: Math.max(0, p.units - delta) } : p));
+  }
+
   async function handleAddProduct(product: Product) {
     if (!selectedTab) return;
     setError('');
+    adjustProductUnits(product.id, 1);
     try {
       const updated = await api.addTabItems(selectedTab.id, [{ product_id: product.id, quantity: 1 }]);
       setSelectedTab(updated);
       loadTabs();
-    } catch (e: unknown) { setError((e as Error).message); }
+    } catch (e: unknown) {
+      adjustProductUnits(product.id, -1); // restore on failure
+      setError((e as Error).message);
+    }
   }
 
   async function handleUpdateItemQuantity(itemId: number, quantity: number) {
     if (!selectedTab) return;
     setError('');
+    const item = selectedTab.items?.find(i => i.id === itemId);
+    const qtyDelta = item ? quantity - item.quantity : 0;
+    if (item && qtyDelta !== 0) adjustProductUnits(item.product_id, qtyDelta);
     try {
       const updated = await api.updateTabItem(selectedTab.id, itemId, quantity);
       setSelectedTab(updated);
       loadTabs();
-    } catch (e: unknown) { setError((e as Error).message); }
+    } catch (e: unknown) {
+      if (item && qtyDelta !== 0) adjustProductUnits(item.product_id, -qtyDelta); // restore on failure
+      setError((e as Error).message);
+    }
   }
 
   async function handlePayTab() {
@@ -277,13 +292,13 @@ export default function TabsView() {
                             className="btn btn--sm btn--ghost"
                             onClick={() => handleUpdateItemQuantity(item.id, item.quantity - 1)}
                           >−</button>
-                          <span data-testid={`tab-item-qty-${slug}`} style={{ fontWeight: 600, minWidth: 24, textAlign: 'center' }}>{item.quantity}</span>
+                          <span key={`qty-${item.id}-${item.quantity}`} className="value-bump" data-testid={`tab-item-qty-${slug}`} style={{ fontWeight: 600, minWidth: 24, textAlign: 'center' }}>{item.quantity}</span>
                           <button
                             data-testid={`tab-item-increase-${slug}`}
                             className="btn btn--sm btn--ghost"
                             onClick={() => handleUpdateItemQuantity(item.id, item.quantity + 1)}
                           >+</button>
-                          <span style={{ fontWeight: 600, minWidth: 50, textAlign: 'right' }}>${item.subtotal.toFixed(2)}</span>
+                          <span key={`sub-${item.id}-${item.subtotal}`} className="value-bump" style={{ fontWeight: 600, minWidth: 50, textAlign: 'right' }}>${item.subtotal.toFixed(2)}</span>
                         </div>
                       </div>
                     );
@@ -300,10 +315,14 @@ export default function TabsView() {
                       <div className="list-item__sub">
                         ${selectedTab.at_cost ? p.cost.toFixed(2) : p.price.toFixed(2)}
                         {selectedTab.at_cost ? <span style={{ marginLeft: 4, fontSize: '0.75rem', color: '#92400e' }}>(cost)</span> : null}
+                        <span style={{ marginLeft: 8 }} data-testid={`tab-product-stock-${p.name.toLowerCase().replace(/\s+/g,'-')}`}>
+                          {p.units > 0 ? `· ${p.units} in stock` : <span style={{ color: 'var(--danger)' }}>· out of stock</span>}
+                        </span>
                       </div>
                     </div>
                     <button data-testid={`tab-add-${p.name.toLowerCase().replace(/\s+/g,'-')}`}
-                      className="btn btn--sm btn--primary" onClick={() => handleAddProduct(p)}>+</button>
+                      className="btn btn--sm btn--primary" onClick={() => handleAddProduct(p)}
+                      disabled={p.units <= 0}>+</button>
                   </div>
                 ))}
               </div>

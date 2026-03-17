@@ -60,6 +60,29 @@ Feature: Tabs (Long-lasting orders)
     Then the tab total is 5.00
     And the tab item count is 1
 
+  Scenario: Adding a product to a tab decrements its stock
+    When I open a new tab named "Stock Test 1"
+    And I add items to the tab
+      | product_name | quantity |
+      | Espresso     | 3        |
+    Then the stock of "Espresso" decreased by 3
+
+  Scenario: Removing units from a tab item restores the stock
+    When I open a new tab named "Stock Test 2"
+    And I add items to the tab
+      | product_name | quantity |
+      | Espresso     | 3        |
+    And I update the tab item "Espresso" to quantity 1
+    Then the stock of "Espresso" decreased by 1
+
+  Scenario: Cannot add more items to a tab than available stock
+    When I open a new tab named "Stock Test 3"
+    And I try to add items to the tab exceeding stock
+      | product_name | quantity |
+      | Espresso     | 9999     |
+    Then the response status is 409
+    And the response error mentions "Insufficient stock"
+
   Scenario: Cannot close register while tabs are open
     When I open a new tab named "Table 9"
     And I add items to the tab

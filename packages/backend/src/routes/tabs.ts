@@ -44,6 +44,13 @@ router.post('/:id/items', async (req, res) => {
   const { items } = req.body as { items: { product_id: number; quantity: number }[] };
   if (!items || items.length === 0) return res.status(400).json({ error: 'items are required' });
 
+  // Stock check before opening the transaction
+  for (const item of items) {
+    const { rows: [product] } = await db.query('SELECT * FROM products WHERE id = $1', [item.product_id]);
+    if (!product) return res.status(404).json({ error: `Product ${item.product_id} not found` });
+    if (product.units < item.quantity) return res.status(409).json({ error: `Insufficient stock for '${product.name}': requested ${item.quantity}, available ${product.units}` });
+  }
+
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
@@ -60,12 +67,13 @@ router.post('/:id/items', async (req, res) => {
       } else {
         await client.query('INSERT INTO tab_items (tab_id, product_id, quantity, unit_price, unit_cost, subtotal) VALUES ($1, $2, $3, $4, $5, $6)', [tab.id, item.product_id, item.quantity, unitPrice, product.cost, subtotal]);
       }
+      await client.query('UPDATE products SET units = units - $1 WHERE id = $2', [item.quantity, item.product_id]);
     }
     await client.query('UPDATE tabs SET total = total + $1 WHERE id = $2', [additionalTotal, tab.id]);
     await client.query('COMMIT');
   } catch (err: unknown) {
     await client.query('ROLLBACK');
-    return res.status(404).json({ error: (err as Error).message });
+    return res.status(500).json({ error: (err as Error).message });
   } finally {
     client.release();
   }
@@ -84,7 +92,7 @@ router.patch('/:id/items/:itemId', async (req, res) => {
   if (tab.status !== 'open') return res.status(409).json({ error: 'Tab is not open' });
 
   const { rows: itemRows } = await db.query('SELECT * FROM tab_items WHERE id = $1 AND tab_id = $2', [req.params.itemId, req.params.id]);
-  const item = itemRows[0] as { id: number; quantity: number; unit_price: number; subtotal: number } | undefined;
+  const item = itemRows[0] as { id: number; product_id: number; quantity: number; unit_price: number; subtotal: number } | undefined;
   if (!item) return res.status(404).json({ error: 'Item not found' });
 
   const { quantity } = req.body as { quantity: number };
@@ -92,17 +100,31 @@ router.patch('/:id/items/:itemId', async (req, res) => {
     return res.status(400).json({ error: 'quantity must be >= 0' });
   }
 
+  const newQty = Number(quantity);
+  const oldQty = Number(item.quantity);
+  const qtyDelta = newQty - oldQty; // positive = more units needed, negative = units restored
+
+  if (qtyDelta > 0) {
+    const { rows: [product] } = await db.query('SELECT units, name FROM products WHERE id = $1', [item.product_id]);
+    if (product.units < qtyDelta) {
+      return res.status(409).json({ error: `Insufficient stock for '${product.name}': requested ${qtyDelta} more, available ${product.units}` });
+    }
+  }
+
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
     const oldSubtotal = Number(item.subtotal);
-    const newSubtotal = Number(quantity) === 0 ? 0 : Number(item.unit_price) * Number(quantity);
-    if (Number(quantity) === 0) {
+    const newSubtotal = newQty === 0 ? 0 : Number(item.unit_price) * newQty;
+    if (newQty === 0) {
       await client.query('DELETE FROM tab_items WHERE id = $1', [item.id]);
     } else {
-      await client.query('UPDATE tab_items SET quantity = $1, subtotal = $2 WHERE id = $3', [Number(quantity), newSubtotal, item.id]);
+      await client.query('UPDATE tab_items SET quantity = $1, subtotal = $2 WHERE id = $3', [newQty, newSubtotal, item.id]);
     }
     await client.query('UPDATE tabs SET total = GREATEST(0, total - $1 + $2) WHERE id = $3', [oldSubtotal, newSubtotal, tab.id]);
+    if (qtyDelta !== 0) {
+      await client.query('UPDATE products SET units = units - $1 WHERE id = $2', [qtyDelta, item.product_id]);
+    }
     await client.query('COMMIT');
   } catch (err: unknown) {
     await client.query('ROLLBACK');
