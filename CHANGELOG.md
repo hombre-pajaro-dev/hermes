@@ -10,6 +10,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ### Tabs
 
+#### Total change feedback
+- Adding or removing a product in Checkout and in a Tab now animates the total with a brief scale-and-colour bump so the user can see the value changed
+- The animation plays on the order total in the Checkout view and on both the tab header total and the Pay Tab button amount in the Tab detail view
+- No animation on first load — the bump only triggers when the total actually changes
+
 #### Tab detail view section order
 - **Pay Tab** is now at the top of the tab detail view for quick access
 - **On the Tab** (items list with quantity controls) appears directly below Pay Tab

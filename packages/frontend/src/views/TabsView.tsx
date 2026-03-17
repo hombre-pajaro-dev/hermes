@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { api } from '../api/client';
 import type { Tab, TabItem, Product } from '../api/client';
 import PinModal from '../components/PinModal';
@@ -83,6 +83,14 @@ export default function TabsView() {
       setSuccess('Tab paid!');
     } catch (e: unknown) { setError((e as Error).message); }
   }
+
+  const prevTabTotal = useRef<number | null>(null);
+  const [totalBump, setTotalBump] = useState(0);
+  useEffect(() => {
+    const t = selectedTab?.total ?? null;
+    if (prevTabTotal.current !== null && prevTabTotal.current !== t) setTotalBump(b => b + 1);
+    prevTabTotal.current = t;
+  }, [selectedTab?.total]);
 
   const openTabs = tabs.filter(t => t.status === 'open');
   const closedTabs = tabs.filter(t => t.status !== 'open');
@@ -214,7 +222,7 @@ export default function TabsView() {
 
           <div className="card">
             <div className="card__title">{selectedTab.name}</div>
-            <div style={{ fontWeight: 700, fontSize: '1.2rem', marginBottom: 8 }} data-testid="tab-total">Total: ${selectedTab.total.toFixed(2)}</div>
+            <div style={{ fontWeight: 700, fontSize: '1.2rem', marginBottom: 8 }} data-testid="tab-total">Total: <span key={totalBump} className="value-bump">${selectedTab.total.toFixed(2)}</span></div>
             <span className={`badge badge--${selectedTab.status}`}>{selectedTab.status.toUpperCase()}</span>
           </div>
 
@@ -247,7 +255,7 @@ export default function TabsView() {
                 )}
                 <button data-testid="pay-tab-btn" className="btn btn--success"
                   onClick={handlePayTab} disabled={payMethod === 'cash' && !cashReceived}>
-                  Pay Tab (${selectedTab.total.toFixed(2)})
+                  Pay Tab (<span key={totalBump} className="value-bump">${selectedTab.total.toFixed(2)}</span>)
                 </button>
               </div>
 

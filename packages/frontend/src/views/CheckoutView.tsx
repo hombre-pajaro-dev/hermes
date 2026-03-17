@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { api } from '../api/client';
 import type { Product } from '../api/client';
 
@@ -30,6 +30,13 @@ export default function CheckoutView() {
   }
 
   const total = lines.reduce((s, l) => s + l.product.price * l.quantity, 0);
+
+  const prevTotal = useRef<number | null>(null);
+  const [totalBump, setTotalBump] = useState(0);
+  useEffect(() => {
+    if (prevTotal.current !== null && prevTotal.current !== total) setTotalBump(b => b + 1);
+    prevTotal.current = total;
+  }, [total]);
 
   async function handleCreateOrder() {
     setError(''); setLoading(true);
@@ -106,7 +113,7 @@ export default function CheckoutView() {
                 </div>
               ))}
               <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 700, marginTop: 12 }}>
-                <span>Total</span><span data-testid="order-total">${total.toFixed(2)}</span>
+                <span>Total</span><span key={totalBump} className="value-bump" data-testid="order-total">${total.toFixed(2)}</span>
               </div>
               <button data-testid="create-order-btn" className="btn btn--primary" style={{ marginTop: 12 }}
                 onClick={handleCreateOrder} disabled={loading}>

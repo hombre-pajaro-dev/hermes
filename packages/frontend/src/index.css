@@ -154,6 +154,14 @@ body {
 .qty { display: flex; align-items: center; gap: 8px; }
 .qty__val { width: 32px; text-align: center; font-weight: 600; }
 
+/* Value change feedback */
+@keyframes value-bump {
+  0%   { transform: scale(1); }
+  40%  { transform: scale(1.18); color: var(--primary); }
+  100% { transform: scale(1); }
+}
+.value-bump { display: inline-block; animation: value-bump 0.35s cubic-bezier(0.34, 1.56, 0.64, 1); }
+
 /* Tab bar for sub-navigation */
 .tabs-nav { display: flex; gap: 4px; margin-bottom: 16px; overflow-x: auto; }
 .tabs-nav__item {
