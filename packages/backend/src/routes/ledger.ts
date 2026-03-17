@@ -9,6 +9,36 @@ router.get('/', async (_req, res) => {
   res.json(rows);
 });
 
+router.get('/entries/:id/items', async (req, res) => {
+  const db = await getDb();
+  const { rows } = await db.query('SELECT * FROM ledger_entries WHERE id = $1', [req.params.id]);
+  const entry = rows[0] as { ref_id?: number; ref_type?: string } | undefined;
+  if (!entry) return res.status(404).json({ error: 'Ledger entry not found' });
+  if (!entry.ref_id || !entry.ref_type) return res.json([]);
+
+  if (entry.ref_type === 'order') {
+    const { rows: items } = await db.query(
+      `SELECT oi.product_id, p.name, oi.quantity, oi.unit_price, oi.subtotal
+       FROM order_items oi JOIN products p ON p.id = oi.product_id
+       WHERE oi.order_id = $1`,
+      [entry.ref_id]
+    );
+    return res.json(items);
+  }
+
+  if (entry.ref_type === 'tab') {
+    const { rows: items } = await db.query(
+      `SELECT ti.product_id, p.name, ti.quantity, ti.unit_price, ti.subtotal
+       FROM tab_items ti JOIN products p ON p.id = ti.product_id
+       WHERE ti.tab_id = $1`,
+      [entry.ref_id]
+    );
+    return res.json(items);
+  }
+
+  res.json([]);
+});
+
 router.get('/accounts', async (_req, res) => {
   const db = await getDb();
   const { rows } = await db.query('SELECT * FROM accounts');

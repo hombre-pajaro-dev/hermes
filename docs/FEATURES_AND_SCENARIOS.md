@@ -66,6 +66,8 @@ This document lists all **features** and **scenarios** covered by the BDD test s
 | 3 | Record a payroll payment from an account | Record payroll amount from an account with description; payroll recorded; ledger has payroll entry; account balance decreases. |
 | 4 | Ledger entries are ordered by timestamp | Ledger list is ordered by created_at descending. |
 | 5 | List accounts | Fetch accounts; list includes cash and credit_card. |
+| 6 | View items for a sale ledger entry | After a card order; fetch ledger; `GET /ledger/:id/items` on the sale entry returns items with correct product name and quantity. |
+| 7 | View items for a tab payment ledger entry | After a paid tab; fetch ledger; `GET /ledger/:id/items` on the tab_payment entry returns items with correct product name and quantity. |
 
 ---
 

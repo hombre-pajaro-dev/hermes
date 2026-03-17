@@ -48,6 +48,7 @@ export const api = {
 
   // Ledger
   getLedger: () => req<LedgerEntry[]>('/ledger'),
+  getLedgerItems: (id: number) => req<LedgerEntryItem[]>(`/ledger/entries/${id}/items`),
   getAccounts: () => req<Account[]>('/ledger/accounts'),
   getBalances: () => req<Balance[]>('/ledger/balances'),
   recordPayroll: (amount: number, account: string, description: string) =>
@@ -80,7 +81,8 @@ export interface Order { id: number; status: string; total: number; payment_meth
 export interface Tab { id: number; name: string; status: string; at_cost: number; total: number; payment_method?: string; created_at: string; paid_at?: string; }
 export interface TabItem { id: number; product_id: number; quantity: number; unit_price: number; subtotal: number; }
 export interface TabsSummary { open_count: number; total_amount: number; }
-export interface LedgerEntry { id: number; entry_type: string; account?: string; amount: number; description: string; created_at: string; }
+export interface LedgerEntry { id: number; entry_type: string; account?: string; amount: number; description: string; ref_id?: number; ref_type?: string; created_at: string; }
+export interface LedgerEntryItem { product_id: number; name: string; quantity: number; unit_price: number; subtotal: number; }
 export interface Account { id: number; name: string; label: string; }
 export interface Balance { account: string; balance: number; }
 export interface SalesByItem { product_id: number; name: string; units_sold: number; revenue: number; cost: number; }

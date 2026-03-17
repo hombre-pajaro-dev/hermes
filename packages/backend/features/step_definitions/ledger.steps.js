@@ -63,3 +63,33 @@ async function getProductByName(agent, name) {
     const found = accounts.some(a => a.name === name);
     (0, chai_1.expect)(found, `Account '${name}' not found`).to.be.true;
 });
+(0, cucumber_1.Then)('the sale ledger entry has items', async function () {
+    const entries = this.response.body;
+    const sale = entries.find(e => e.entry_type === 'sale');
+    (0, chai_1.expect)(sale, 'Expected a sale entry').to.exist;
+    const res = await this.agent.get(`/api/ledger/entries/${sale.id}/items`);
+    (0, chai_1.expect)(res.status).to.equal(200);
+    (0, chai_1.expect)(res.body).to.be.an('array').with.length.greaterThan(0);
+    this.context.saleItems = res.body;
+});
+(0, cucumber_1.Then)('the sale items include {string} with quantity {int}', function (name, qty) {
+    const items = this.context.saleItems;
+    const item = items.find(i => i.name === name);
+    (0, chai_1.expect)(item, `Expected item '${name}'`).to.exist;
+    (0, chai_1.expect)(item.quantity).to.equal(qty);
+});
+(0, cucumber_1.Then)('the tab_payment ledger entry has items', async function () {
+    const entries = this.response.body;
+    const entry = entries.find(e => e.entry_type === 'tab_payment');
+    (0, chai_1.expect)(entry, 'Expected a tab_payment entry').to.exist;
+    const res = await this.agent.get(`/api/ledger/entries/${entry.id}/items`);
+    (0, chai_1.expect)(res.status).to.equal(200);
+    (0, chai_1.expect)(res.body).to.be.an('array').with.length.greaterThan(0);
+    this.context.tabPaymentItems = res.body;
+});
+(0, cucumber_1.Then)('the tab payment items include {string} with quantity {int}', function (name, qty) {
+    const items = this.context.tabPaymentItems;
+    const item = items.find(i => i.name === name);
+    (0, chai_1.expect)(item, `Expected item '${name}'`).to.exist;
+    (0, chai_1.expect)(item.quantity).to.equal(qty);
+});

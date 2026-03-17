@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react';
 import { api } from '../api/client';
-import type { LedgerEntry, Balance, Account } from '../api/client';
+import type { LedgerEntry, LedgerEntryItem, Balance, Account } from '../api/client';
+
+const EXPANDABLE = new Set(['sale', 'tab_payment']);
 
 export default function LedgerView() {
   const [entries, setEntries] = useState<LedgerEntry[]>([]);
@@ -12,6 +14,10 @@ export default function LedgerView() {
   const [payrollDesc, setPayrollDesc] = useState('');
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
+  const [expandedId, setExpandedId] = useState<number | null>(null);
+  // null = fetch failed (allows retry), LedgerEntryItem[] = loaded (even if empty)
+  const [itemsCache, setItemsCache] = useState<Record<number, LedgerEntryItem[] | null>>({});
+  const [loadingId, setLoadingId] = useState<number | null>(null);
 
   useEffect(() => {
     api.getLedger().then(setEntries).catch(() => {});
@@ -28,6 +34,34 @@ export default function LedgerView() {
       const [e, b] = await Promise.all([api.getLedger(), api.getBalances()]);
       setEntries(e); setBalances(b);
     } catch (e: unknown) { setError((e as Error).message); }
+  }
+
+  async function fetchEntryItems(entryId: number) {
+    setLoadingId(entryId);
+    try {
+      const items = await api.getLedgerItems(entryId);
+      setItemsCache(prev => ({ ...prev, [entryId]: items }));
+    } catch {
+      setItemsCache(prev => ({ ...prev, [entryId]: null }));
+    }
+    setLoadingId(null);
+  }
+
+  async function toggleEntry(entry: LedgerEntry) {
+    if (!EXPANDABLE.has(entry.entry_type)) return;
+    if (expandedId === entry.id) {
+      // If it failed last time, retry instead of collapsing
+      if (itemsCache[entry.id] === null) {
+        fetchEntryItems(entry.id);
+        return;
+      }
+      setExpandedId(null);
+      return;
+    }
+    setExpandedId(entry.id);
+    // Skip fetch if already loaded (truthy non-null array)
+    if (itemsCache[entry.id]) return;
+    fetchEntryItems(entry.id);
   }
 
   const TYPE_COLORS: Record<string, string> = {
@@ -49,23 +83,69 @@ export default function LedgerView() {
 
       {tab === 'entries' && (
         <div className="card" data-testid="ledger-entries">
-          {entries.length === 0 ? <div className="empty">No entries yet</div> : entries.map(e => (
-            <div className="list-item" key={e.id} data-testid="ledger-entry">
-              <div className="list-item__main">
-                <div className="list-item__name" style={{ color: TYPE_COLORS[e.entry_type] ?? 'inherit' }}>
-                  {e.entry_type.replace('_', ' ')}
+          {entries.length === 0 ? <div className="empty">No entries yet</div> : entries.map(e => {
+            const expandable = EXPANDABLE.has(e.entry_type);
+            const expanded = expandedId === e.id;
+            const items = itemsCache[e.id];
+            return (
+              <div key={e.id} data-testid="ledger-entry">
+                <div
+                  className={`list-item${expandable ? ' list-item--tappable' : ''}`}
+                  style={expandable ? { cursor: 'pointer' } : undefined}
+                  onClick={() => toggleEntry(e)}
+                >
+                  <div className="list-item__main">
+                    <div className="list-item__name" style={{ color: TYPE_COLORS[e.entry_type] ?? 'inherit', display: 'flex', alignItems: 'center', gap: 6 }}>
+                      {e.entry_type.replace('_', ' ')}
+                      {expandable && (
+                        <span style={{ fontSize: '0.7rem', opacity: 0.7 }}>{expanded ? '▲' : '▼'}</span>
+                      )}
+                    </div>
+                    <div className="list-item__sub">{e.description}</div>
+                    <div className="list-item__sub">{e.created_at.slice(0, 16).replace('T', ' ')}</div>
+                  </div>
+                  <div className="list-item__right">
+                    <div style={{ fontWeight: 700, color: e.amount >= 0 ? 'var(--success)' : 'var(--danger)' }}>
+                      {e.amount >= 0 ? '+' : ''}${e.amount.toFixed(2)}
+                    </div>
+                    {e.account && <div className="list-item__sub">{e.account}</div>}
+                  </div>
                 </div>
-                <div className="list-item__sub">{e.description}</div>
-                <div className="list-item__sub">{e.created_at.slice(0, 16).replace('T', ' ')}</div>
+                {expanded && (
+                  <div data-testid={`ledger-entry-items-${e.id}`} style={{ background: 'var(--surface-2, #f8fafc)', borderTop: '1px solid var(--border)', padding: '8px 16px 12px' }}>
+                    {loadingId === e.id ? (
+                      <div style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', padding: '4px 0' }}>Loading…</div>
+                    ) : items === null ? (
+                      <div style={{ fontSize: '0.85rem', color: 'var(--danger)' }}>Could not load items — tap to retry</div>
+                    ) : items && items.length > 0 ? (
+                      <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.85rem' }}>
+                        <thead>
+                          <tr style={{ color: 'var(--text-secondary)', textAlign: 'left' }}>
+                            <th style={{ fontWeight: 600, paddingBottom: 4 }}>Product</th>
+                            <th style={{ fontWeight: 600, paddingBottom: 4, textAlign: 'center' }}>Qty</th>
+                            <th style={{ fontWeight: 600, paddingBottom: 4, textAlign: 'right' }}>Unit</th>
+                            <th style={{ fontWeight: 600, paddingBottom: 4, textAlign: 'right' }}>Subtotal</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {items.map(item => (
+                            <tr key={item.product_id} data-testid="ledger-item-row">
+                              <td style={{ padding: '2px 0' }}>{item.name}</td>
+                              <td style={{ padding: '2px 0', textAlign: 'center' }}>{item.quantity}</td>
+                              <td style={{ padding: '2px 0', textAlign: 'right' }}>${item.unit_price.toFixed(2)}</td>
+                              <td style={{ padding: '2px 0', textAlign: 'right', fontWeight: 600 }}>${item.subtotal.toFixed(2)}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    ) : (
+                      <div style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>No items</div>
+                    )}
+                  </div>
+                )}
               </div>
-              <div className="list-item__right">
-                <div style={{ fontWeight: 700, color: e.amount >= 0 ? 'var(--success)' : 'var(--danger)' }}>
-                  {e.amount >= 0 ? '+' : ''}${e.amount.toFixed(2)}
-                </div>
-                {e.account && <div className="list-item__sub">{e.account}</div>}
-              </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       )}
 

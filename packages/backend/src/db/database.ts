@@ -1,9 +1,12 @@
 import { Pool } from 'pg';
 import { applySchema } from './schema';
 
+const connectionString = process.env.POSTGRES_URL ?? process.env.DATABASE_URL;
+const isLocal = !connectionString || connectionString.includes('localhost') || connectionString.includes('127.0.0.1');
+
 export const pool = new Pool({
-  connectionString: process.env.POSTGRES_URL ?? process.env.DATABASE_URL,
-  ssl: process.env.POSTGRES_URL ? { rejectUnauthorized: false } : false,
+  connectionString,
+  ssl: isLocal ? false : { rejectUnauthorized: false },
 });
 
 let schemaPromise: Promise<void> | null = null;

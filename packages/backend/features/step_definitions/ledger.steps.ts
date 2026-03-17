@@ -77,3 +77,37 @@ Then('the accounts list includes {string}', function (this: PosWorld, name: stri
   const found = accounts.some(a => a.name === name);
   expect(found, `Account '${name}' not found`).to.be.true;
 });
+
+Then('the sale ledger entry has items', async function (this: PosWorld) {
+  const entries = this.response.body as { id: number; entry_type: string }[];
+  const sale = entries.find(e => e.entry_type === 'sale');
+  expect(sale, 'Expected a sale entry').to.exist;
+  const res = await this.agent.get(`/api/ledger/entries/${sale!.id}/items`);
+  expect(res.status).to.equal(200);
+  expect(res.body).to.be.an('array').with.length.greaterThan(0);
+  this.context.saleItems = res.body;
+});
+
+Then('the sale items include {string} with quantity {int}', function (this: PosWorld, name: string, qty: number) {
+  const items = this.context.saleItems as { name: string; quantity: number }[];
+  const item = items.find(i => i.name === name);
+  expect(item, `Expected item '${name}'`).to.exist;
+  expect(item!.quantity).to.equal(qty);
+});
+
+Then('the tab_payment ledger entry has items', async function (this: PosWorld) {
+  const entries = this.response.body as { id: number; entry_type: string }[];
+  const entry = entries.find(e => e.entry_type === 'tab_payment');
+  expect(entry, 'Expected a tab_payment entry').to.exist;
+  const res = await this.agent.get(`/api/ledger/entries/${entry!.id}/items`);
+  expect(res.status).to.equal(200);
+  expect(res.body).to.be.an('array').with.length.greaterThan(0);
+  this.context.tabPaymentItems = res.body;
+});
+
+Then('the tab payment items include {string} with quantity {int}', function (this: PosWorld, name: string, qty: number) {
+  const items = this.context.tabPaymentItems as { name: string; quantity: number }[];
+  const item = items.find(i => i.name === name);
+  expect(item, `Expected item '${name}'`).to.exist;
+  expect(item!.quantity).to.equal(qty);
+});

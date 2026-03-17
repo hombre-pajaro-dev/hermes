@@ -46,3 +46,22 @@ Feature: General Ledger and Accounts
     When I fetch the accounts list
     Then the accounts list includes "cash"
     And the accounts list includes "credit_card"
+
+  Scenario: View items for a sale ledger entry
+    When I create an order with items
+      | product_name | quantity |
+      | Espresso     | 2        |
+    And I pay the order with card
+    And I fetch the ledger
+    Then the sale ledger entry has items
+    And the sale items include "Espresso" with quantity 2
+
+  Scenario: View items for a tab payment ledger entry
+    When I open a new tab named "Table 1"
+    And I add items to the tab
+      | product_name | quantity |
+      | Latte        | 1        |
+    And I pay the tab with card
+    And I fetch the ledger
+    Then the tab_payment ledger entry has items
+    And the tab payment items include "Latte" with quantity 1

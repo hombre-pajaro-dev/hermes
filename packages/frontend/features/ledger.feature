@@ -21,3 +21,9 @@ Feature: General Ledger and Accounts
     And I enter payroll description "Weekly payroll"
     And I click Record Payroll
     Then I see a success message
+
+  Scenario: View items in a sale ledger entry
+    Given there is a paid order via the API with "Espresso"
+    And I am on the Ledger page
+    When I expand the first sale entry
+    Then I see item rows for that entry

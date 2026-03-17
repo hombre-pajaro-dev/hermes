@@ -8,6 +8,17 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+### Ledger
+
+#### Expandable order and tab items on ledger entries
+- `sale` and `tab_payment` ledger entries are now tappable rows — tapping expands an inline table showing product name, quantity, unit price, and subtotal for every item in that order or tab
+- A small ▼/▲ chevron indicates which entries can be expanded
+- Items are loaded on demand and cached; subsequent expands of the same entry make no additional network requests
+- Backend: new `GET /api/ledger/:id/items` endpoint — resolves `ref_type` (`order` or `tab`) and `ref_id` from the ledger entry and returns the matching `order_items` or `tab_items` joined with product names
+- BDD scenarios: 2 new backend scenarios (sale items, tab payment items) and 1 new frontend scenario (expand sale entry and see item rows)
+
+---
+
 ### Tabs
 
 #### Per-item change feedback and live stock in Add Items
