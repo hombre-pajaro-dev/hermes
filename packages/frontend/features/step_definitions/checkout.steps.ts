@@ -96,8 +96,8 @@ When('I close the receipt modal', async function (this: PosWorld) {
 });
 
 Then('the order is cleared', async function (this: PosWorld) {
-  const isVisible = await this.page.locator('[data-testid="order-lines"]').isVisible();
-  expect(isVisible).to.be.false;
+  await this.page.locator('[data-testid="order-empty"]').waitFor({ timeout: 5000 });
+  expect(await this.page.locator('[data-testid="order-empty"]').isVisible()).to.be.true;
 });
 
 Then('I see a payment success message', async function (this: PosWorld) {

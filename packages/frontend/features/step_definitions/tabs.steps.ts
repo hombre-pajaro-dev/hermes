@@ -93,9 +93,8 @@ When('I decrease the quantity of {string} on the tab to zero', async function (t
 });
 
 Then('the tab items section is empty', async function (this: PosWorld) {
-  await this.page.waitForSelector('[data-testid="tab-items"]', { state: 'hidden', timeout: 8000 }).catch(() => {});
-  const visible = await this.page.locator('[data-testid="tab-items"]').isVisible().catch(() => false);
-  expect(visible).to.equal(false);
+  await this.page.locator('[data-testid="tab-items-empty"]').waitFor({ timeout: 8000 });
+  expect(await this.page.locator('[data-testid="tab-items-empty"]').isVisible()).to.be.true;
 });
 
 Then('I see the tabs list', async function (this: PosWorld) {

@@ -391,11 +391,12 @@ export default function TabsView() {
 
           {selectedTab.status === 'open' && (
             <>
-              {selectedTab.items && selectedTab.items.length > 0 && (
-                <div className="card" data-testid="tab-items">
-                  <div className="card__title">On the Tab</div>
-                  <div style={{ maxHeight: '35vh', overflowY: 'auto', overscrollBehavior: 'contain' }}>
-                    {selectedTab.items.map(item => {
+              <div className="card" data-testid="tab-items">
+                <div className="card__title">On the Tab</div>
+                <div style={{ height: '35vh', overflowY: 'auto', overscrollBehavior: 'contain' }}>
+                  {!selectedTab.items || selectedTab.items.length === 0 ? (
+                    <div className="empty" data-testid="tab-items-empty">No items on the tab yet</div>
+                  ) : selectedTab.items.map(item => {
                       const product = products.find(p => p.id === item.product_id);
                       const slug = product?.name.toLowerCase().replace(/\s+/g, '-') ?? String(item.id);
                       return (
@@ -420,10 +421,9 @@ export default function TabsView() {
                           </div>
                         </div>
                       );
-                    })}
-                  </div>
+                  })}
                 </div>
-              )}
+              </div>
 
               <div className="card">
                 <div className="card__title">Pay Tab</div>
