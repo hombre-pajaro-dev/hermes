@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { api } from '../api/client';
 import type { Product, Tab } from '../api/client';
+import ImagePicker from '../components/ImagePicker';
 
 type EditField = 'price' | 'cost';
 type ViewMode = 'list' | 'grid';
@@ -12,6 +13,7 @@ export default function ProductsView() {
   const [error, setError] = useState('');
   const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState({ name: '', description: '', cost: '', price: '', units: '' });
+  const [formImage, setFormImage] = useState<string | null>(null);
   const [editingPrice, setEditingPrice] = useState<Record<number, string>>({});
   const [editingCost, setEditingCost] = useState<Record<number, string>>({});
   const [viewMode, setViewMode] = useState<ViewMode>(() => {
@@ -45,10 +47,26 @@ export default function ProductsView() {
   async function handleCreate() {
     setError('');
     try {
-      await api.createProduct({ name: form.name, description: form.description, cost: Number(form.cost), price: Number(form.price), units: Number(form.units) });
+      await api.createProduct({
+        name: form.name,
+        description: form.description,
+        cost: Number(form.cost),
+        price: Number(form.price),
+        units: Number(form.units),
+        image: formImage,
+      });
       setForm({ name: '', description: '', cost: '', price: '', units: '' });
+      setFormImage(null);
       setShowForm(false);
       load();
+    } catch (e: unknown) { setError((e as Error).message); }
+  }
+
+  async function handleImageChange(productId: number, dataUrl: string) {
+    setError('');
+    try {
+      const updated = await api.updateImage(productId, dataUrl);
+      setProducts(prev => prev.map(p => p.id === productId ? { ...p, image: updated.image } : p));
     } catch (e: unknown) { setError((e as Error).message); }
   }
 
@@ -149,6 +167,26 @@ export default function ProductsView() {
       {showForm && (
         <div className="card" data-testid="product-form">
           <div className="card__title">New Product</div>
+
+          <div className="field" style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: 6 }}>
+            <label className="label">Photo</label>
+            <ImagePicker
+              image={formImage}
+              testId="product-thumbnail-new"
+              size={96}
+              onChange={setFormImage}
+            />
+            {formImage && (
+              <button
+                className="btn btn--sm btn--ghost"
+                style={{ fontSize: '0.75rem' }}
+                onClick={() => setFormImage(null)}
+              >
+                Remove photo
+              </button>
+            )}
+          </div>
+
           {(['name', 'description', 'cost', 'price', 'units'] as const).map(f => (
             <div className="field" key={f}>
               <label className="label">{f.charAt(0).toUpperCase() + f.slice(1)}</label>
@@ -172,6 +210,14 @@ export default function ProductsView() {
             const locked = lockedIds.has(p.id);
             return (
               <div className="product-card" key={p.id} data-testid="product-item">
+                <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 10 }}>
+                  <ImagePicker
+                    image={p.image}
+                    testId={`product-thumbnail-${p.id}`}
+                    size={96}
+                    onChange={dataUrl => handleImageChange(p.id, dataUrl)}
+                  />
+                </div>
                 <div className="product-card__name" data-testid="product-name">{p.name}</div>
                 <div className="product-card__meta">Price</div>
                 <div className="product-card__field">
@@ -191,7 +237,13 @@ export default function ProductsView() {
           {products.length === 0 ? <div className="empty">No products yet</div> : products.map(p => {
             const locked = lockedIds.has(p.id);
             return (
-              <div className="list-item" key={p.id} data-testid="product-item">
+              <div className="list-item" key={p.id} data-testid="product-item" style={{ gap: 12 }}>
+                <ImagePicker
+                  image={p.image}
+                  testId={`product-thumbnail-${p.id}`}
+                  size={56}
+                  onChange={dataUrl => handleImageChange(p.id, dataUrl)}
+                />
                 <div className="list-item__main">
                   <div className="list-item__name" data-testid="product-name">{p.name}</div>
                   <div className="list-item__sub" style={{ marginTop: 4 }}>

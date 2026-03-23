@@ -3,6 +3,7 @@ import { api } from '../api/client';
 import type { Tab, TabItem, Product } from '../api/client';
 import PinModal from '../components/PinModal';
 import ReceiptModal, { type ReceiptLine } from '../components/ReceiptModal';
+import ProductThumb from '../components/ProductThumb';
 
 interface Receipt {
   timestamp: Date;
@@ -322,7 +323,8 @@ export default function TabsView() {
             {(selectedTab.items ?? []).map(item => {
               const product = products.find(p => p.id === item.product_id);
               return (
-                <div className="list-item" key={item.id}>
+                <div className="list-item" key={item.id} style={{ gap: 10 }}>
+                  <ProductThumb image={product?.image} name={product?.name} size={36} />
                   <div className="list-item__main">
                     <div className="list-item__name">{product?.name ?? `Product #${item.product_id}`}</div>
                     <div className="list-item__sub">${item.unit_price.toFixed(2)} × {item.quantity}</div>
@@ -424,7 +426,8 @@ export default function TabsView() {
                       const product = products.find(p => p.id === item.product_id);
                       const slug = product?.name.toLowerCase().replace(/\s+/g, '-') ?? String(item.id);
                       return (
-                        <div className="list-item" key={item.id}>
+                        <div className="list-item" key={item.id} style={{ gap: 10 }}>
+                          <ProductThumb image={product?.image} name={product?.name} size={36} />
                           <div className="list-item__main">
                             <div className="list-item__name">{product?.name ?? `Product #${item.product_id}`}</div>
                             <div className="list-item__sub">@ ${item.unit_price.toFixed(2)} each</div>
@@ -485,7 +488,8 @@ export default function TabsView() {
                 <div className="card__title">Add Items</div>
                 <div style={{ maxHeight: '45vh', overflowY: 'auto', overscrollBehavior: 'contain' }}>
                 {products.map(p => (
-                  <div className="list-item" key={p.id}>
+                  <div className="list-item" key={p.id} style={{ gap: 10 }}>
+                    <ProductThumb image={p.image} name={p.name} size={40} />
                     <div className="list-item__main">
                       <div className="list-item__name">{p.name}</div>
                       <div className="list-item__sub">

@@ -10,6 +10,20 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ### Products
 
+#### Product image thumbnails
+- Each product now has an optional photo thumbnail shown everywhere products appear
+- **Products view** — in grid view: 96×96 px thumbnail (centred, editable by tapping); in list view: 56×56 px on the left (also editable)
+- **Checkout Add Items** — grid picker: full-width 72 px banner at top of each card; list picker: 40×40 px on the left of each row
+- **Checkout order summary** — 36×36 px thumbnail next to each line item
+- **Tabs Add Items** — 40×40 px thumbnail on the left of each product row
+- **Tabs On the Tab** and **cash payment summary** — 36×36 px thumbnail next to each line item
+- In the **create product** form, a photo picker lets the user take a photo with the camera or choose from the gallery before saving
+- Tapping any thumbnail (or its placeholder) in the Products view opens the device camera/gallery picker to replace the image
+- Images are cropped client-side to a 200×200 px centre-crop JPEG (quality 0.75) before being stored — no server-side processing needed
+- Products without an image show a grey 📷 placeholder everywhere
+- Backend: `image TEXT` column added to `products` (migration-safe `ALTER TABLE ... ADD COLUMN IF NOT EXISTS`); `PATCH /api/products/:id/image` endpoint; `POST /api/products` now accepts optional `image` field
+- BDD: 2 new backend scenarios (upload image, create with image) and 2 new frontend scenarios (placeholder visible, image shown when set)
+
 #### Close (void) an empty tab
 - When a tab has no items the "Pay Tab" card shows a **Close Tab (no charge)** button instead of the payment buttons
 - Closing requires a PIN — the existing PIN modal is reused

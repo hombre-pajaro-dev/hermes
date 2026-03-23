@@ -22,6 +22,7 @@ export const api = {
   createProduct: (body: Omit<Product, 'id'>) => req<Product>('/products', { method: 'POST', body: JSON.stringify(body) }),
   updatePrice: (id: number, price: number) => req<Product>(`/products/${id}/price`, { method: 'PATCH', body: JSON.stringify({ price }) }),
   updateCost: (id: number, cost: number) => req<Product>(`/products/${id}/cost`, { method: 'PATCH', body: JSON.stringify({ cost }) }),
+  updateImage: (id: number, image: string | null) => req<Product>(`/products/${id}/image`, { method: 'PATCH', body: JSON.stringify({ image }) }),
 
   // Register
   getSession: () => req<RegisterSession | null>('/register/session'),
@@ -74,7 +75,7 @@ export const api = {
 };
 
 // Types
-export interface Product { id: number; name: string; description: string; cost: number; price: number; units: number; }
+export interface Product { id: number; name: string; description: string; cost: number; price: number; units: number; image?: string | null; }
 export interface RegisterSession { id: number; status: string; opening_cash: number; closing_cash?: number; opened_at: string; closed_at?: string; }
 export interface Cashout { id: number; session_id: number; amount: number; reason: string; created_at: string; }
 export interface OrderItem { product_id: number; quantity: number; }

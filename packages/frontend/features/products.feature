@@ -67,3 +67,12 @@ Feature: Products
     And each product card shows name and price
     When I switch to list view
     Then I see the list view
+
+  Scenario: Products show image thumbnail or placeholder
+    Given I am on the Products page
+    Then each product shows a thumbnail or placeholder
+
+  Scenario: Product with image shows the image
+    Given a product "Espresso" has an image via the API
+    And I am on the Products page
+    Then the product "Espresso" shows its image

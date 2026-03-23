@@ -83,6 +83,21 @@ Then('no ledger entry is created for the cost change', async function (this: Pos
   expect(entries.some(e => e.entry_type === 'cost_change')).to.be.false;
 });
 
+When('I upload an image for {string}', async function (this: PosWorld, name: string) {
+  const productRes = await this.agent.get(`/api/products?name=${encodeURIComponent(name)}`);
+  const product = productRes.body as { id: number };
+  this.response = await this.agent.patch(`/api/products/${product.id}/image`).send({ image: 'data:image/jpeg;base64,/9j/4AAQ' });
+});
+
+When('I create a product with name {string} description {string} cost {float} price {float} units {int} and image {string}', async function (this: PosWorld, name: string, description: string, cost: number, price: number, units: number, image: string) {
+  this.response = await this.agent.post('/api/products').send({ name, description, cost, price, units, image });
+});
+
+Then('the product has an image field', function (this: PosWorld) {
+  const body = this.response.body as { image: unknown };
+  expect(body).to.have.property('image');
+});
+
 Given('a product {string} is added to an open tab', async function (this: PosWorld, name: string) {
   const tabRes = await this.agent.post('/api/tabs').send({ name: 'Test Tab' });
   const tabId = tabRes.body.id as number;

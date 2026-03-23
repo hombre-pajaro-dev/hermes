@@ -216,6 +216,38 @@ Then('each product card shows name and price', async function (this: PosWorld) {
   expect(count).to.be.greaterThan(0);
 });
 
+Given('a product {string} has an image via the API', async function (this: PosWorld, name: string) {
+  const res = await fetch(`${API}/api/products?name=${encodeURIComponent(name)}`);
+  const product = await res.json() as { id: number };
+  await fetch(`${API}/api/products/${product.id}/image`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ image: 'data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAAgGBgcGBQgHBwcJCQgKDBQNDAsLDBkSEw8UHRofHh0aHBwgJC4nICIsIxwcKDcpLDAxNDQ0Hyc5PTgyPC4zNDL/wAARC' }),
+  });
+});
+
+Then('each product shows a thumbnail or placeholder', async function (this: PosWorld) {
+  await this.page.locator('[data-testid="product-item"]').first().waitFor({ timeout: 5000 });
+  const items = this.page.locator('[data-testid="product-item"]');
+  const count = await items.count();
+  expect(count).to.be.greaterThan(0);
+  for (let i = 0; i < count; i++) {
+    const thumb = items.nth(i).locator('[data-testid^="product-thumbnail-"]');
+    expect(await thumb.isVisible()).to.be.true;
+  }
+});
+
+Then('the product {string} shows its image', async function (this: PosWorld, name: string) {
+  const res = await fetch(`${API}/api/products?name=${encodeURIComponent(name)}`);
+  const product = await res.json() as { id: number };
+  await this.page.reload();
+  await this.page.waitForLoadState('networkidle');
+  const thumb = this.page.locator(`[data-testid="product-thumbnail-${product.id}"]`);
+  await thumb.waitFor({ timeout: 5000 });
+  const img = thumb.locator('img');
+  expect(await img.isVisible()).to.be.true;
+});
+
 Then('the cost edit for {string} is locked', async function (this: PosWorld, name: string) {
   const res = await fetch(`${API}/api/products?name=${encodeURIComponent(name)}`);
   const product = await res.json() as { id: number };

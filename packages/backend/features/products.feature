@@ -57,3 +57,13 @@ Feature: Products
     When I update the cost of "Espresso" to 1.50
     Then the response status is 409
     And the response error mentions "open tabs"
+
+  Scenario: Upload an image for a product
+    When I upload an image for "Espresso"
+    Then the response status is 200
+    And the product has an image field
+
+  Scenario: Create a product with an image
+    When I create a product with name "Matcha" description "Green tea" cost 1.00 price 4.00 units 30 and image "data:image/jpeg;base64,/9j/4AAQ"
+    Then the response status is 201
+    And the product has an image field

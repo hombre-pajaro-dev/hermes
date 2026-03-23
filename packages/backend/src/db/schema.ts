@@ -129,6 +129,8 @@ export async function applySchema(db: Pool): Promise<void> {
     ('cash', 'Cash Drawer'), ('credit_card', 'Credit Card'), ('payroll', 'Payroll')
     ON CONFLICT DO NOTHING
   `);
+  await db.query(`ALTER TABLE products ADD COLUMN IF NOT EXISTS image TEXT`);
+
   await db.query(`
     CREATE TABLE IF NOT EXISTS settings (
       key   TEXT PRIMARY KEY,

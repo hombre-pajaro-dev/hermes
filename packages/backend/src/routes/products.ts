@@ -22,16 +22,25 @@ router.get('/:id', async (req, res) => {
 });
 
 router.post('/', async (req, res) => {
-  const { name, description = '', cost, price, units = 0 } = req.body;
+  const { name, description = '', cost, price, units = 0, image = null } = req.body;
   if (!name || cost == null || price == null) {
     return res.status(400).json({ error: 'name, cost, and price are required' });
   }
   const db = await getDb();
   const { rows } = await db.query(
-    'INSERT INTO products (name, description, cost, price, units) VALUES ($1, $2, $3, $4, $5) RETURNING *',
-    [name, description, cost, price, units]
+    'INSERT INTO products (name, description, cost, price, units, image) VALUES ($1, $2, $3, $4, $5, $6) RETURNING *',
+    [name, description, cost, price, units, image]
   );
   res.status(201).json(rows[0]);
+});
+
+router.patch('/:id/image', async (req, res) => {
+  const { image } = req.body;
+  const db = await getDb();
+  const { rows: existing } = await db.query('SELECT * FROM products WHERE id = $1', [req.params.id]);
+  if (!existing[0]) return res.status(404).json({ error: 'Product not found' });
+  const { rows } = await db.query('UPDATE products SET image = $1 WHERE id = $2 RETURNING *', [image ?? null, req.params.id]);
+  res.json(rows[0]);
 });
 
 router.patch('/:id/price', async (req, res) => {

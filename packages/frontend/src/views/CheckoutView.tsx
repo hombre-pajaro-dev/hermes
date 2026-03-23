@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { api } from '../api/client';
 import type { Product } from '../api/client';
 import ReceiptModal, { type ReceiptLine } from '../components/ReceiptModal';
+import ProductThumb from '../components/ProductThumb';
 
 type ViewMode = 'list' | 'grid';
 type Step = 'order' | 'cash';
@@ -197,7 +198,8 @@ export default function CheckoutView() {
                 <div className="empty" data-testid="order-empty">No items in the order yet</div>
               ) : (
                 lines.map(l => (
-                  <div className="list-item" key={l.product.id}>
+                  <div className="list-item" key={l.product.id} style={{ gap: 10 }}>
+                    <ProductThumb image={l.product.image} name={l.product.name} size={36} />
                     <div className="list-item__main">
                       <div className="list-item__name">{l.product.name}</div>
                       <div className="list-item__sub">${l.product.price.toFixed(2)} each</div>
@@ -277,14 +279,22 @@ export default function CheckoutView() {
                       key={p.id}
                       data-testid={`add-${p.name.toLowerCase().replace(/\s+/g, '-')}`}
                       className="product-card"
-                      style={{ border: inOrder ? '2px solid var(--primary)' : undefined, cursor: 'pointer', textAlign: 'left', width: '100%' }}
+                      style={{ border: inOrder ? '2px solid var(--primary)' : undefined, cursor: 'pointer', textAlign: 'left', width: '100%', padding: 0, overflow: 'hidden' }}
                       onClick={() => addProduct(p)}
                       disabled={p.units <= 0}
                     >
-                      <div className="product-card__name">{p.name}</div>
-                      <div className="product-card__price">${p.price.toFixed(2)}</div>
-                      <div className="product-card__meta">{p.units > 0 ? `${p.units} in stock` : 'Out of stock'}</div>
-                      {inOrder && <div style={{ fontSize: '0.75rem', color: 'var(--primary)', fontWeight: 600 }}>× {inOrder.quantity} in order</div>}
+                      <div style={{ width: '100%', height: 72, background: '#f3f4f6', borderBottom: '1px solid var(--border)', flexShrink: 0, overflow: 'hidden' }}>
+                        {p.image
+                          ? <img src={p.image} alt={p.name} style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
+                          : <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#d1d5db', fontSize: '1.8rem' }}>📷</div>
+                        }
+                      </div>
+                      <div style={{ padding: '8px 10px', display: 'flex', flexDirection: 'column', gap: 3 }}>
+                        <div className="product-card__name">{p.name}</div>
+                        <div className="product-card__price">${p.price.toFixed(2)}</div>
+                        <div className="product-card__meta">{p.units > 0 ? `${p.units} in stock` : 'Out of stock'}</div>
+                        {inOrder && <div style={{ fontSize: '0.75rem', color: 'var(--primary)', fontWeight: 600 }}>× {inOrder.quantity} in order</div>}
+                      </div>
                     </button>
                   );
                 })}
@@ -292,7 +302,8 @@ export default function CheckoutView() {
             ) : (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }} data-testid="checkout-products-list">
                 {filteredProducts.map(p => (
-                  <div className="list-item" key={p.id}>
+                  <div className="list-item" key={p.id} style={{ gap: 10 }}>
+                    <ProductThumb image={p.image} name={p.name} size={40} />
                     <div className="list-item__main">
                       <div className="list-item__name">{p.name}</div>
                       <div className="list-item__sub">{p.units} in stock</div>
