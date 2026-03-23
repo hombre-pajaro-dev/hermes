@@ -45,7 +45,7 @@ export default function TabsView() {
     api.getProducts().then(setProducts).catch(() => {});
     try {
       const full = await api.getTab(t.id);
-      setSelectedTab(full);
+      setSelectedTab(stableItems(full));
     } catch { /* ignore */ }
   }
 
@@ -69,7 +69,7 @@ export default function TabsView() {
     adjustProductUnits(product.id, 1);
     try {
       const updated = await api.addTabItems(selectedTab.id, [{ product_id: product.id, quantity: 1 }]);
-      setSelectedTab(updated);
+      setSelectedTab(stableItems(updated));
       loadTabs();
     } catch (e: unknown) {
       adjustProductUnits(product.id, -1);
@@ -85,12 +85,18 @@ export default function TabsView() {
     if (item && qtyDelta !== 0) adjustProductUnits(item.product_id, qtyDelta);
     try {
       const updated = await api.updateTabItem(selectedTab.id, itemId, quantity);
-      setSelectedTab(updated);
+      setSelectedTab(stableItems(updated));
       loadTabs();
     } catch (e: unknown) {
       if (item && qtyDelta !== 0) adjustProductUnits(item.product_id, -qtyDelta);
       setError((e as Error).message);
     }
+  }
+
+  // Sort items by id (insertion order) so the list never jumps after an update
+  function stableItems<T extends Tab & { items?: TabItem[] }>(tab: T): T {
+    if (!tab.items) return tab;
+    return { ...tab, items: [...tab.items].sort((a, b) => a.id - b.id) };
   }
 
   function toReceiptLines(items: TabItem[]): ReceiptLine[] {
@@ -385,28 +391,6 @@ export default function TabsView() {
 
           {selectedTab.status === 'open' && (
             <>
-              <div className="card">
-                <div className="card__title">Pay Tab</div>
-                <div style={{ display: 'flex', gap: 8 }}>
-                  <button
-                    data-testid="pay-card-btn"
-                    className="btn btn--primary"
-                    style={{ flex: 1 }}
-                    onClick={handlePayCard}
-                  >
-                    💳 Pay with Card
-                  </button>
-                  <button
-                    data-testid="proceed-to-cash-btn"
-                    className="btn btn--success"
-                    style={{ flex: 1 }}
-                    onClick={() => setPayStep('cash')}
-                  >
-                    💵 Pay with Cash
-                  </button>
-                </div>
-              </div>
-
               {selectedTab.items && selectedTab.items.length > 0 && (
                 <div className="card" data-testid="tab-items">
                   <div className="card__title">On the Tab</div>
@@ -438,6 +422,28 @@ export default function TabsView() {
                   })}
                 </div>
               )}
+
+              <div className="card">
+                <div className="card__title">Pay Tab</div>
+                <div style={{ display: 'flex', gap: 8 }}>
+                  <button
+                    data-testid="pay-card-btn"
+                    className="btn btn--primary"
+                    style={{ flex: 1 }}
+                    onClick={handlePayCard}
+                  >
+                    💳 Pay with Card
+                  </button>
+                  <button
+                    data-testid="proceed-to-cash-btn"
+                    className="btn btn--success"
+                    style={{ flex: 1 }}
+                    onClick={() => setPayStep('cash')}
+                  >
+                    💵 Pay with Cash
+                  </button>
+                </div>
+              </div>
 
               <div className="card">
                 <div className="card__title">Add Items</div>

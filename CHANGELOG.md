@@ -15,6 +15,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - `ReceiptLine` interface exported from the component; callers map their domain lines (checkout `LineItem`, tab `TabItem`) to this neutral type
 - Tabs preserve their specific pricing: at-cost tabs show `unit_price` (cost price) in the receipt, not the regular sale price
 
+#### Tab detail section order and stable item list
+- **Fix**: Item order in "On the Tab" no longer jumps when adjusting quantities — items are now sorted by ID (insertion order) after every API response
+- "On the Tab" is now the first section after the tab header, followed by "Pay Tab", then "Add Items"
+
 #### Cash payment view and receipt modal in Tabs
 - Tab payment now mirrors the Checkout flow: "Pay with Card" and "Pay with Cash" buttons replace the old Card/Cash tab selector
 - "Pay with Cash" transitions to a dedicated cash payment view showing the tab name, item breakdown, total due, live change calculation, and a Confirm button
