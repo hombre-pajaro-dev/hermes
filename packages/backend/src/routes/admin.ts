@@ -1,12 +1,12 @@
 import { Router } from 'express';
-import type { Request } from 'express';
+import type { Request, Response, NextFunction } from 'express';
 import { getDb } from '../db/database';
 
 interface AuthRequest extends Request {
   session?: { user: { role?: string } };
 }
 
-function requireAdmin(req: AuthRequest, res: Parameters<Parameters<Router['use']>[0]>[1], next: Parameters<Parameters<Router['use']>[0]>[2]) {
+function requireAdmin(req: AuthRequest, res: Response, next: NextFunction) {
   if (req.session?.user?.role !== 'admin') {
     res.status(403).json({ error: 'Admin access required' });
     return;
