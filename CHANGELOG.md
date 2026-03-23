@@ -10,6 +10,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ### Products
 
+#### Order summary moved to top of Checkout
+- The current order (items, quantities, total, Proceed to Payment) now appears above the Add Items section so staff can always see what's in the order without scrolling down
+
 #### Product search filter in Checkout
 - A search box above the product list/grid filters products by name as you type (case-insensitive, substring match)
 - Clearing the search restores all products instantly — no network request needed
