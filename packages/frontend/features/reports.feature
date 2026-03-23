@@ -13,6 +13,13 @@ Feature: Reports
     When I switch to the Daily tab
     Then I see the daily total section
 
+  Scenario: Daily total shows cash and card breakdown
+    Given I am on the Reports page
+    When I switch to the Daily tab
+    Then I see the daily total section
+    And I see the cash sales stat
+    And I see the card sales stat
+
   Scenario: View daily range report
     Given I am on the Reports page
     When I switch to the Range tab

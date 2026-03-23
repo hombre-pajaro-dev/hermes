@@ -41,3 +41,13 @@ Then('I see the close brief section', async function (this: PosWorld) {
   await this.page.waitForSelector('[data-testid="close-brief"]', { timeout: 8000 });
   expect(await this.page.locator('[data-testid="close-brief"]').isVisible()).to.be.true;
 });
+
+Then('I see the cash sales stat', async function (this: PosWorld) {
+  await this.page.waitForSelector('[data-testid="cash-sales"]', { timeout: 5000 });
+  expect(await this.page.locator('[data-testid="cash-sales"]').isVisible()).to.be.true;
+});
+
+Then('I see the card sales stat', async function (this: PosWorld) {
+  await this.page.waitForSelector('[data-testid="card-sales"]', { timeout: 5000 });
+  expect(await this.page.locator('[data-testid="card-sales"]').isVisible()).to.be.true;
+});

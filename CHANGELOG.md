@@ -8,6 +8,17 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+### Reports
+
+#### Cash and card sales breakdown in daily total (fix + feature)
+- Fixed a rendering crash in the Daily tab: `cash_sales` and `card_sales` were `undefined` when fetched from an older backend, causing `.toFixed()` to throw and silently prevent the daily section from rendering
+- Daily total now shows two additional stat tiles: **Cash** and **Card** — so staff can reconcile the till at a glance
+- Backend `GET /api/reports/daily-total` now returns `cash_sales` and `card_sales` fields computed from `payment_method`
+- Frontend `DailyTotal` type marks both fields as optional so the view degrades gracefully if the backend is not yet updated
+- BDD: new backend scenario "Daily total report breaks down sales by payment method" and new frontend scenario "Daily total shows cash and card breakdown" with `cash-sales` / `card-sales` testid selectors
+
+---
+
 ### Ledger
 
 #### Expandable order and tab items on ledger entries

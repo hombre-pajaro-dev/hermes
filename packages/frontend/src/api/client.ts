@@ -86,7 +86,7 @@ export interface LedgerEntryItem { product_id: number; name: string; quantity: n
 export interface Account { id: number; name: string; label: string; }
 export interface Balance { account: string; balance: number; }
 export interface SalesByItem { product_id: number; name: string; units_sold: number; revenue: number; cost: number; }
-export interface DailyTotal { date: string; order_count: number; total_sales: number; cash_sales: number; card_sales: number; total_cost: number; }
+export interface DailyTotal { date: string; order_count: number; total_sales: number; cash_sales?: number; card_sales?: number; total_cost: number; }
 export interface DailyRange { date: string; revenue: number; cost: number; order_count: number; }
 export interface CloseBrief { session_id: number; revenue: number; total_cost: number; gross_profit: number; most_sold?: { name: string; units_sold: number } | null; most_profitable?: { name: string; profit: number } | null; by_item: SalesByItem[]; }
 export interface RestockOrder { id: number; session_id: number; items: { product_id: number; name: string; quantity: number; new_units: number }[]; }
