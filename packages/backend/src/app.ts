@@ -1,6 +1,45 @@
 import express from 'express';
 import cors from 'cors';
-import { toNodeHandler, fromNodeHeaders } from 'better-auth/node';
+import type { IncomingMessage, ServerResponse, IncomingHttpHeaders } from 'http';
+
+function fromNodeHeaders(nodeHeaders: IncomingHttpHeaders): Headers {
+  const headers = new Headers();
+  for (const [key, value] of Object.entries(nodeHeaders)) {
+    if (value === undefined) continue;
+    if (Array.isArray(value)) value.forEach(v => headers.append(key, v));
+    else headers.set(key, value);
+  }
+  return headers;
+}
+
+function toNodeHandler(auth: { handler: (req: Request) => Promise<Response> }) {
+  return async (nodeReq: IncomingMessage, nodeRes: ServerResponse) => {
+    const proto = (nodeReq.headers['x-forwarded-proto'] as string | undefined)
+      ?? ((nodeReq.socket as { encrypted?: boolean }).encrypted ? 'https' : 'http');
+    const url = `${proto}://${nodeReq.headers.host ?? 'localhost'}${nodeReq.url ?? '/'}`;
+
+    const chunks: Buffer[] = [];
+    for await (const chunk of nodeReq) chunks.push(chunk as Buffer);
+    const body = Buffer.concat(chunks);
+
+    const request = new Request(url, {
+      method: nodeReq.method ?? 'GET',
+      headers: fromNodeHeaders(nodeReq.headers),
+      body: body.length > 0 ? body : undefined,
+    });
+
+    const response = await auth.handler(request);
+
+    nodeRes.statusCode = response.status;
+    const setCookies = response.headers.getSetCookie?.() ?? [];
+    response.headers.forEach((value, key) => {
+      if (key.toLowerCase() !== 'set-cookie') nodeRes.setHeader(key, value);
+    });
+    if (setCookies.length > 0) nodeRes.setHeader('set-cookie', setCookies);
+
+    nodeRes.end(Buffer.from(await response.arrayBuffer()));
+  };
+}
 import { auth } from './auth';
 import productsRouter from './routes/products';
 import registerRouter from './routes/register';
