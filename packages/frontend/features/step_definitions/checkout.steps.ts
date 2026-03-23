@@ -47,12 +47,6 @@ When('I add {string} to the order', async function (this: PosWorld, name: string
   await this.page.click(`[data-testid="${testId}"]`);
 });
 
-When('I click Proceed to Payment', async function (this: PosWorld) {
-  await this.page.waitForSelector('[data-testid="create-order-btn"]', { timeout: 5000 });
-  await this.page.click('[data-testid="create-order-btn"]');
-  await this.page.waitForLoadState('networkidle');
-});
-
 When('I select card payment', async function (this: PosWorld) {
   await this.page.click('[data-testid="pay-card-tab"]');
 });

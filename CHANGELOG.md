@@ -10,8 +10,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ### Products
 
+#### Inline payment in Checkout
+- Payment no longer redirects to a separate view — the Card/Cash tab selector, cash amount input, and Pay button are all inline inside the order card
+- After a successful payment a success banner appears at the top; cash payments also show a "Change Due" card
+- A "New Order" button resets the view to start a fresh sale
+- BDD scenarios updated to remove the "Proceed to Payment" step (no longer needed)
+
 #### Order summary moved to top of Checkout
-- The current order (items, quantities, total, Proceed to Payment) now appears above the Add Items section so staff can always see what's in the order without scrolling down
+- The current order (items, quantities, total, and payment controls) now appears above the Add Items section so staff can always see what's in the order without scrolling down
 
 #### Product search filter in Checkout
 - A search box above the product list/grid filters products by name as you type (case-insensitive, substring match)
