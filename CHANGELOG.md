@@ -10,11 +10,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ### Products
 
-#### Inline payment in Checkout
-- Payment no longer redirects to a separate view — the Card/Cash tab selector, cash amount input, and Pay button are all inline inside the order card
-- After a successful payment a success banner appears at the top; cash payments also show a "Change Due" card
-- A "New Order" button resets the view to start a fresh sale
-- BDD scenarios updated to remove the "Proceed to Payment" step (no longer needed)
+#### Cash payment view with live change calculation and receipt modal
+- Clicking "Pay with Cash" transitions to a dedicated cash payment view showing the order summary and a cash-received input
+- Change due is calculated live as the cashier types — shown in green when sufficient, red when short
+- "Confirm Payment" is disabled until cash received ≥ order total
+- After any payment (card or cash) a receipt modal appears showing: timestamp, itemised order (name, quantity, unit price, line total), subtotal, total, and change due for cash sales
+- Receipt modal includes placeholder **Print** and **Email** buttons (not yet wired up) for future use
+- Closing the modal clears the order and resets to a fresh state
+- BDD scenarios added: cash payment live change, receipt modal content, close to start new order
 
 #### Order summary moved to top of Checkout
 - The current order (items, quantities, total, and payment controls) now appears above the Add Items section so staff can always see what's in the order without scrolling down

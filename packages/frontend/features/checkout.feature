@@ -7,25 +7,46 @@ Feature: Checkout
   Scenario: Complete a sale with card
     Given I am on the Checkout page
     When I add "Espresso" to the order
-    And I select card payment
-    And I confirm payment
-    Then I see a payment success message
+    And I pay with card
+    Then I see the receipt modal
 
   Scenario: Complete a sale with cash and receive change
     Given I am on the Checkout page
     When I add "Latte" to the order
-    And I select cash payment
+    And I proceed to cash payment
     And I enter cash received as 10
     And I confirm payment
-    Then I see a payment success message
+    Then I see the receipt modal
     And I see change due displayed
 
   Scenario: Cannot checkout when register is closed
     Given the register is closed via the API
     And I am on the Checkout page
     When I add "Espresso" to the order
-    And I confirm payment
+    And I pay with card
     Then I see an error message
+
+  Scenario: Cash payment view shows live change calculation
+    Given I am on the Checkout page
+    When I add "Latte" to the order
+    And I proceed to cash payment
+    And I enter cash received as 10
+    Then I see the live change amount
+
+  Scenario: Receipt modal shows order details
+    Given I am on the Checkout page
+    When I add "Espresso" to the order
+    And I pay with card
+    Then I see the receipt modal
+    And the receipt shows a timestamp
+    And the receipt shows order items
+
+  Scenario: Close receipt modal to start new order
+    Given I am on the Checkout page
+    When I add "Espresso" to the order
+    And I pay with card
+    And I close the receipt modal
+    Then the order is cleared
 
   Scenario: Filter products by name in checkout
     Given I am on the Checkout page

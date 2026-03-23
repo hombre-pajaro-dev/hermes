@@ -8,7 +8,7 @@ When('I type {string} in the product search', async function (this: PosWorld, qu
 });
 
 Then('only products matching {string} are shown', async function (this: PosWorld, name: string) {
-  await this.page.locator(`[data-testid="add-${name.toLowerCase().replace(/\s+/g, '-')}"]`).waitFor({ timeout: 5000 });
+  await this.page.locator(`[data-testid="add-${name.toLowerCase().replace(/\s+/g, '-')}\"]`).waitFor({ timeout: 5000 });
   const visible = await this.page.locator('[data-testid^="add-"]').evaluateAll(
     els => els.filter(el => (el as HTMLElement).offsetParent !== null).length
   );
@@ -47,12 +47,15 @@ When('I add {string} to the order', async function (this: PosWorld, name: string
   await this.page.click(`[data-testid="${testId}"]`);
 });
 
-When('I select card payment', async function (this: PosWorld) {
-  await this.page.click('[data-testid="pay-card-tab"]');
+When('I pay with card', async function (this: PosWorld) {
+  await this.page.waitForSelector('[data-testid="pay-card-btn"]', { timeout: 5000 });
+  await this.page.click('[data-testid="pay-card-btn"]');
+  await this.page.waitForLoadState('networkidle');
 });
 
-When('I select cash payment', async function (this: PosWorld) {
-  await this.page.click('[data-testid="pay-cash-tab"]');
+When('I proceed to cash payment', async function (this: PosWorld) {
+  await this.page.waitForSelector('[data-testid="proceed-to-cash-btn"]', { timeout: 5000 });
+  await this.page.click('[data-testid="proceed-to-cash-btn"]');
 });
 
 When('I enter cash received as {int}', async function (this: PosWorld, amount: number) {
@@ -62,6 +65,39 @@ When('I enter cash received as {int}', async function (this: PosWorld, amount: n
 When('I confirm payment', async function (this: PosWorld) {
   await this.page.click('[data-testid="confirm-payment-btn"]');
   await this.page.waitForLoadState('networkidle');
+});
+
+Then('I see the live change amount', async function (this: PosWorld) {
+  await this.page.locator('[data-testid="live-change-amount"]').waitFor({ timeout: 5000 });
+  expect(await this.page.locator('[data-testid="live-change-amount"]').isVisible()).to.be.true;
+});
+
+Then('I see the receipt modal', async function (this: PosWorld) {
+  await this.page.locator('[data-testid="receipt-modal"]').waitFor({ timeout: 8000 });
+  expect(await this.page.locator('[data-testid="receipt-modal"]').isVisible()).to.be.true;
+});
+
+Then('the receipt shows a timestamp', async function (this: PosWorld) {
+  const ts = this.page.locator('[data-testid="receipt-timestamp"]');
+  await ts.waitFor({ timeout: 5000 });
+  const text = await ts.textContent();
+  expect(text?.trim().length).to.be.greaterThan(0);
+});
+
+Then('the receipt shows order items', async function (this: PosWorld) {
+  const items = this.page.locator('[data-testid^="receipt-item-"]');
+  await items.first().waitFor({ timeout: 5000 });
+  const count = await items.count();
+  expect(count).to.be.greaterThan(0);
+});
+
+When('I close the receipt modal', async function (this: PosWorld) {
+  await this.page.click('[data-testid="close-receipt-btn"]');
+});
+
+Then('the order is cleared', async function (this: PosWorld) {
+  const isVisible = await this.page.locator('[data-testid="order-lines"]').isVisible();
+  expect(isVisible).to.be.false;
 });
 
 Then('I see a payment success message', async function (this: PosWorld) {
