@@ -8,6 +8,16 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+### Infrastructure
+
+#### Database migration script
+- Added `pnpm --filter backend migrate` (runs `src/scripts/migrate.ts`) — connects to the PostgreSQL server, creates the target database if it does not exist, then applies the full schema
+- Fixes the "database does not exist" error when setting up a fresh local or hosted Postgres instance
+- Safe to re-run: all `CREATE TABLE` statements use `IF NOT EXISTS`
+- README updated with step-by-step local setup instructions including Docker quickstart and migration command
+
+---
+
 ### Reports
 
 #### Cash and card sales breakdown in daily total (fix + feature)
