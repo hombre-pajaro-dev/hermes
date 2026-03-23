@@ -36,10 +36,8 @@ When('I add {string} to the tab', async function (this: PosWorld, name: string) 
 });
 
 When('I view the tab {string}', async function (this: PosWorld, _name: string) {
-  // Reload to see tabs list
   await this.page.reload();
   await this.page.waitForLoadState('networkidle');
-  // Find and click the tab
   const self = this as PosWorld & { tabId?: number };
   const tabId = self.tabId;
   if (tabId) {
@@ -48,13 +46,12 @@ When('I view the tab {string}', async function (this: PosWorld, _name: string) {
 });
 
 When('I pay the tab with card', async function (this: PosWorld) {
-  await this.page.waitForSelector('[data-testid="pay-tab-btn"]');
-  await this.page.click('[data-testid="pay-tab-btn"]');
+  await this.page.waitForSelector('[data-testid="pay-card-btn"]', { timeout: 5000 });
+  await this.page.click('[data-testid="pay-card-btn"]');
   await this.page.waitForLoadState('networkidle');
 });
 
 Then('the tab total is greater than 0', async function (this: PosWorld) {
-  // Wait for the total to update - poll until it shows > 0
   await this.page.waitForSelector('[data-testid="tab-total"]', { timeout: 10000 });
   await this.page.waitForFunction(() => {
     const el = document.querySelector('[data-testid="tab-total"]');
@@ -101,6 +98,7 @@ Then('the tab items section is empty', async function (this: PosWorld) {
   expect(visible).to.equal(false);
 });
 
-Then('the tab is marked as paid', async function (this: PosWorld) {
-  await this.page.waitForSelector('[data-testid="success-banner"]', { timeout: 5000 });
+Then('I see the tabs list', async function (this: PosWorld) {
+  await this.page.locator('[data-testid="open-tab-count"]').waitFor({ timeout: 5000 });
+  expect(await this.page.locator('[data-testid="open-tab-count"]').isVisible()).to.be.true;
 });

@@ -2,6 +2,14 @@ import { useEffect, useRef, useState } from 'react';
 import { api } from '../api/client';
 import type { Tab, TabItem, Product } from '../api/client';
 import PinModal from '../components/PinModal';
+import ReceiptModal, { type ReceiptLine } from '../components/ReceiptModal';
+
+interface Receipt {
+  timestamp: Date;
+  lines: ReceiptLine[];
+  total: number;
+  changeDue: number | null;
+}
 
 export default function TabsView() {
   const [tabs, setTabs] = useState<Tab[]>([]);
@@ -9,13 +17,13 @@ export default function TabsView() {
   const [selectedTab, setSelectedTab] = useState<(Tab & { items?: TabItem[] }) | null>(null);
   const [tabName, setTabName] = useState('');
   const [atCost, setAtCost] = useState(false);
-  const [payMethod, setPayMethod] = useState<'cash' | 'card'>('card');
+  const [payStep, setPayStep] = useState<'form' | 'cash'>('form');
   const [cashReceived, setCashReceived] = useState('');
   const [error, setError] = useState('');
-  const [success, setSuccess] = useState('');
   const [view, setView] = useState<'list' | 'new' | 'detail'>('list');
   const [closedPage, setClosedPage] = useState(0);
   const [showPinForTab, setShowPinForTab] = useState(false);
+  const [receipt, setReceipt] = useState<Receipt | null>(null);
   const PAGE_SIZE = 10;
 
   async function loadTabs(resetPage = false) {
@@ -31,10 +39,8 @@ export default function TabsView() {
   }, []);
 
   async function openTab(t: Tab) {
-    // Show the tab immediately with basic data, then load items + fresh stock in background
     setSelectedTab(t as Tab & { items?: TabItem[] });
-    setError(''); setSuccess('');
-    setCashReceived(''); setPayMethod('card');
+    setError(''); setCashReceived(''); setPayStep('form');
     setView('detail');
     api.getProducts().then(setProducts).catch(() => {});
     try {
@@ -66,7 +72,7 @@ export default function TabsView() {
       setSelectedTab(updated);
       loadTabs();
     } catch (e: unknown) {
-      adjustProductUnits(product.id, -1); // restore on failure
+      adjustProductUnits(product.id, -1);
       setError((e as Error).message);
     }
   }
@@ -82,21 +88,53 @@ export default function TabsView() {
       setSelectedTab(updated);
       loadTabs();
     } catch (e: unknown) {
-      if (item && qtyDelta !== 0) adjustProductUnits(item.product_id, -qtyDelta); // restore on failure
+      if (item && qtyDelta !== 0) adjustProductUnits(item.product_id, -qtyDelta);
       setError((e as Error).message);
     }
   }
 
-  async function handlePayTab() {
+  function toReceiptLines(items: TabItem[]): ReceiptLine[] {
+    return items.map(item => {
+      const product = products.find(p => p.id === item.product_id);
+      return {
+        id: item.id,
+        name: product?.name ?? `Product #${item.product_id}`,
+        quantity: item.quantity,
+        unitPrice: item.unit_price,
+      };
+    });
+  }
+
+  async function handlePayCard() {
     if (!selectedTab) return;
     setError('');
+    const snapshot = { items: selectedTab.items ?? [], total: selectedTab.total };
     try {
-      await api.payTab(selectedTab.id, payMethod, payMethod === 'cash' ? Number(cashReceived) : undefined);
+      await api.payTab(selectedTab.id, 'card');
+      setReceipt({ timestamp: new Date(), lines: toReceiptLines(snapshot.items), total: snapshot.total, changeDue: null });
       setSelectedTab(null);
-      setView('list');
       await loadTabs(true);
-      setSuccess('Tab paid!');
     } catch (e: unknown) { setError((e as Error).message); }
+  }
+
+  async function handlePayCash() {
+    if (!selectedTab) return;
+    setError('');
+    const snapshot = { items: selectedTab.items ?? [], total: selectedTab.total };
+    const cash = Number(cashReceived);
+    try {
+      await api.payTab(selectedTab.id, 'cash', cash);
+      setReceipt({ timestamp: new Date(), lines: toReceiptLines(snapshot.items), total: snapshot.total, changeDue: Math.max(0, cash - snapshot.total) });
+      setSelectedTab(null);
+      setCashReceived('');
+      await loadTabs(true);
+    } catch (e: unknown) { setError((e as Error).message); }
+  }
+
+  function handleCloseReceipt() {
+    setReceipt(null);
+    setView('list');
+    setError('');
   }
 
   const prevTabTotal = useRef<number | null>(null);
@@ -106,6 +144,10 @@ export default function TabsView() {
     if (prevTabTotal.current !== null && prevTabTotal.current !== t) setTotalBump(b => b + 1);
     prevTabTotal.current = t;
   }, [selectedTab?.total]);
+
+  const tabTotal = selectedTab?.total ?? 0;
+  const cashNum = Number(cashReceived) || 0;
+  const liveChange = cashReceived !== '' ? cashNum - tabTotal : null;
 
   const openTabs = tabs.filter(t => t.status === 'open');
   const closedTabs = tabs.filter(t => t.status !== 'open');
@@ -126,11 +168,20 @@ export default function TabsView() {
         />
       )}
 
+      {receipt && (
+        <ReceiptModal
+          timestamp={receipt.timestamp}
+          lines={receipt.lines}
+          total={receipt.total}
+          changeDue={receipt.changeDue}
+          onClose={handleCloseReceipt}
+        />
+      )}
+
       {error && <div className="error-banner" data-testid="error-banner">{error}</div>}
-      {success && <div className="success-banner" data-testid="success-banner">{success}</div>}
 
       <div className="tabs-nav">
-        <button className={`tabs-nav__item${view === 'list' ? ' active' : ''}`} onClick={() => setView('list')}>Tabs</button>
+        <button className={`tabs-nav__item${view === 'list' ? ' active' : ''}`} onClick={() => { setView('list'); setPayStep('form'); }}>Tabs</button>
         <button className={`tabs-nav__item${view === 'new' ? ' active' : ''}`} onClick={() => setView('new')}>+ New Tab</button>
       </div>
 
@@ -185,19 +236,9 @@ export default function TabsView() {
               </div>
               {closedPageCount > 1 && (
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 0' }}>
-                  <button
-                    className="btn btn--sm btn--ghost"
-                    onClick={() => setClosedPage(p => Math.max(0, p - 1))}
-                    disabled={closedPage === 0}
-                  >← Prev</button>
-                  <span style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
-                    Page {closedPage + 1} of {closedPageCount}
-                  </span>
-                  <button
-                    className="btn btn--sm btn--ghost"
-                    onClick={() => setClosedPage(p => Math.min(closedPageCount - 1, p + 1))}
-                    disabled={closedPage >= closedPageCount - 1}
-                  >Next →</button>
+                  <button className="btn btn--sm btn--ghost" onClick={() => setClosedPage(p => Math.max(0, p - 1))} disabled={closedPage === 0}>← Prev</button>
+                  <span style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>Page {closedPage + 1} of {closedPageCount}</span>
+                  <button className="btn btn--sm btn--ghost" onClick={() => setClosedPage(p => Math.min(closedPageCount - 1, p + 1))} disabled={closedPage >= closedPageCount - 1}>Next →</button>
                 </div>
               )}
             </>
@@ -231,7 +272,96 @@ export default function TabsView() {
         </div>
       )}
 
-      {view === 'detail' && selectedTab && (
+      {/* Cash payment step — rendered instead of detail when paying with cash */}
+      {view === 'detail' && selectedTab && payStep === 'cash' && (
+        <div>
+          <button className="btn btn--ghost" style={{ marginBottom: 12 }}
+            onClick={() => { setPayStep('form'); setError(''); setCashReceived(''); }}>
+            ← Back to Tab
+          </button>
+
+          <div className="card" data-testid="tab-cash-payment-view">
+            <div className="card__title">Cash Payment — {selectedTab.name}</div>
+
+            {selectedTab.at_cost ? (
+              <div style={{ background: '#fef08a', color: '#713f12', borderRadius: 8, padding: '8px 12px', marginBottom: 12, fontSize: '0.85rem', fontWeight: 600, border: '1px solid #ca8a04' }}>
+                ⚠️ STAFF COST PRICE
+              </div>
+            ) : null}
+
+            {(selectedTab.items ?? []).map(item => {
+              const product = products.find(p => p.id === item.product_id);
+              return (
+                <div className="list-item" key={item.id}>
+                  <div className="list-item__main">
+                    <div className="list-item__name">{product?.name ?? `Product #${item.product_id}`}</div>
+                    <div className="list-item__sub">${item.unit_price.toFixed(2)} × {item.quantity}</div>
+                  </div>
+                  <div style={{ minWidth: 60, textAlign: 'right' }}>${item.subtotal.toFixed(2)}</div>
+                </div>
+              );
+            })}
+
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 700, fontSize: '1.1rem', margin: '12px 0 16px' }}>
+              <span>Total Due</span>
+              <span>${tabTotal.toFixed(2)}</span>
+            </div>
+
+            <div className="field">
+              <label className="label">Amount Received ($)</label>
+              <input
+                data-testid="cash-received-input"
+                className="input"
+                type="number"
+                min="0"
+                step="0.01"
+                value={cashReceived}
+                onChange={e => setCashReceived(e.target.value)}
+                autoFocus
+              />
+            </div>
+
+            {liveChange !== null && (
+              <div
+                data-testid="live-change-amount"
+                style={{
+                  fontSize: '1.6rem',
+                  fontWeight: 700,
+                  textAlign: 'center',
+                  padding: '14px 0',
+                  color: liveChange >= 0 ? 'var(--success)' : 'var(--danger)',
+                }}
+              >
+                {liveChange >= 0
+                  ? `Change: $${liveChange.toFixed(2)}`
+                  : `Still needed: $${Math.abs(liveChange).toFixed(2)}`}
+              </div>
+            )}
+
+            <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
+              <button
+                className="btn btn--ghost"
+                style={{ width: 'auto', padding: '10px 16px' }}
+                onClick={() => { setPayStep('form'); setError(''); setCashReceived(''); }}
+              >
+                ← Back
+              </button>
+              <button
+                data-testid="confirm-payment-btn"
+                className="btn btn--success"
+                style={{ flex: 1 }}
+                onClick={handlePayCash}
+                disabled={!cashReceived || Number(cashReceived) < tabTotal}
+              >
+                Confirm Payment
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Tab detail view */}
+      {view === 'detail' && selectedTab && payStep === 'form' && (
         <div>
           <button className="btn btn--ghost" style={{ marginBottom: 12 }} onClick={() => { setView('list'); setSelectedTab(null); }}>← All Tabs</button>
 
@@ -257,21 +387,24 @@ export default function TabsView() {
             <>
               <div className="card">
                 <div className="card__title">Pay Tab</div>
-                <div className="tabs-nav">
-                  <button className={`tabs-nav__item${payMethod === 'card' ? ' active' : ''}`} onClick={() => setPayMethod('card')}>Card</button>
-                  <button className={`tabs-nav__item${payMethod === 'cash' ? ' active' : ''}`} onClick={() => setPayMethod('cash')}>Cash</button>
+                <div style={{ display: 'flex', gap: 8 }}>
+                  <button
+                    data-testid="pay-card-btn"
+                    className="btn btn--primary"
+                    style={{ flex: 1 }}
+                    onClick={handlePayCard}
+                  >
+                    💳 Pay with Card
+                  </button>
+                  <button
+                    data-testid="proceed-to-cash-btn"
+                    className="btn btn--success"
+                    style={{ flex: 1 }}
+                    onClick={() => setPayStep('cash')}
+                  >
+                    💵 Pay with Cash
+                  </button>
                 </div>
-                {payMethod === 'cash' && (
-                  <div className="field">
-                    <label className="label">Amount Received ($)</label>
-                    <input data-testid="tab-cash-input" className="input" type="number" min="0" step="0.01"
-                      value={cashReceived} onChange={e => setCashReceived(e.target.value)} />
-                  </div>
-                )}
-                <button data-testid="pay-tab-btn" className="btn btn--success"
-                  onClick={handlePayTab} disabled={payMethod === 'cash' && !cashReceived}>
-                  Pay Tab (<span key={totalBump} className="value-bump">${selectedTab.total.toFixed(2)}</span>)
-                </button>
               </div>
 
               {selectedTab.items && selectedTab.items.length > 0 && (
@@ -315,12 +448,12 @@ export default function TabsView() {
                       <div className="list-item__sub">
                         ${selectedTab.at_cost ? p.cost.toFixed(2) : p.price.toFixed(2)}
                         {selectedTab.at_cost ? <span style={{ marginLeft: 4, fontSize: '0.75rem', color: '#92400e' }}>(cost)</span> : null}
-                        <span style={{ marginLeft: 8 }} data-testid={`tab-product-stock-${p.name.toLowerCase().replace(/\s+/g,'-')}`}>
+                        <span style={{ marginLeft: 8 }} data-testid={`tab-product-stock-${p.name.toLowerCase().replace(/\s+/g, '-')}`}>
                           {p.units > 0 ? `· ${p.units} in stock` : <span style={{ color: 'var(--danger)' }}>· out of stock</span>}
                         </span>
                       </div>
                     </div>
-                    <button data-testid={`tab-add-${p.name.toLowerCase().replace(/\s+/g,'-')}`}
+                    <button data-testid={`tab-add-${p.name.toLowerCase().replace(/\s+/g, '-')}`}
                       className="btn btn--sm btn--primary" onClick={() => handleAddProduct(p)}
                       disabled={p.units <= 0}>+</button>
                   </div>

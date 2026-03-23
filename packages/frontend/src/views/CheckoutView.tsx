@@ -1,18 +1,18 @@
 import { useEffect, useRef, useState } from 'react';
 import { api } from '../api/client';
 import type { Product } from '../api/client';
+import ReceiptModal, { type ReceiptLine } from '../components/ReceiptModal';
 
 type ViewMode = 'list' | 'grid';
 type Step = 'order' | 'cash';
 
 interface LineItem { product: Product; quantity: number; }
 
-interface ReceiptData {
+interface Receipt {
   timestamp: Date;
-  lines: LineItem[];
+  lines: ReceiptLine[];
   total: number;
   changeDue: number | null;
-  payMethod: 'card' | 'cash';
 }
 
 export default function CheckoutView() {
@@ -20,7 +20,7 @@ export default function CheckoutView() {
   const [lines, setLines] = useState<LineItem[]>([]);
   const [step, setStep] = useState<Step>('order');
   const [cashReceived, setCashReceived] = useState('');
-  const [receipt, setReceipt] = useState<ReceiptData | null>(null);
+  const [receipt, setReceipt] = useState<Receipt | null>(null);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [viewMode, setViewMode] = useState<ViewMode>(() => {
@@ -66,13 +66,17 @@ export default function CheckoutView() {
   const cashNum = Number(cashReceived) || 0;
   const liveChange = cashReceived !== '' ? cashNum - total : null;
 
+  function toReceiptLines(items: LineItem[]): ReceiptLine[] {
+    return items.map(l => ({ id: l.product.id, name: l.product.name, quantity: l.quantity, unitPrice: l.product.price }));
+  }
+
   async function handlePayCard() {
     setError(''); setLoading(true);
     const snapshot = { lines: [...lines], total };
     try {
       const order = await api.createOrder(snapshot.lines.map(l => ({ product_id: l.product.id, quantity: l.quantity })));
       await api.payOrder(order.id, 'card');
-      setReceipt({ timestamp: new Date(), lines: snapshot.lines, total: snapshot.total, changeDue: null, payMethod: 'card' });
+      setReceipt({ timestamp: new Date(), lines: toReceiptLines(snapshot.lines), total: snapshot.total, changeDue: null });
       setLines([]);
       const updated = await api.getProducts();
       setProducts(updated);
@@ -86,7 +90,7 @@ export default function CheckoutView() {
     try {
       const order = await api.createOrder(snapshot.lines.map(l => ({ product_id: l.product.id, quantity: l.quantity })));
       const paid = await api.payOrder(order.id, 'cash', Number(cashReceived));
-      setReceipt({ timestamp: new Date(), lines: snapshot.lines, total: snapshot.total, changeDue: paid.change_due ?? null, payMethod: 'cash' });
+      setReceipt({ timestamp: new Date(), lines: toReceiptLines(snapshot.lines), total: snapshot.total, changeDue: paid.change_due ?? null });
       setLines([]);
       setCashReceived('');
       const updated = await api.getProducts();
@@ -103,64 +107,19 @@ export default function CheckoutView() {
 
   return (
     <div>
-      {/* Receipt Modal */}
       {receipt && (
-        <div className="modal-overlay" data-testid="receipt-modal">
-          <div className="modal">
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 16 }}>
-              <div>
-                <div className="card__title" style={{ marginBottom: 4 }}>Receipt</div>
-                <div style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }} data-testid="receipt-timestamp">
-                  {receipt.timestamp.toLocaleString()}
-                </div>
-              </div>
-              <span className="badge badge--open" data-testid="payment-success">Paid</span>
-            </div>
-
-            <div data-testid="receipt-items">
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr auto auto auto', gap: '4px 12px', fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-secondary)', borderBottom: '1px solid var(--border)', paddingBottom: 6, marginBottom: 6 }}>
-                <span>Item</span><span>Qty</span><span>Unit</span><span>Total</span>
-              </div>
-              {receipt.lines.map(l => (
-                <div key={l.product.id} data-testid={`receipt-item-${l.product.id}`}
-                  style={{ display: 'grid', gridTemplateColumns: '1fr auto auto auto', gap: '4px 12px', fontSize: '0.9rem', padding: '5px 0', borderBottom: '1px solid var(--border)' }}>
-                  <span style={{ fontWeight: 500 }}>{l.product.name}</span>
-                  <span style={{ color: 'var(--text-secondary)' }}>{l.quantity}</span>
-                  <span>${l.product.price.toFixed(2)}</span>
-                  <span style={{ fontWeight: 600 }}>${(l.product.price * l.quantity).toFixed(2)}</span>
-                </div>
-              ))}
-            </div>
-
-            <div style={{ marginTop: 12, paddingTop: 12 }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.9rem', color: 'var(--text-secondary)', marginBottom: 4 }}>
-                <span>Subtotal</span><span>${receipt.total.toFixed(2)}</span>
-              </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 700, fontSize: '1.15rem' }}>
-                <span>Total</span><span>${receipt.total.toFixed(2)}</span>
-              </div>
-              {receipt.changeDue !== null && receipt.changeDue > 0 && (
-                <div style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--success)', fontWeight: 600, marginTop: 10, fontSize: '1.1rem' }} data-testid="change-due">
-                  <span>Change Due</span><span>${receipt.changeDue.toFixed(2)}</span>
-                </div>
-              )}
-            </div>
-
-            <div style={{ display: 'flex', gap: 8, marginTop: 20, flexWrap: 'wrap' }}>
-              <button className="btn btn--ghost btn--sm" data-testid="print-receipt-btn" onClick={() => {}}>🖨 Print</button>
-              <button className="btn btn--ghost btn--sm" data-testid="email-receipt-btn" onClick={() => {}}>✉ Email</button>
-              <button className="btn btn--primary" data-testid="close-receipt-btn" style={{ marginLeft: 'auto', width: 'auto', padding: '10px 20px' }} onClick={handleCloseReceipt}>
-                Close
-              </button>
-            </div>
-          </div>
-        </div>
+        <ReceiptModal
+          timestamp={receipt.timestamp}
+          lines={receipt.lines}
+          total={receipt.total}
+          changeDue={receipt.changeDue}
+          onClose={handleCloseReceipt}
+        />
       )}
 
       {error && <div className="error-banner" data-testid="error-banner">{error}</div>}
 
       {step === 'cash' ? (
-        /* Cash Payment View */
         <div className="card" data-testid="cash-payment-view">
           <div className="card__title">Cash Payment</div>
 
@@ -231,7 +190,6 @@ export default function CheckoutView() {
         </div>
       ) : (
         <>
-          {/* Order Summary */}
           {lines.length > 0 && (
             <div className="card" data-testid="order-lines">
               <div className="card__title">Order</div>
@@ -276,7 +234,6 @@ export default function CheckoutView() {
             </div>
           )}
 
-          {/* Add Items */}
           <div className="card">
             <div style={{ display: 'flex', alignItems: 'center', marginBottom: 8 }}>
               <div className="card__title" style={{ flex: 1, marginBottom: 0 }}>Add Items</div>

@@ -10,6 +10,18 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ### Products
 
+#### Shared ReceiptModal component
+- Extracted the receipt modal into `src/components/ReceiptModal.tsx` — used by both Checkout and Tabs
+- `ReceiptLine` interface exported from the component; callers map their domain lines (checkout `LineItem`, tab `TabItem`) to this neutral type
+- Tabs preserve their specific pricing: at-cost tabs show `unit_price` (cost price) in the receipt, not the regular sale price
+
+#### Cash payment view and receipt modal in Tabs
+- Tab payment now mirrors the Checkout flow: "Pay with Card" and "Pay with Cash" buttons replace the old Card/Cash tab selector
+- "Pay with Cash" transitions to a dedicated cash payment view showing the tab name, item breakdown, total due, live change calculation, and a Confirm button
+- After paying a tab (card or cash), the same `ReceiptModal` used in Checkout is shown with timestamp, itemised items, total, and change due
+- Closing the receipt modal returns to the tabs list
+- BDD scenarios added: cash shows live change, receipt shown after card/cash, receipt has order items, close returns to list
+
 #### Cash payment view with live change calculation and receipt modal
 - Clicking "Pay with Cash" transitions to a dedicated cash payment view showing the order summary and a cash-received input
 - Change due is calculated live as the cashier types — shown in green when sufficient, red when short
