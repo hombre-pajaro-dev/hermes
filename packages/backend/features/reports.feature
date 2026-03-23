@@ -20,6 +20,11 @@ Feature: Reports
     And the daily total has positive total_sales
     And the daily total has positive total_cost
 
+  Scenario: Daily total report breaks down sales by payment method
+    When I fetch the daily total report for today
+    Then the daily total has cash_sales greater than 0
+    And the daily total has card_sales greater than 0
+
   Scenario: Close brief includes revenue, cost, most sold and most profitable
     When I fetch the close brief
     Then the close brief has revenue

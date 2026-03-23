@@ -45,17 +45,28 @@ router.get('/sales-by-item', async (req, res) => {
 router.get('/daily-total', async (req, res) => {
   const date = (req.query.date as string) || new Date().toISOString().slice(0, 10);
   const db = await getDb();
-  const { rows: [orders] } = await db.query(
-    "SELECT COUNT(*)::int as order_count, COALESCE(SUM(total), 0) as total_sales FROM orders WHERE status = 'paid' AND paid_at::date = $1::date",
-    [date]
-  );
+  const { rows: [orders] } = await db.query(`
+    SELECT
+      COUNT(*)::int as order_count,
+      COALESCE(SUM(total), 0) as total_sales,
+      COALESCE(SUM(CASE WHEN payment_method = 'cash' THEN total ELSE 0 END), 0) as cash_sales,
+      COALESCE(SUM(CASE WHEN payment_method = 'card' THEN total ELSE 0 END), 0) as card_sales
+    FROM orders WHERE status = 'paid' AND paid_at::date = $1::date
+  `, [date]);
   const { rows: [costRow] } = await db.query(`
     SELECT COALESCE(SUM(oi.quantity * oi.unit_cost), 0) as total_cost
     FROM order_items oi
     JOIN orders o ON o.id = oi.order_id
     WHERE o.status = 'paid' AND o.paid_at::date = $1::date
   `, [date]);
-  res.json({ date, order_count: orders.order_count, total_sales: Number(orders.total_sales), total_cost: Number(costRow.total_cost) });
+  res.json({
+    date,
+    order_count: orders.order_count,
+    total_sales: Number(orders.total_sales),
+    cash_sales: Number(orders.cash_sales),
+    card_sales: Number(orders.card_sales),
+    total_cost: Number(costRow.total_cost),
+  });
 });
 
 router.get('/close-brief', async (req, res) => {

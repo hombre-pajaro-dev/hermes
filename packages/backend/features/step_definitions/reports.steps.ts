@@ -65,6 +65,16 @@ Then('the daily total has positive total_cost', function (this: PosWorld) {
   expect(body.total_cost).to.be.greaterThan(0);
 });
 
+Then('the daily total has cash_sales greater than {int}', function (this: PosWorld, min: number) {
+  const body = this.response.body as { cash_sales: number };
+  expect(Number(body.cash_sales)).to.be.greaterThan(min);
+});
+
+Then('the daily total has card_sales greater than {int}', function (this: PosWorld, min: number) {
+  const body = this.response.body as { card_sales: number };
+  expect(Number(body.card_sales)).to.be.greaterThan(min);
+});
+
 Then('the close brief has revenue', function (this: PosWorld) {
   expect(this.response.body).to.have.property('revenue');
 });
