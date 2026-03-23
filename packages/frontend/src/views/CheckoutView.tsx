@@ -212,33 +212,30 @@ export default function CheckoutView() {
                 ))
               )}
             </div>
-            {lines.length > 0 && (
-              <>
-                <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 700, marginTop: 12, marginBottom: 14 }}>
-                  <span>Total</span>
-                  <span key={totalBump} className="value-bump" data-testid="order-total">${total.toFixed(2)}</span>
-                </div>
-                <div style={{ display: 'flex', gap: 8 }}>
-                  <button
-                    data-testid="pay-card-btn"
-                    className="btn btn--primary"
-                    style={{ flex: 1 }}
-                    onClick={handlePayCard}
-                    disabled={loading}
-                  >
-                    {loading ? 'Processing…' : '💳 Pay with Card'}
-                  </button>
-                  <button
-                    data-testid="proceed-to-cash-btn"
-                    className="btn btn--success"
-                    style={{ flex: 1 }}
-                    onClick={() => setStep('cash')}
-                  >
-                    💵 Pay with Cash
-                  </button>
-                </div>
-              </>
-            )}
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 700, marginTop: 12, marginBottom: 14 }}>
+              <span>Total</span>
+              <span key={totalBump} className="value-bump" data-testid="order-total">${total.toFixed(2)}</span>
+            </div>
+            <div style={{ display: 'flex', gap: 8 }}>
+              <button
+                data-testid="pay-card-btn"
+                className="btn btn--primary"
+                style={{ flex: 1 }}
+                onClick={handlePayCard}
+                disabled={loading || lines.length === 0}
+              >
+                {loading ? 'Processing…' : '💳 Pay with Card'}
+              </button>
+              <button
+                data-testid="proceed-to-cash-btn"
+                className="btn btn--success"
+                style={{ flex: 1 }}
+                onClick={() => setStep('cash')}
+                disabled={lines.length === 0}
+              >
+                💵 Pay with Cash
+              </button>
+            </div>
           </div>
 
           <div className="card">
