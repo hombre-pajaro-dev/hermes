@@ -83,6 +83,21 @@ Feature: Tabs (Long-lasting orders)
     Then the response status is 409
     And the response error mentions "Insufficient stock"
 
+  Scenario: Void an empty tab
+    When I open a new tab named "Empty Tab"
+    And I void the tab
+    Then the response status is 200
+    And the tab status is "voided"
+
+  Scenario: Cannot void a tab that has items
+    When I open a new tab named "Non-Empty Tab"
+    And I add items to the tab
+      | product_name | quantity |
+      | Espresso     | 1        |
+    And I void the tab
+    Then the response status is 409
+    And the response error mentions "has items"
+
   Scenario: Cannot close register while tabs are open
     When I open a new tab named "Table 9"
     And I add items to the tab

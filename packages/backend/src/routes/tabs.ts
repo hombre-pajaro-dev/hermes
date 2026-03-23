@@ -139,6 +139,21 @@ router.patch('/:id/items/:itemId', async (req, res) => {
   res.json({ ...updatedTab, item_count: itemCount, items: tabItems });
 });
 
+router.post('/:id/void', async (req, res) => {
+  const db = await getDb();
+  const { rows } = await db.query('SELECT * FROM tabs WHERE id = $1', [req.params.id]);
+  const tab = rows[0] as { id: number; status: string } | undefined;
+  if (!tab) return res.status(404).json({ error: 'Tab not found' });
+  if (tab.status !== 'open') return res.status(409).json({ error: 'Tab is not open' });
+  const { rows: items } = await db.query('SELECT id FROM tab_items WHERE tab_id = $1', [req.params.id]);
+  if (items.length > 0) return res.status(409).json({ error: 'Cannot void a tab that has items' });
+  const { rows: [updated] } = await db.query(
+    "UPDATE tabs SET status = 'voided' WHERE id = $1 RETURNING *",
+    [tab.id]
+  );
+  res.json(updated);
+});
+
 router.post('/:id/pay', async (req, res) => {
   const db = await getDb();
   const { rows } = await db.query('SELECT * FROM tabs WHERE id = $1', [req.params.id]);

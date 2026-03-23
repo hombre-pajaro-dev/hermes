@@ -42,6 +42,11 @@ When('I try to add items to the tab exceeding stock', async function (this: PosW
   this.response = await this.agent.post(`/api/tabs/${tabId}/items`).send({ items });
 });
 
+When('I void the tab', async function (this: PosWorld) {
+  const tabId = this.context.tabId as number;
+  this.response = await this.agent.post(`/api/tabs/${tabId}/void`);
+});
+
 When('I request the tabs summary', async function (this: PosWorld) {
   this.response = await this.agent.get('/api/tabs/summary');
 });

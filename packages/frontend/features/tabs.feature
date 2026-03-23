@@ -49,6 +49,13 @@ Feature: Tabs (Long-lasting orders)
     And I close the receipt modal
     Then I see the tabs list
 
+  Scenario: Close an empty tab requires PIN
+    Given I am on the Tabs page
+    When I open a new tab named "Empty Tab"
+    Then I see the close tab button
+    When I close the empty tab with PIN "1234"
+    Then I see the tabs list
+
   Scenario: Stock count is visible in the Add Items section
     Given there is an open tab via the API named "Stock View Tab"
     And I am on the Tabs page

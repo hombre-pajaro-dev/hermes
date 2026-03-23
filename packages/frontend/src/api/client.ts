@@ -45,6 +45,7 @@ export const api = {
     req<Tab & { items: TabItem[] }>(`/tabs/${tabId}/items/${itemId}`, { method: 'PATCH', body: JSON.stringify({ quantity }) }),
   payTab: (id: number, payment_method: string, amount_received?: number) =>
     req<Tab>(`/tabs/${id}/pay`, { method: 'POST', body: JSON.stringify({ payment_method, amount_received }) }),
+  voidTab: (id: number) => req<Tab>(`/tabs/${id}/void`, { method: 'POST' }),
 
   // Ledger
   getLedger: () => req<LedgerEntry[]>('/ledger'),

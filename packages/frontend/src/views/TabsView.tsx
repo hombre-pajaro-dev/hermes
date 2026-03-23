@@ -23,6 +23,7 @@ export default function TabsView() {
   const [view, setView] = useState<'list' | 'new' | 'detail'>('list');
   const [closedPage, setClosedPage] = useState(0);
   const [showPinForTab, setShowPinForTab] = useState(false);
+  const [showPinForVoid, setShowPinForVoid] = useState(false);
   const [receipt, setReceipt] = useState<Receipt | null>(null);
   const PAGE_SIZE = 10;
 
@@ -143,6 +144,17 @@ export default function TabsView() {
     setError('');
   }
 
+  async function handleVoidTab() {
+    if (!selectedTab) return;
+    setError('');
+    try {
+      await api.voidTab(selectedTab.id);
+      setSelectedTab(null);
+      setView('list');
+      await loadTabs(true);
+    } catch (e: unknown) { setError((e as Error).message); }
+  }
+
   const prevTabTotal = useRef<number | null>(null);
   const [totalBump, setTotalBump] = useState(0);
   useEffect(() => {
@@ -171,6 +183,18 @@ export default function TabsView() {
             await handleCreateTab();
           }}
           onCancel={() => setShowPinForTab(false)}
+        />
+      )}
+
+      {showPinForVoid && (
+        <PinModal
+          title="Close Tab — Enter PIN"
+          onConfirm={async (pin) => {
+            await api.verifyPin(pin);
+            setShowPinForVoid(false);
+            await handleVoidTab();
+          }}
+          onCancel={() => setShowPinForVoid(false)}
         />
       )}
 
@@ -427,24 +451,34 @@ export default function TabsView() {
 
               <div className="card">
                 <div className="card__title">Pay Tab</div>
-                <div style={{ display: 'flex', gap: 8 }}>
+                {selectedTab.items?.length === 0 ? (
                   <button
-                    data-testid="pay-card-btn"
-                    className="btn btn--primary"
-                    style={{ flex: 1 }}
-                    onClick={handlePayCard}
+                    data-testid="void-tab-btn"
+                    className="btn btn--danger"
+                    onClick={() => setShowPinForVoid(true)}
                   >
-                    💳 Pay with Card
+                    Close Tab (no charge)
                   </button>
-                  <button
-                    data-testid="proceed-to-cash-btn"
-                    className="btn btn--success"
-                    style={{ flex: 1 }}
-                    onClick={() => setPayStep('cash')}
-                  >
-                    💵 Pay with Cash
-                  </button>
-                </div>
+                ) : (
+                  <div style={{ display: 'flex', gap: 8 }}>
+                    <button
+                      data-testid="pay-card-btn"
+                      className="btn btn--primary"
+                      style={{ flex: 1 }}
+                      onClick={handlePayCard}
+                    >
+                      💳 Pay with Card
+                    </button>
+                    <button
+                      data-testid="proceed-to-cash-btn"
+                      className="btn btn--success"
+                      style={{ flex: 1 }}
+                      onClick={() => setPayStep('cash')}
+                    >
+                      💵 Pay with Cash
+                    </button>
+                  </div>
+                )}
               </div>
 
               <div className="card">

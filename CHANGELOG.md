@@ -10,6 +10,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ### Products
 
+#### Close (void) an empty tab
+- When a tab has no items the "Pay Tab" card shows a **Close Tab (no charge)** button instead of the payment buttons
+- Closing requires a PIN — the existing PIN modal is reused
+- Backend: `POST /api/tabs/:id/void` — marks the tab `voided`; returns 409 if the tab has items
+- BDD: 2 new backend scenarios (void empty tab, reject void with items) and 1 new frontend scenario (close empty tab with PIN)
+
 #### Shared ReceiptModal component
 - Extracted the receipt modal into `src/components/ReceiptModal.tsx` — used by both Checkout and Tabs
 - `ReceiptLine` interface exported from the component; callers map their domain lines (checkout `LineItem`, tab `TabItem`) to this neutral type
