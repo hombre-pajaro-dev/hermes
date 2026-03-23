@@ -29,7 +29,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
   return (
     <div className="layout">
       <header className="layout__header">
-        <span className="layout__title">{TITLES[pathname] ?? 'Hermes POS'}</span>
+        <span className="layout__title">{TITLES[pathname] ?? 'POS - El Nido'}</span>
       </header>
       <main className="layout__content">{children}</main>
       <nav className="layout__nav">
