@@ -100,6 +100,8 @@ export default function ReportsView() {
             <div className="stats" data-testid="daily-total">
               <div className="stat"><div className="stat__label">Orders</div><div className="stat__value" data-testid="order-count">{dailyTotal.order_count}</div></div>
               <div className="stat"><div className="stat__label">Sales</div><div className="stat__value" data-testid="total-sales">${dailyTotal.total_sales.toFixed(2)}</div></div>
+              <div className="stat"><div className="stat__label">Cash</div><div className="stat__value" data-testid="cash-sales">${dailyTotal.cash_sales.toFixed(2)}</div></div>
+              <div className="stat"><div className="stat__label">Card</div><div className="stat__value" data-testid="card-sales">${dailyTotal.card_sales.toFixed(2)}</div></div>
               <div className="stat"><div className="stat__label">Cost</div><div className="stat__value">${dailyTotal.total_cost.toFixed(2)}</div></div>
               <div className="stat"><div className="stat__label">Profit</div><div className="stat__value">${(dailyTotal.total_sales - dailyTotal.total_cost).toFixed(2)}</div></div>
             </div>
