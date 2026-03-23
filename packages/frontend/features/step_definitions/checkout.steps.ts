@@ -2,6 +2,24 @@ import { When, Then } from '@cucumber/cucumber';
 import { expect } from 'chai';
 import { PosWorld } from '../support/world';
 
+When('I switch checkout to grid view', async function (this: PosWorld) {
+  await this.page.click('[data-testid="checkout-grid-view-btn"]');
+});
+
+When('I switch checkout to list view', async function (this: PosWorld) {
+  await this.page.click('[data-testid="checkout-list-view-btn"]');
+});
+
+Then('I see the checkout product grid', async function (this: PosWorld) {
+  await this.page.locator('[data-testid="checkout-products-grid"]').waitFor({ timeout: 5000 });
+  expect(await this.page.locator('[data-testid="checkout-products-grid"]').isVisible()).to.be.true;
+});
+
+Then('I see the checkout product list', async function (this: PosWorld) {
+  await this.page.locator('[data-testid="checkout-products-list"]').waitFor({ timeout: 5000 });
+  expect(await this.page.locator('[data-testid="checkout-products-list"]').isVisible()).to.be.true;
+});
+
 When('I add {string} to the order', async function (this: PosWorld, name: string) {
   const testId = `add-${name.toLowerCase().replace(/\s+/g, '-')}`;
   await this.page.waitForSelector(`[data-testid="${testId}"]`, { timeout: 5000 });

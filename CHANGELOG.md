@@ -10,6 +10,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ### Products
 
+#### Grid view in Checkout
+- The "Add Items" section in Checkout now also supports grid/list toggle (⊞ / ☰), defaulting to grid
+- In grid mode each product is a tappable card showing name, price, and stock; tapping adds it to the order; cards with items already in the order are highlighted with a blue border and show the current quantity
+- The `add-{name}` testid is present in both views so existing checkout tests work unchanged
+- View preference persisted to `localStorage` under `checkout-view`
+- BDD scenario added: "Switch between grid and list view in checkout"
+
 #### Grid view with list/grid toggle
 - Products page now defaults to a **grid layout** — each product shown as a compact card with name, price (editable), cost (editable), and unit count
 - A toggle in the top-right switches between grid (⊞) and list (☰) views; the choice is persisted to `localStorage` so it survives page refreshes

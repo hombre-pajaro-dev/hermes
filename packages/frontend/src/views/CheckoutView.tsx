@@ -2,6 +2,8 @@ import { useEffect, useRef, useState } from 'react';
 import { api } from '../api/client';
 import type { Product } from '../api/client';
 
+type ViewMode = 'list' | 'grid';
+
 interface LineItem { product: Product; quantity: number; }
 
 export default function CheckoutView() {
@@ -14,6 +16,14 @@ export default function CheckoutView() {
   const [result, setResult] = useState<{ change_due?: number } | null>(null);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [viewMode, setViewMode] = useState<ViewMode>(() => {
+    return (localStorage.getItem('checkout-view') as ViewMode | null) ?? 'grid';
+  });
+
+  function setView(mode: ViewMode) {
+    setViewMode(mode);
+    localStorage.setItem('checkout-view', mode);
+  }
 
   useEffect(() => { api.getProducts().then(setProducts).catch(() => {}); }, []);
 
@@ -78,21 +88,61 @@ export default function CheckoutView() {
       {!orderId && (
         <>
           <div className="card">
-            <div className="card__title">Add Items</div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-              {products.map(p => (
-                <div className="list-item" key={p.id}>
-                  <div className="list-item__main">
-                    <div className="list-item__name">{p.name}</div>
-                    <div className="list-item__sub">{p.units} in stock</div>
-                  </div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                    <span>${p.price.toFixed(2)}</span>
-                    <button data-testid={`add-${p.name.toLowerCase().replace(/\s+/g,'-')}`} className="btn btn--sm btn--primary" onClick={() => addProduct(p)}>+</button>
-                  </div>
-                </div>
-              ))}
+            <div style={{ display: 'flex', alignItems: 'center', marginBottom: 8 }}>
+              <div className="card__title" style={{ flex: 1, marginBottom: 0 }}>Add Items</div>
+              <div className="view-toggle">
+                <button
+                  data-testid="checkout-grid-view-btn"
+                  className={`view-toggle__btn${viewMode === 'grid' ? ' active' : ''}`}
+                  onClick={() => setView('grid')}
+                  title="Grid view"
+                >⊞</button>
+                <button
+                  data-testid="checkout-list-view-btn"
+                  className={`view-toggle__btn${viewMode === 'list' ? ' active' : ''}`}
+                  onClick={() => setView('list')}
+                  title="List view"
+                >☰</button>
+              </div>
             </div>
+
+            {viewMode === 'grid' ? (
+              <div className="products-grid" data-testid="checkout-products-grid">
+                {products.map(p => {
+                  const inOrder = lines.find(l => l.product.id === p.id);
+                  return (
+                    <button
+                      key={p.id}
+                      data-testid={`add-${p.name.toLowerCase().replace(/\s+/g, '-')}`}
+                      className="product-card"
+                      style={{ border: inOrder ? '2px solid var(--primary)' : undefined, cursor: 'pointer', textAlign: 'left', width: '100%' }}
+                      onClick={() => addProduct(p)}
+                      disabled={p.units <= 0}
+                    >
+                      <div className="product-card__name">{p.name}</div>
+                      <div className="product-card__price">${p.price.toFixed(2)}</div>
+                      <div className="product-card__meta">{p.units > 0 ? `${p.units} in stock` : 'Out of stock'}</div>
+                      {inOrder && <div style={{ fontSize: '0.75rem', color: 'var(--primary)', fontWeight: 600 }}>× {inOrder.quantity} in order</div>}
+                    </button>
+                  );
+                })}
+              </div>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }} data-testid="checkout-products-list">
+                {products.map(p => (
+                  <div className="list-item" key={p.id}>
+                    <div className="list-item__main">
+                      <div className="list-item__name">{p.name}</div>
+                      <div className="list-item__sub">{p.units} in stock</div>
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <span>${p.price.toFixed(2)}</span>
+                      <button data-testid={`add-${p.name.toLowerCase().replace(/\s+/g, '-')}`} className="btn btn--sm btn--primary" onClick={() => addProduct(p)}>+</button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
 
           {lines.length > 0 && (

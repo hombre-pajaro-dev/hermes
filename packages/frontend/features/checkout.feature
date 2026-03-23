@@ -22,6 +22,14 @@ Feature: Checkout
     Then I see a payment success message
     And I see change due displayed
 
+  Scenario: Switch between grid and list view in checkout
+    Given I am on the Checkout page
+    Then I see the checkout product grid
+    When I switch checkout to list view
+    Then I see the checkout product list
+    When I switch checkout to grid view
+    Then I see the checkout product grid
+
   Scenario: Cannot checkout when register is closed
     Given the register is closed via the API
     And I am on the Checkout page
