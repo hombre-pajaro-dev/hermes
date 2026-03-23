@@ -394,32 +394,34 @@ export default function TabsView() {
               {selectedTab.items && selectedTab.items.length > 0 && (
                 <div className="card" data-testid="tab-items">
                   <div className="card__title">On the Tab</div>
-                  {selectedTab.items.map(item => {
-                    const product = products.find(p => p.id === item.product_id);
-                    const slug = product?.name.toLowerCase().replace(/\s+/g, '-') ?? String(item.id);
-                    return (
-                      <div className="list-item" key={item.id}>
-                        <div className="list-item__main">
-                          <div className="list-item__name">{product?.name ?? `Product #${item.product_id}`}</div>
-                          <div className="list-item__sub">@ ${item.unit_price.toFixed(2)} each</div>
+                  <div style={{ maxHeight: '35vh', overflowY: 'auto', overscrollBehavior: 'contain' }}>
+                    {selectedTab.items.map(item => {
+                      const product = products.find(p => p.id === item.product_id);
+                      const slug = product?.name.toLowerCase().replace(/\s+/g, '-') ?? String(item.id);
+                      return (
+                        <div className="list-item" key={item.id}>
+                          <div className="list-item__main">
+                            <div className="list-item__name">{product?.name ?? `Product #${item.product_id}`}</div>
+                            <div className="list-item__sub">@ ${item.unit_price.toFixed(2)} each</div>
+                          </div>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                            <button
+                              data-testid={`tab-item-decrease-${slug}`}
+                              className="btn btn--sm btn--ghost"
+                              onClick={() => handleUpdateItemQuantity(item.id, item.quantity - 1)}
+                            >−</button>
+                            <span key={`qty-${item.id}-${item.quantity}`} className="value-bump" data-testid={`tab-item-qty-${slug}`} style={{ fontWeight: 600, minWidth: 24, textAlign: 'center' }}>{item.quantity}</span>
+                            <button
+                              data-testid={`tab-item-increase-${slug}`}
+                              className="btn btn--sm btn--ghost"
+                              onClick={() => handleUpdateItemQuantity(item.id, item.quantity + 1)}
+                            >+</button>
+                            <span key={`sub-${item.id}-${item.subtotal}`} className="value-bump" style={{ fontWeight: 600, minWidth: 50, textAlign: 'right' }}>${item.subtotal.toFixed(2)}</span>
+                          </div>
                         </div>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                          <button
-                            data-testid={`tab-item-decrease-${slug}`}
-                            className="btn btn--sm btn--ghost"
-                            onClick={() => handleUpdateItemQuantity(item.id, item.quantity - 1)}
-                          >−</button>
-                          <span key={`qty-${item.id}-${item.quantity}`} className="value-bump" data-testid={`tab-item-qty-${slug}`} style={{ fontWeight: 600, minWidth: 24, textAlign: 'center' }}>{item.quantity}</span>
-                          <button
-                            data-testid={`tab-item-increase-${slug}`}
-                            className="btn btn--sm btn--ghost"
-                            onClick={() => handleUpdateItemQuantity(item.id, item.quantity + 1)}
-                          >+</button>
-                          <span key={`sub-${item.id}-${item.subtotal}`} className="value-bump" style={{ fontWeight: 600, minWidth: 50, textAlign: 'right' }}>${item.subtotal.toFixed(2)}</span>
-                        </div>
-                      </div>
-                    );
-                  })}
+                      );
+                    })}
+                  </div>
                 </div>
               )}
 
@@ -447,6 +449,7 @@ export default function TabsView() {
 
               <div className="card">
                 <div className="card__title">Add Items</div>
+                <div style={{ maxHeight: '45vh', overflowY: 'auto', overscrollBehavior: 'contain' }}>
                 {products.map(p => (
                   <div className="list-item" key={p.id}>
                     <div className="list-item__main">
@@ -464,6 +467,7 @@ export default function TabsView() {
                       disabled={p.units <= 0}>+</button>
                   </div>
                 ))}
+                </div>
               </div>
             </>
           )}

@@ -193,20 +193,22 @@ export default function CheckoutView() {
           {lines.length > 0 && (
             <div className="card" data-testid="order-lines">
               <div className="card__title">Order</div>
-              {lines.map(l => (
-                <div className="list-item" key={l.product.id}>
-                  <div className="list-item__main">
-                    <div className="list-item__name">{l.product.name}</div>
-                    <div className="list-item__sub">${l.product.price.toFixed(2)} each</div>
+              <div style={{ maxHeight: '35vh', overflowY: 'auto', overscrollBehavior: 'contain' }}>
+                {lines.map(l => (
+                  <div className="list-item" key={l.product.id}>
+                    <div className="list-item__main">
+                      <div className="list-item__name">{l.product.name}</div>
+                      <div className="list-item__sub">${l.product.price.toFixed(2)} each</div>
+                    </div>
+                    <div className="qty">
+                      <button className="btn btn--sm btn--ghost" onClick={() => changeQty(l.product.id, -1)}>−</button>
+                      <span className="qty__val" data-testid={`qty-${l.product.name.toLowerCase()}`}>{l.quantity}</span>
+                      <button className="btn btn--sm btn--ghost" onClick={() => changeQty(l.product.id, +1)}>+</button>
+                    </div>
+                    <div style={{ minWidth: 60, textAlign: 'right' }}>${(l.product.price * l.quantity).toFixed(2)}</div>
                   </div>
-                  <div className="qty">
-                    <button className="btn btn--sm btn--ghost" onClick={() => changeQty(l.product.id, -1)}>−</button>
-                    <span className="qty__val" data-testid={`qty-${l.product.name.toLowerCase()}`}>{l.quantity}</span>
-                    <button className="btn btn--sm btn--ghost" onClick={() => changeQty(l.product.id, +1)}>+</button>
-                  </div>
-                  <div style={{ minWidth: 60, textAlign: 'right' }}>${(l.product.price * l.quantity).toFixed(2)}</div>
-                </div>
-              ))}
+                ))}
+              </div>
               <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 700, marginTop: 12, marginBottom: 14 }}>
                 <span>Total</span>
                 <span key={totalBump} className="value-bump" data-testid="order-total">${total.toFixed(2)}</span>
@@ -263,6 +265,7 @@ export default function CheckoutView() {
               style={{ marginBottom: 10 }}
             />
 
+            <div style={{ maxHeight: '45vh', overflowY: 'auto', overscrollBehavior: 'contain' }}>
             {viewMode === 'grid' ? (
               <div className="products-grid" data-testid="checkout-products-grid">
                 {filteredProducts.map(p => {
@@ -300,6 +303,7 @@ export default function CheckoutView() {
                 ))}
               </div>
             )}
+            </div>
           </div>
         </>
       )}
