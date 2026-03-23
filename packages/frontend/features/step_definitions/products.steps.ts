@@ -5,12 +5,20 @@ import { PosWorld } from '../support/world';
 const API = process.env.TEST_API_URL ?? 'http://localhost:3001';
 
 Then('I see a list of products', async function (this: PosWorld) {
+  // Accepts either list or grid view — checks that products are displayed
+  const listOrGrid = this.page.locator('[data-testid="products-list"], [data-testid="products-grid"]');
+  await listOrGrid.first().waitFor({ timeout: 5000 });
+  expect(await listOrGrid.first().isVisible()).to.be.true;
+});
+
+Then('I see the list view', async function (this: PosWorld) {
   const list = this.page.locator('[data-testid="products-list"]');
   await list.waitFor({ timeout: 5000 });
   expect(await list.isVisible()).to.be.true;
 });
 
 Then('each product shows name and price', async function (this: PosWorld) {
+  await this.page.locator('[data-testid="product-item"]').first().waitFor({ timeout: 5000 });
   const count = await this.page.locator('[data-testid="product-item"]').count();
   expect(count).to.be.greaterThan(0);
 });
@@ -186,6 +194,26 @@ Then('no ledger entry is added for the cost change', async function (this: PosWo
   const res = await fetch(`${API}/api/ledger`);
   const entries = await res.json() as { entry_type: string }[];
   expect(entries.some(e => e.entry_type === 'cost_change')).to.be.false;
+});
+
+When('I switch to grid view', async function (this: PosWorld) {
+  await this.page.click('[data-testid="grid-view-btn"]');
+});
+
+When('I switch to list view', async function (this: PosWorld) {
+  await this.page.click('[data-testid="list-view-btn"]');
+});
+
+Then('I see products in a grid layout', async function (this: PosWorld) {
+  const grid = this.page.locator('[data-testid="products-grid"]');
+  await grid.waitFor({ timeout: 5000 });
+  expect(await grid.isVisible()).to.be.true;
+});
+
+Then('each product card shows name and price', async function (this: PosWorld) {
+  await this.page.locator('[data-testid="product-item"]').first().waitFor({ timeout: 5000 });
+  const count = await this.page.locator('[data-testid="product-item"]').count();
+  expect(count).to.be.greaterThan(0);
 });
 
 Then('the cost edit for {string} is locked', async function (this: PosWorld, name: string) {

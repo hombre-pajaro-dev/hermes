@@ -3,6 +3,7 @@ import { api } from '../api/client';
 import type { Product, Tab } from '../api/client';
 
 type EditField = 'price' | 'cost';
+type ViewMode = 'list' | 'grid';
 
 export default function ProductsView() {
   const [products, setProducts] = useState<Product[]>([]);
@@ -13,6 +14,14 @@ export default function ProductsView() {
   const [form, setForm] = useState({ name: '', description: '', cost: '', price: '', units: '' });
   const [editingPrice, setEditingPrice] = useState<Record<number, string>>({});
   const [editingCost, setEditingCost] = useState<Record<number, string>>({});
+  const [viewMode, setViewMode] = useState<ViewMode>(() => {
+    return (localStorage.getItem('products-view') as ViewMode | null) ?? 'grid';
+  });
+
+  function setView(mode: ViewMode) {
+    setViewMode(mode);
+    localStorage.setItem('products-view', mode);
+  }
 
   async function load() {
     try {
@@ -115,10 +124,27 @@ export default function ProductsView() {
   return (
     <div>
       {error && <div className="error-banner" data-testid="error-banner">{error}</div>}
-      <button data-testid="add-product-btn" className="btn btn--primary" style={{ marginBottom: 16 }}
-        onClick={() => setShowForm(!showForm)}>
-        {showForm ? 'Cancel' : '+ Add Product'}
-      </button>
+
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 16 }}>
+        <button data-testid="add-product-btn" className="btn btn--primary" style={{ flex: 1 }}
+          onClick={() => setShowForm(!showForm)}>
+          {showForm ? 'Cancel' : '+ Add Product'}
+        </button>
+        <div className="view-toggle">
+          <button
+            data-testid="grid-view-btn"
+            className={`view-toggle__btn${viewMode === 'grid' ? ' active' : ''}`}
+            onClick={() => setView('grid')}
+            title="Grid view"
+          >⊞</button>
+          <button
+            data-testid="list-view-btn"
+            className={`view-toggle__btn${viewMode === 'list' ? ' active' : ''}`}
+            onClick={() => setView('list')}
+            title="List view"
+          >☰</button>
+        </div>
+      </div>
 
       {showForm && (
         <div className="card" data-testid="product-form">
@@ -140,27 +166,49 @@ export default function ProductsView() {
         </div>
       )}
 
-      <div className="card" data-testid="products-list">
-        {products.length === 0 ? <div className="empty">No products yet</div> : products.map(p => {
-          const locked = lockedIds.has(p.id);
-          return (
-            <div className="list-item" key={p.id} data-testid="product-item">
-              <div className="list-item__main">
-                <div className="list-item__name" data-testid="product-name">{p.name}</div>
-                <div className="list-item__sub" style={{ marginTop: 4 }}>
-                  <span style={{ marginRight: 8 }}>Cost:</span>
+      {viewMode === 'grid' ? (
+        <div className="products-grid" data-testid="products-grid">
+          {products.length === 0 ? <div className="empty">No products yet</div> : products.map(p => {
+            const locked = lockedIds.has(p.id);
+            return (
+              <div className="product-card" key={p.id} data-testid="product-item">
+                <div className="product-card__name" data-testid="product-name">{p.name}</div>
+                <div className="product-card__meta">Price</div>
+                <div className="product-card__field">
+                  {renderEditableField(p, 'price', p.price, locked)}
+                </div>
+                <div className="product-card__meta">Cost</div>
+                <div className="product-card__field">
                   {renderEditableField(p, 'cost', p.cost, locked)}
                 </div>
+                <div className="product-card__meta" data-testid="product-units">{p.units} units</div>
               </div>
-              <div className="list-item__right" style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 4 }}>
-                <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginBottom: 2 }}>Price</div>
-                {renderEditableField(p, 'price', p.price, locked)}
-                <div className="list-item__sub" data-testid="product-units">{p.units} units</div>
+            );
+          })}
+        </div>
+      ) : (
+        <div className="card" data-testid="products-list">
+          {products.length === 0 ? <div className="empty">No products yet</div> : products.map(p => {
+            const locked = lockedIds.has(p.id);
+            return (
+              <div className="list-item" key={p.id} data-testid="product-item">
+                <div className="list-item__main">
+                  <div className="list-item__name" data-testid="product-name">{p.name}</div>
+                  <div className="list-item__sub" style={{ marginTop: 4 }}>
+                    <span style={{ marginRight: 8 }}>Cost:</span>
+                    {renderEditableField(p, 'cost', p.cost, locked)}
+                  </div>
+                </div>
+                <div className="list-item__right" style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 4 }}>
+                  <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginBottom: 2 }}>Price</div>
+                  {renderEditableField(p, 'price', p.price, locked)}
+                  <div className="list-item__sub" data-testid="product-units">{p.units} units</div>
+                </div>
               </div>
-            </div>
-          );
-        })}
-      </div>
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 }

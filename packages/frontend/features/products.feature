@@ -58,3 +58,12 @@ Feature: Products
     And "Espresso" is in an open tab via the API
     And I am on the Products page
     Then the cost edit for "Espresso" is locked
+
+  Scenario: Switch between list and grid view
+    Given I am on the Products page
+    Then I see a list of products
+    When I switch to grid view
+    Then I see products in a grid layout
+    And each product card shows name and price
+    When I switch to list view
+    Then I see the list view

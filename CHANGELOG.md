@@ -8,6 +8,16 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+### Products
+
+#### Grid view with list/grid toggle
+- Products page now defaults to a **grid layout** — each product shown as a compact card with name, price (editable), cost (editable), and unit count
+- A toggle in the top-right switches between grid (⊞) and list (☰) views; the choice is persisted to `localStorage` so it survives page refreshes
+- All existing functionality (inline price/cost editing, lock indicator for products in open tabs, add product form) works identically in both views
+- BDD scenario added: "Switch between list and grid view" — verifies toggle renders the correct container and product cards are visible in each mode
+
+---
+
 ### Infrastructure
 
 #### Database migration script
