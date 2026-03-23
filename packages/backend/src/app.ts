@@ -1,45 +1,6 @@
 import express from 'express';
 import cors from 'cors';
 import type { IncomingMessage, ServerResponse, IncomingHttpHeaders } from 'http';
-
-function fromNodeHeaders(nodeHeaders: IncomingHttpHeaders): Headers {
-  const headers = new Headers();
-  for (const [key, value] of Object.entries(nodeHeaders)) {
-    if (value === undefined) continue;
-    if (Array.isArray(value)) value.forEach(v => headers.append(key, v));
-    else headers.set(key, value);
-  }
-  return headers;
-}
-
-function toNodeHandler(auth: { handler: (req: Request) => Promise<Response> }) {
-  return async (nodeReq: IncomingMessage, nodeRes: ServerResponse) => {
-    const proto = (nodeReq.headers['x-forwarded-proto'] as string | undefined)
-      ?? ((nodeReq.socket as { encrypted?: boolean }).encrypted ? 'https' : 'http');
-    const url = `${proto}://${nodeReq.headers.host ?? 'localhost'}${nodeReq.url ?? '/'}`;
-
-    const chunks: Buffer[] = [];
-    for await (const chunk of nodeReq) chunks.push(chunk as Buffer);
-    const body = Buffer.concat(chunks);
-
-    const request = new Request(url, {
-      method: nodeReq.method ?? 'GET',
-      headers: fromNodeHeaders(nodeReq.headers),
-      body: body.length > 0 ? body : undefined,
-    });
-
-    const response = await auth.handler(request);
-
-    nodeRes.statusCode = response.status;
-    const setCookies = response.headers.getSetCookie?.() ?? [];
-    response.headers.forEach((value, key) => {
-      if (key.toLowerCase() !== 'set-cookie') nodeRes.setHeader(key, value);
-    });
-    if (setCookies.length > 0) nodeRes.setHeader('set-cookie', setCookies);
-
-    nodeRes.end(Buffer.from(await response.arrayBuffer()));
-  };
-}
 import { auth } from './auth.js';
 import productsRouter from './routes/products.js';
 import registerRouter from './routes/register.js';
@@ -51,6 +12,53 @@ import restockRouter from './routes/restock.js';
 import inventoryRouter from './routes/inventory.js';
 import adminRouter from './routes/admin.js';
 import { resetDb } from './db/database.js';
+
+function fromNodeHeaders(nodeHeaders: IncomingHttpHeaders): Headers {
+  const headers = new Headers();
+  for (const [key, value] of Object.entries(nodeHeaders)) {
+    if (value === undefined) continue;
+    if (Array.isArray(value)) value.forEach(v => headers.append(key, v));
+    else headers.set(key, value);
+  }
+  return headers;
+}
+
+function toNodeHandler(authInstance: { handler: (req: Request) => Promise<Response> }) {
+  return (nodeReq: IncomingMessage, nodeRes: ServerResponse) => {
+    const proto = (nodeReq.headers['x-forwarded-proto'] as string | undefined)
+      ?? ((nodeReq.socket as { encrypted?: boolean }).encrypted ? 'https' : 'http');
+    const fullPath = (nodeReq as IncomingMessage & { originalUrl?: string }).originalUrl ?? nodeReq.url ?? '/';
+    const url = `${proto}://${nodeReq.headers.host ?? 'localhost'}${fullPath}`;
+
+    const body = new Promise<Buffer>((resolve, reject) => {
+      const chunks: Buffer[] = [];
+      nodeReq.on('data', (chunk: Buffer) => chunks.push(chunk));
+      nodeReq.on('end', () => resolve(Buffer.concat(chunks)));
+      nodeReq.on('error', reject);
+    });
+
+    body.then(async (buf) => {
+      const request = new Request(url, {
+        method: nodeReq.method ?? 'GET',
+        headers: fromNodeHeaders(nodeReq.headers),
+        body: buf.length > 0 ? (buf as unknown as BodyInit) : undefined,
+      });
+
+      const response = await authInstance.handler(request);
+
+      nodeRes.statusCode = response.status;
+      const setCookies = response.headers.getSetCookie?.() ?? [];
+      response.headers.forEach((value, key) => {
+        if (key.toLowerCase() !== 'set-cookie') nodeRes.setHeader(key, value);
+      });
+      if (setCookies.length > 0) nodeRes.setHeader('set-cookie', setCookies);
+      nodeRes.end(Buffer.from(await response.arrayBuffer()));
+    }).catch((err) => {
+      console.error('[auth handler]', err);
+      if (!nodeRes.headersSent) { nodeRes.statusCode = 500; nodeRes.end(); }
+    });
+  };
+}
 
 // Sub-paths under /api that don't require authentication
 const PUBLIC_PATHS = new Set(['/health']);
