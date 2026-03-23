@@ -2,6 +2,7 @@ const BASE = (import.meta.env.VITE_API_BASE as string | undefined) ?? '/api';
 
 async function req<T>(path: string, options?: RequestInit): Promise<T> {
   const res = await fetch(`${BASE}${path}`, {
+    credentials: 'include',
     headers: { 'Content-Type': 'application/json' },
     ...options,
   });
@@ -69,9 +70,15 @@ export const api = {
   adjustInventory: (adjustments: { product_id: number; physical_count: number }[]) =>
     req<AdjustResult>('/inventory/adjust', { method: 'POST', body: JSON.stringify({ adjustments }) }),
 
-  // Admin
+  // Admin — PIN
   verifyPin: (pin: string) => req<{ ok: true }>('/admin/pin/verify', { method: 'POST', body: JSON.stringify({ pin }) }),
   changePin: (current_pin: string, new_pin: string) => req<{ ok: true }>('/admin/pin/change', { method: 'POST', body: JSON.stringify({ current_pin, new_pin }) }),
+
+  // Admin — Authorized users
+  getAuthorizedUsers: () => req<AuthorizedUser[]>('/admin/users'),
+  addAuthorizedUser: (email: string, role: 'staff' | 'admin') => req<AuthorizedUser>('/admin/users', { method: 'POST', body: JSON.stringify({ email, role }) }),
+  updateAuthorizedUserRole: (id: number, role: 'staff' | 'admin') => req<AuthorizedUser>(`/admin/users/${id}`, { method: 'PATCH', body: JSON.stringify({ role }) }),
+  removeAuthorizedUser: (id: number) => req<{ ok: true }>(`/admin/users/${id}`, { method: 'DELETE' }),
 };
 
 // Types
@@ -93,3 +100,4 @@ export interface DailyRange { date: string; revenue: number; cost: number; order
 export interface CloseBrief { session_id: number; revenue: number; total_cost: number; gross_profit: number; most_sold?: { name: string; units_sold: number } | null; most_profitable?: { name: string; profit: number } | null; by_item: SalesByItem[]; }
 export interface RestockOrder { id: number; session_id: number; items: { product_id: number; name: string; quantity: number; new_units: number }[]; }
 export interface AdjustResult { adjustments: { product_id: number; name: string; previous_units: number; physical_count: number; delta: number; new_units: number }[]; }
+export interface AuthorizedUser { id: number; email: string; role: 'staff' | 'admin'; created_at: string; }

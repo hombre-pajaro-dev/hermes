@@ -131,6 +131,95 @@ export async function applySchema(db: Pool): Promise<void> {
   `);
   await db.query(`ALTER TABLE products ADD COLUMN IF NOT EXISTS image TEXT`);
 
+  // Auth — authorized users allowlist (source of truth for who may sign in)
+  await db.query(`
+    CREATE TABLE IF NOT EXISTS authorized_users (
+      id         SERIAL PRIMARY KEY,
+      email      TEXT NOT NULL UNIQUE,
+      role       TEXT NOT NULL DEFAULT 'staff',
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    )
+  `);
+
+  // Seed first admin from env var so the app is not locked out on fresh installs
+  const adminEmail = process.env.ADMIN_EMAIL;
+  if (adminEmail) {
+    await db.query(
+      `INSERT INTO authorized_users (email, role) VALUES ($1, 'admin') ON CONFLICT (email) DO NOTHING`,
+      [adminEmail.toLowerCase()]
+    );
+  }
+
+  // Better Auth internal tables — Kysely adapter expects camelCase column names
+  // Drop and recreate if columns were previously created with snake_case names
+  await db.query(`
+    DO $$
+    BEGIN
+      IF EXISTS (
+        SELECT 1 FROM information_schema.columns
+        WHERE table_name = 'verification' AND column_name = 'expires_at'
+      ) THEN
+        DROP TABLE IF EXISTS "verification";
+        DROP TABLE IF EXISTS "session";
+        DROP TABLE IF EXISTS "account";
+        DROP TABLE IF EXISTS "user";
+      END IF;
+    END $$
+  `);
+  await db.query(`
+    CREATE TABLE IF NOT EXISTS "user" (
+      id              TEXT PRIMARY KEY,
+      name            TEXT NOT NULL,
+      email           TEXT NOT NULL UNIQUE,
+      "emailVerified" BOOLEAN NOT NULL DEFAULT false,
+      image           TEXT,
+      role            TEXT NOT NULL DEFAULT 'staff',
+      "createdAt"     TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      "updatedAt"     TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    )
+  `);
+  await db.query(`
+    CREATE TABLE IF NOT EXISTS "session" (
+      id            TEXT PRIMARY KEY,
+      "expiresAt"   TIMESTAMPTZ NOT NULL,
+      token         TEXT NOT NULL UNIQUE,
+      "createdAt"   TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      "updatedAt"   TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      "ipAddress"   TEXT,
+      "userAgent"   TEXT,
+      "userId"      TEXT NOT NULL REFERENCES "user"(id) ON DELETE CASCADE
+    )
+  `);
+  await db.query(`
+    CREATE TABLE IF NOT EXISTS "account" (
+      id                        TEXT PRIMARY KEY,
+      "accountId"               TEXT NOT NULL,
+      "providerId"              TEXT NOT NULL,
+      "userId"                  TEXT NOT NULL REFERENCES "user"(id) ON DELETE CASCADE,
+      "accessToken"             TEXT,
+      "refreshToken"            TEXT,
+      "idToken"                 TEXT,
+      "accessTokenExpiresAt"    TIMESTAMPTZ,
+      "refreshTokenExpiresAt"   TIMESTAMPTZ,
+      scope                     TEXT,
+      password                  TEXT,
+      "createdAt"               TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      "updatedAt"               TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    )
+  `);
+  await db.query(`
+    CREATE TABLE IF NOT EXISTS "verification" (
+      id            TEXT PRIMARY KEY,
+      identifier    TEXT NOT NULL,
+      value         TEXT NOT NULL,
+      "expiresAt"   TIMESTAMPTZ NOT NULL,
+      "createdAt"   TIMESTAMPTZ,
+      "updatedAt"   TIMESTAMPTZ
+    )
+  `);
+  // Ensure role column exists for databases created before this column was added
+  await db.query(`ALTER TABLE "user" ADD COLUMN IF NOT EXISTS role TEXT NOT NULL DEFAULT 'staff'`);
+
   await db.query(`
     CREATE TABLE IF NOT EXISTS settings (
       key   TEXT PRIMARY KEY,

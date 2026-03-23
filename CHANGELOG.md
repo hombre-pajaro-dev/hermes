@@ -8,7 +8,35 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
-### Products
+### Authentication & Authorization
+
+#### User profile and sign-out in header
+- The app header now shows the signed-in user's profile picture (from Google), initials fallback, display name, and a ⏻ sign-out button on every page
+- Tapping the sign-out button ends the session and redirects to `/login`
+
+#### Login with email/password or Google — authorized users only
+- The entire app is now protected: unauthenticated users are redirected to `/login`
+- **Email + password** and **Sign in with Google** (OAuth) are both supported
+- **Access is restricted** — only email addresses pre-added to the `authorized_users` allowlist can sign in; anyone else sees a clear error message regardless of which method they use
+- The allowlist is checked on every sign-in (not just first sign-up), so revoking access takes effect immediately on the user's next sign-in
+- Powered by **Better Auth** (MIT licence) — sessions stored in Postgres alongside existing data
+- New env vars required (see setup notes below):
+  - `BETTER_AUTH_SECRET` — random secret for session signing
+  - `BETTER_AUTH_URL` — full URL of the backend (e.g. `https://your-app.vercel.app`)
+  - `ADMIN_EMAIL` — email seeded as the first admin on fresh installs
+  - `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` — Google OAuth credentials (Google button hidden if not set)
+  - `FRONTEND_URL` — frontend origin for CORS (e.g. `https://your-app.vercel.app`)
+- Google OAuth callback URL to register in Google Cloud Console: `{BETTER_AUTH_URL}/api/auth/callback/google`
+
+#### Admin — Authorized Users management
+- New **Authorized Users** section in the Admin page (visible to admins only)
+- Admin can add a user's email with a role (`staff` or `admin`) before they first log in
+- Admin can change a user's role (takes effect immediately — the Better Auth user record is updated)
+- Admin can remove a user (they will be blocked on next sign-in)
+- Admin page now shows the signed-in user's name, email, and role with a **Sign out** button
+- Backend: `GET/POST/PATCH/DELETE /api/admin/users` (admin role required)
+
+---
 
 #### Product image thumbnails
 - Each product now has an optional photo thumbnail shown everywhere products appear
