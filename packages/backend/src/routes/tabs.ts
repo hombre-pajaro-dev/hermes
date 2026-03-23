@@ -1,6 +1,6 @@
 import { Router } from 'express';
-import { getDb, pool } from '../db/database';
-import { requireOpenRegister } from '../middleware/requireOpenRegister';
+import { getDb, pool } from '../db/database.js';
+import { requireOpenRegister } from '../middleware/requireOpenRegister.js';
 
 const router = Router();
 
@@ -80,7 +80,7 @@ router.post('/:id/items', async (req, res) => {
 
   const { rows: [updatedTab] } = await db.query('SELECT * FROM tabs WHERE id = $1', [tab.id]);
   const { rows: tabItems } = await db.query('SELECT * FROM tab_items WHERE tab_id = $1', [tab.id]);
-  const itemCount = tabItems.reduce((sum, ti) => sum + Number(ti.quantity), 0);
+  const itemCount = tabItems.reduce((sum: number, ti: { quantity: number }) => sum + Number(ti.quantity), 0);
   res.json({ ...updatedTab, item_count: itemCount, items: tabItems });
 });
 

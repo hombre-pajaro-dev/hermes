@@ -1,5 +1,5 @@
 import { Pool } from 'pg';
-import { applySchema } from '../db/schema';
+import { applySchema } from '../db/schema.js';
 
 async function migrate() {
   const connectionString = process.env.POSTGRES_URL ?? process.env.DATABASE_URL;

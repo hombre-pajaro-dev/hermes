@@ -2,6 +2,7 @@
   "name": "backend",
   "version": "1.0.0-beta.1",
   "private": true,
+  "type": "module",
   "scripts": {
     "migrate": "tsx --env-file=.env src/scripts/migrate.ts",
     "dev": "tsx watch --env-file=.env src/index.ts",

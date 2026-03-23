@@ -1,6 +1,6 @@
 import { betterAuth } from 'better-auth';
 import { Kysely, PostgresDialect } from 'kysely';
-import { pool } from './db/database';
+import { pool } from './db/database.js';
 
 // Better Auth v1.5+ requires a Kysely instance — wrap the existing pg Pool
 const kyselyDb = new Kysely({ dialect: new PostgresDialect({ pool }) });

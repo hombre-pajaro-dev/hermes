@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import type { Request, Response, NextFunction } from 'express';
-import { getDb } from '../db/database';
+import { getDb } from '../db/database.js';
 
 interface AuthRequest extends Request {
   session?: { user: { role?: string } };

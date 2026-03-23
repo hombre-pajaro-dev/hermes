@@ -40,17 +40,17 @@ function toNodeHandler(auth: { handler: (req: Request) => Promise<Response> }) {
     nodeRes.end(Buffer.from(await response.arrayBuffer()));
   };
 }
-import { auth } from './auth';
-import productsRouter from './routes/products';
-import registerRouter from './routes/register';
-import checkoutRouter from './routes/checkout';
-import tabsRouter from './routes/tabs';
-import ledgerRouter from './routes/ledger';
-import reportsRouter from './routes/reports';
-import restockRouter from './routes/restock';
-import inventoryRouter from './routes/inventory';
-import adminRouter from './routes/admin';
-import { resetDb } from './db/database';
+import { auth } from './auth.js';
+import productsRouter from './routes/products.js';
+import registerRouter from './routes/register.js';
+import checkoutRouter from './routes/checkout.js';
+import tabsRouter from './routes/tabs.js';
+import ledgerRouter from './routes/ledger.js';
+import reportsRouter from './routes/reports.js';
+import restockRouter from './routes/restock.js';
+import inventoryRouter from './routes/inventory.js';
+import adminRouter from './routes/admin.js';
+import { resetDb } from './db/database.js';
 
 // Sub-paths under /api that don't require authentication
 const PUBLIC_PATHS = new Set(['/health']);

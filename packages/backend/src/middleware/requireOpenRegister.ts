@@ -1,5 +1,5 @@
 import { Request, Response, NextFunction } from 'express';
-import { getDb } from '../db/database';
+import { getDb } from '../db/database.js';
 
 export async function requireOpenRegister(req: Request, res: Response, next: NextFunction): Promise<void> {
   const db = await getDb();

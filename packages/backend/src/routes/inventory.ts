@@ -1,6 +1,6 @@
 import { Router } from 'express';
-import { getDb, pool } from '../db/database';
-import { requireOpenRegister } from '../middleware/requireOpenRegister';
+import { getDb, pool } from '../db/database.js';
+import { requireOpenRegister } from '../middleware/requireOpenRegister.js';
 
 const router = Router();
 
