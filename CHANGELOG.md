@@ -10,6 +10,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ### Products
 
+#### Product search filter in Checkout
+- A search box above the product list/grid filters products by name as you type (case-insensitive, substring match)
+- Clearing the search restores all products instantly — no network request needed
+- Works in both grid and list views
+- BDD scenario added: "Filter products by name in checkout"
+
 #### Grid view in Checkout
 - The "Add Items" section in Checkout now also supports grid/list toggle (⊞ / ☰), defaulting to grid
 - In grid mode each product is a tappable card showing name, price, and stock; tapping adds it to the order; cards with items already in the order are highlighted with a blue border and show the current quantity

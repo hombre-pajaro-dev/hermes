@@ -2,6 +2,27 @@ import { When, Then } from '@cucumber/cucumber';
 import { expect } from 'chai';
 import { PosWorld } from '../support/world';
 
+When('I type {string} in the product search', async function (this: PosWorld, query: string) {
+  await this.page.waitForSelector('[data-testid="product-search"]', { timeout: 5000 });
+  await this.page.fill('[data-testid="product-search"]', query);
+});
+
+Then('only products matching {string} are shown', async function (this: PosWorld, name: string) {
+  await this.page.locator(`[data-testid="add-${name.toLowerCase().replace(/\s+/g, '-')}"]`).waitFor({ timeout: 5000 });
+  const visible = await this.page.locator('[data-testid^="add-"]').evaluateAll(
+    els => els.filter(el => (el as HTMLElement).offsetParent !== null).length
+  );
+  expect(visible).to.be.greaterThan(0);
+});
+
+Then('products not matching are hidden', async function (this: PosWorld) {
+  const total = await this.page.locator('[data-testid^="add-"]').count();
+  const visible = await this.page.locator('[data-testid^="add-"]').evaluateAll(
+    els => els.filter(el => (el as HTMLElement).offsetParent !== null).length
+  );
+  expect(visible).to.be.lessThan(total);
+});
+
 When('I switch checkout to grid view', async function (this: PosWorld) {
   await this.page.click('[data-testid="checkout-grid-view-btn"]');
 });

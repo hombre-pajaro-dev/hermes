@@ -19,6 +19,7 @@ export default function CheckoutView() {
   const [viewMode, setViewMode] = useState<ViewMode>(() => {
     return (localStorage.getItem('checkout-view') as ViewMode | null) ?? 'grid';
   });
+  const [search, setSearch] = useState('');
 
   function setView(mode: ViewMode) {
     setViewMode(mode);
@@ -26,6 +27,10 @@ export default function CheckoutView() {
   }
 
   useEffect(() => { api.getProducts().then(setProducts).catch(() => {}); }, []);
+
+  const filteredProducts = search.trim()
+    ? products.filter(p => p.name.toLowerCase().includes(search.toLowerCase()))
+    : products;
 
   function addProduct(product: Product) {
     setLines(prev => {
@@ -106,9 +111,19 @@ export default function CheckoutView() {
               </div>
             </div>
 
+            <input
+              data-testid="product-search"
+              className="input"
+              type="search"
+              placeholder="Search products…"
+              value={search}
+              onChange={e => setSearch(e.target.value)}
+              style={{ marginBottom: 10 }}
+            />
+
             {viewMode === 'grid' ? (
               <div className="products-grid" data-testid="checkout-products-grid">
-                {products.map(p => {
+                {filteredProducts.map(p => {
                   const inOrder = lines.find(l => l.product.id === p.id);
                   return (
                     <button
@@ -129,7 +144,7 @@ export default function CheckoutView() {
               </div>
             ) : (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }} data-testid="checkout-products-list">
-                {products.map(p => (
+                {filteredProducts.map(p => (
                   <div className="list-item" key={p.id}>
                     <div className="list-item__main">
                       <div className="list-item__name">{p.name}</div>

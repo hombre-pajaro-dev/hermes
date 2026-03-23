@@ -22,6 +22,12 @@ Feature: Checkout
     Then I see a payment success message
     And I see change due displayed
 
+  Scenario: Filter products by name in checkout
+    Given I am on the Checkout page
+    When I type "esp" in the product search
+    Then only products matching "Espresso" are shown
+    And products not matching are hidden
+
   Scenario: Switch between grid and list view in checkout
     Given I am on the Checkout page
     Then I see the checkout product grid
