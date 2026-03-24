@@ -7,6 +7,9 @@ const apiBase = import.meta.env.VITE_API_BASE_URL as string | undefined;
 export const authClient = createAuthClient({
   baseURL: apiBase ?? (typeof window !== 'undefined' ? window.location.origin : ''),
   basePath: '/api/auth',
+  fetchOptions: {
+    credentials: 'include',
+  },
 });
 
 export type Session = Awaited<ReturnType<typeof authClient.getSession>>['data'];

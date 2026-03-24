@@ -11,6 +11,7 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 - OAuth redirect after Google sign-in now correctly lands on the frontend (`pos.el-nido.mx`) instead of the backend URL — fixed trailing-slash mismatch in `trustedOrigins` validation and removed the trailing slash from `callbackURL`
+- Fixed "state mismatch" error on Google OAuth — the Better Auth client was making cross-origin requests without `credentials: 'include'`, so the browser discarded the state cookie; added `fetchOptions: { credentials: 'include' }` to `createAuthClient`
 
 ---
 
