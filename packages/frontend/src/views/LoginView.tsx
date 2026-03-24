@@ -19,7 +19,7 @@ export default function LoginView() {
     setError(''); setLoading(true);
     await authClient.signIn.social({
       provider: 'google',
-      callbackURL: `${window.location.origin}/`,
+      callbackURL: window.location.origin,
       errorCallbackURL: `${window.location.origin}/login`,
     });
     setLoading(false);

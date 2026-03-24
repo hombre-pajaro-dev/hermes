@@ -15,6 +15,7 @@ export const auth = betterAuth({
   secret: process.env.BETTER_AUTH_SECRET ?? 'dev-secret-change-in-production',
   trustedOrigins: [
     process.env.FRONTEND_URL ?? 'http://localhost:5173',
+    ...(process.env.FRONTEND_URL ? [`${process.env.FRONTEND_URL}/`] : ['http://localhost:5173/']),
     ...(process.env.BETTER_AUTH_URL ? [process.env.BETTER_AUTH_URL] : []),
     'http://localhost:3001',
     'http://localhost:4173',

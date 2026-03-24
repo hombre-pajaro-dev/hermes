@@ -9,6 +9,9 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Fixed
+- OAuth redirect after Google sign-in now correctly lands on the frontend (`pos.el-nido.mx`) instead of the backend URL — fixed trailing-slash mismatch in `trustedOrigins` validation and removed the trailing slash from `callbackURL`
+
 ---
 
 ## [1.0.0-beta.1] — 2026-03-23

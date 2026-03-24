@@ -9,13 +9,14 @@ export const pool = new Pool({
   ssl: isLocal ? false : { rejectUnauthorized: false },
 });
 
-let schemaPromise: Promise<void> | null = null;
+// Apply schema eagerly so it runs before any route — including Better Auth routes
+// that use pool directly and never call getDb().
+export const schemaReady: Promise<void> = applySchema(pool).catch((err) => {
+  console.error('[db] schema migration failed:', err);
+});
 
 export async function getDb(): Promise<Pool> {
-  if (!schemaPromise) {
-    schemaPromise = applySchema(pool);
-  }
-  await schemaPromise;
+  await schemaReady;
   return pool;
 }
 
