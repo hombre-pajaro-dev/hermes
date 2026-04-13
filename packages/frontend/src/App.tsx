@@ -2,7 +2,6 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { authClient } from './lib/auth-client';
 import Layout from './components/Layout';
 import LoginView from './views/LoginView';
-import RegisterView from './views/RegisterView';
 import CheckoutView from './views/CheckoutView';
 import TabsView from './views/TabsView';
 import ProductsView from './views/ProductsView';
@@ -35,8 +34,8 @@ export default function App() {
             <RequireAuth>
               <Layout>
                 <Routes>
-                  <Route path="/" element={<Navigate to="/register" replace />} />
-                  <Route path="/register" element={<RegisterView />} />
+                  <Route path="/" element={<Navigate to="/checkout" replace />} />
+                  <Route path="/register" element={<Navigate to="/admin" replace />} />
                   <Route path="/checkout" element={<CheckoutView />} />
                   <Route path="/tabs" element={<TabsView />} />
                   <Route path="/products" element={<ProductsView />} />

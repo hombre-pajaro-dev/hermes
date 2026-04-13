@@ -5,7 +5,7 @@ import { PosWorld } from '../support/world';
 const API = process.env.TEST_API_URL ?? 'http://localhost:3001';
 
 const ROUTES: Record<string, string> = {
-  'Register': '/register',
+  'Register': '/admin',
   'Checkout': '/checkout',
   'Tabs': '/tabs',
   'Products': '/products',

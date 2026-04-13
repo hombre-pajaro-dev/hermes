@@ -2,7 +2,6 @@ import { NavLink, useLocation } from 'react-router-dom';
 import { authClient } from '../lib/auth-client';
 
 const NAV = [
-  { to: '/register', label: 'Register', icon: '🏧' },
   { to: '/checkout', label: 'Checkout', icon: '🛒' },
   { to: '/tabs', label: 'Tabs', icon: '📋' },
   { to: '/products', label: 'Products', icon: '📦' },
@@ -14,7 +13,6 @@ const NAV = [
 ];
 
 const TITLES: Record<string, string> = {
-  '/register': 'Register',
   '/checkout': 'Checkout',
   '/tabs': 'Tabs',
   '/products': 'Products',

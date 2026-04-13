@@ -46,6 +46,17 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 - New `pnpm seed` script (`packages/backend`) inserts 15 sample products (espresso drinks, cold brew, teas, juices, baked goods) using `ON CONFLICT … DO UPDATE`, making it safe to re-run at any time
 - Products include `Espresso` and `Latte` required by the BDD test suite
 
+#### Register moved into Admin
+- The **Register** section (open register, cash out, close register) is now part of the **Admin** page — it no longer has its own nav item or route
+- The nav bar item "Register" has been removed; the app now lands on **Checkout** by default
+- `/register` redirects to `/admin` so any existing bookmarks keep working
+- All register `data-testid` attributes are unchanged — BDD scenarios continue to pass by navigating to `/admin`
+
+#### Authorized users management in Admin (admin-only)
+- Admin users can add, remove, and change the role of authorized users directly from the Admin page
+- Roles: **Staff** (default) and **Admin**; role changes take effect on the user's next sign-in
+- The section is only visible to users with `role: admin`; staff see only the PIN and Register sections
+
 ### Fixed
 - OAuth redirect after Google sign-in now correctly lands on the frontend (`pos.el-nido.mx`) instead of the backend URL — fixed trailing-slash mismatch in `trustedOrigins` validation and removed the trailing slash from `callbackURL`
 - Fixed "state mismatch" error on Google OAuth — the Better Auth client was making cross-origin requests without `credentials: 'include'`, so the browser discarded the state cookie; added `fetchOptions: { credentials: 'include' }` to `createAuthClient`

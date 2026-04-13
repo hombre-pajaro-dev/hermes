@@ -49,6 +49,8 @@ This document lists all **features** and **scenarios** covered by the BDD test s
 
 **Feature:** As an employee, I want to open and close the POS register and cash out so that we track cash in the drawer and can remove excess.
 
+> **UI location:** Register controls are now part of the **Admin** page (`/admin`). There is no separate Register route.
+
 | # | Scenario | Description |
 |---|----------|-------------|
 | 1 | Open the register with starting cash | Register is closed; open with opening cash; session exists with that opening cash; ledger has register_open entry. |
@@ -140,9 +142,13 @@ This document lists all **features** and **scenarios** covered by the BDD test s
 
 ---
 
-## 9. Admin — PIN Security
+## 9. Admin
 
-**Feature:** As an admin, I want to manage the security PIN and protect sensitive operations so that unauthorised staff cannot perform cash-outs, close the register, or open staff-cost tabs.
+**Feature:** As an admin, I want to manage the security PIN, control register open/close, and manage which users can access the system so that operations are secure and only authorised staff can sign in.
+
+**Register sub-section:** The Register controls (open, cash out, close) live on the Admin page. All staff can open the register; cash out and close require PIN confirmation.
+
+**Authorized Users sub-section (admin only):** Only users with `role: admin` see this section. Admins can add an email + role, change an existing user's role, or remove a user. Changes take effect on the user's next sign-in.
 
 | # | Scenario | Description |
 |---|----------|-------------|
@@ -185,4 +191,4 @@ This document lists all **features** and **scenarios** covered by the BDD test s
 | Restock | `features/restock.feature` |
 | Inventory adjustment | `features/inventory_adjustment.feature` |
 | Products | `features/products.feature` |
-| Admin — PIN Security | `features/admin.feature` |
+| Admin (PIN, Register, Authorized Users) | `features/admin.feature`, `features/register.feature` |
