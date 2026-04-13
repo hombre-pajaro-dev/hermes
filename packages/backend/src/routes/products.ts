@@ -75,6 +75,15 @@ router.patch('/:id/cost', async (req, res) => {
   res.json(rows[0]);
 });
 
+router.patch('/:id/active', async (req, res) => {
+  const { active } = req.body;
+  if (typeof active !== 'boolean') return res.status(400).json({ error: 'active must be a boolean' });
+  const db = await getDb();
+  const { rows } = await db.query('UPDATE products SET active = $1 WHERE id = $2 RETURNING *', [active, req.params.id]);
+  if (!rows[0]) return res.status(404).json({ error: 'Product not found' });
+  res.json(rows[0]);
+});
+
 router.put('/:id', async (req, res) => {
   const { name, description, cost, price, units } = req.body;
   const db = await getDb();

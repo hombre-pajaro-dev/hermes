@@ -85,6 +85,14 @@ export default function ProductsView() {
     else setEditingCost(prev => { const n = { ...prev }; delete n[id]; return n; });
   }
 
+  async function handleToggleActive(p: Product) {
+    setError('');
+    try {
+      const updated = await api.setProductActive(p.id, !p.active);
+      setProducts(prev => prev.map(x => x.id === updated.id ? updated : x));
+    } catch (e: unknown) { setError((e as Error).message); }
+  }
+
   async function saveField(p: Product, field: EditField) {
     setError('');
     const raw = field === 'price' ? editingPrice[p.id] : editingCost[p.id];
@@ -224,7 +232,7 @@ export default function ProductsView() {
           {filteredProducts.length === 0 ? <div className="empty">No products yet</div> : filteredProducts.map(p => {
             const locked = lockedIds.has(p.id);
             return (
-              <div className="product-card" key={p.id} data-testid="product-item">
+              <div className="product-card" key={p.id} data-testid="product-item" style={{ opacity: p.active ? 1 : 0.55 }}>
                 <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 10 }}>
                   <ImagePicker
                     image={p.image}
@@ -233,7 +241,10 @@ export default function ProductsView() {
                     onChange={dataUrl => handleImageChange(p.id, dataUrl)}
                   />
                 </div>
-                <div className="product-card__name" data-testid="product-name">{p.name}</div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4 }}>
+                  <div className="product-card__name" data-testid="product-name" style={{ flex: 1 }}>{p.name}</div>
+                  {!p.active && <span className="badge badge--void" style={{ fontSize: '0.65rem' }}>INACTIVE</span>}
+                </div>
                 <div className="product-card__meta">Price</div>
                 <div className="product-card__field">
                   {renderEditableField(p, 'price', p.price, locked)}
@@ -243,6 +254,14 @@ export default function ProductsView() {
                   {renderEditableField(p, 'cost', p.cost, locked)}
                 </div>
                 <div className="product-card__meta" data-testid="product-units">{p.units} units</div>
+                <button
+                  data-testid={`toggle-active-${p.id}`}
+                  className={`btn btn--sm ${p.active ? 'btn--ghost' : 'btn--success'}`}
+                  style={{ marginTop: 8, width: '100%', fontSize: '0.75rem' }}
+                  onClick={() => handleToggleActive(p)}
+                >
+                  {p.active ? 'Deactivate' : 'Activate'}
+                </button>
               </div>
             );
           })}
@@ -252,7 +271,7 @@ export default function ProductsView() {
           {filteredProducts.length === 0 ? <div className="empty">No products yet</div> : filteredProducts.map(p => {
             const locked = lockedIds.has(p.id);
             return (
-              <div className="list-item" key={p.id} data-testid="product-item" style={{ gap: 12 }}>
+              <div className="list-item" key={p.id} data-testid="product-item" style={{ gap: 12, opacity: p.active ? 1 : 0.55 }}>
                 <ImagePicker
                   image={p.image}
                   testId={`product-thumbnail-${p.id}`}
@@ -260,7 +279,10 @@ export default function ProductsView() {
                   onChange={dataUrl => handleImageChange(p.id, dataUrl)}
                 />
                 <div className="list-item__main">
-                  <div className="list-item__name" data-testid="product-name">{p.name}</div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                    <div className="list-item__name" data-testid="product-name">{p.name}</div>
+                    {!p.active && <span className="badge badge--void" style={{ fontSize: '0.65rem' }}>INACTIVE</span>}
+                  </div>
                   <div className="list-item__sub" style={{ marginTop: 4 }}>
                     <span style={{ marginRight: 8 }}>Cost:</span>
                     {renderEditableField(p, 'cost', p.cost, locked)}
@@ -270,6 +292,14 @@ export default function ProductsView() {
                   <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginBottom: 2 }}>Price</div>
                   {renderEditableField(p, 'price', p.price, locked)}
                   <div className="list-item__sub" data-testid="product-units">{p.units} units</div>
+                  <button
+                    data-testid={`toggle-active-${p.id}`}
+                    className={`btn btn--sm ${p.active ? 'btn--ghost' : 'btn--success'}`}
+                    style={{ fontSize: '0.72rem', marginTop: 2 }}
+                    onClick={() => handleToggleActive(p)}
+                  >
+                    {p.active ? 'Deactivate' : 'Activate'}
+                  </button>
                 </div>
               </div>
             );

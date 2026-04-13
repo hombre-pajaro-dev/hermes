@@ -34,6 +34,10 @@ interface Props {
   soldCounts?: Record<number, number>;
   /** localStorage key for persisting the sort preference. If omitted the state is not persisted. */
   sortStorageKey?: string;
+  /** When true, renders an "Active" filter toggle that hides inactive products. */
+  showActiveFilter?: boolean;
+  /** localStorage key for persisting the active-only filter. Shared across views. */
+  activeFilterStorageKey?: string;
 }
 
 const toSlug = (name: string) => name.toLowerCase().replace(/\s+/g, '-');
@@ -58,10 +62,20 @@ export default function ProductPicker({
   orderQty,
   soldCounts,
   sortStorageKey,
+  showActiveFilter = false,
+  activeFilterStorageKey,
 }: Props) {
   const [sortByMostSold, setSortByMostSold] = useState<boolean>(() => {
     if (sortStorageKey) {
       const stored = localStorage.getItem(sortStorageKey);
+      if (stored !== null) return stored === 'true';
+    }
+    return true;
+  });
+
+  const [activeOnly, setActiveOnly] = useState<boolean>(() => {
+    if (activeFilterStorageKey) {
+      const stored = localStorage.getItem(activeFilterStorageKey);
       if (stored !== null) return stored === 'true';
     }
     return true; // on by default
@@ -73,18 +87,39 @@ export default function ProductPicker({
     if (sortStorageKey) localStorage.setItem(sortStorageKey, String(next));
   }
 
-  const displayProducts = soldCounts && sortByMostSold
-    ? [...products].sort((a, b) => (soldCounts[b.id] ?? 0) - (soldCounts[a.id] ?? 0))
+  function toggleActiveFilter() {
+    const next = !activeOnly;
+    setActiveOnly(next);
+    if (activeFilterStorageKey) localStorage.setItem(activeFilterStorageKey, String(next));
+  }
+
+  const activeFiltered = showActiveFilter && activeOnly
+    ? products.filter(p => p.active !== false)
     : products;
 
+  const displayProducts = soldCounts && sortByMostSold
+    ? [...activeFiltered].sort((a, b) => (soldCounts[b.id] ?? 0) - (soldCounts[a.id] ?? 0))
+    : activeFiltered;
+
   const effectivePrice = (p: Product) => (getPrice ? getPrice(p) : p.price);
-  const hasHeader = title || (showViewToggle && onViewModeChange && viewToggleTestIds) || soldCounts;
+  const hasHeader = title || (showViewToggle && onViewModeChange && viewToggleTestIds) || soldCounts || showActiveFilter;
 
   return (
     <div>
       {hasHeader && (
         <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: showSearch ? 4 : 8 }}>
           {title && <div className="card__title" style={{ flex: 1, marginBottom: 0 }}>{title}</div>}
+          {showActiveFilter && (
+            <button
+              data-testid="active-filter-btn"
+              className={`btn btn--sm ${activeOnly ? 'btn--primary' : 'btn--ghost'}`}
+              onClick={toggleActiveFilter}
+              title={activeOnly ? 'Showing active products only — click to show all' : 'Showing all products — click to show active only'}
+              style={{ fontSize: '0.72rem', padding: '4px 8px', whiteSpace: 'nowrap' }}
+            >
+              ● Active
+            </button>
+          )}
           {soldCounts && (
             <button
               data-testid="sort-by-sold-btn"

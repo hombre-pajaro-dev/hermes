@@ -267,6 +267,8 @@ export default function CheckoutView() {
               orderQty={id => lines.find(l => l.product.id === id)?.quantity}
               soldCounts={soldCounts}
               sortStorageKey="product-sort"
+              showActiveFilter
+              activeFilterStorageKey="product-active-filter"
             />
           </div>
         </>

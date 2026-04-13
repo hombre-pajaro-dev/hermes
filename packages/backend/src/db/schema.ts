@@ -130,6 +130,7 @@ export async function applySchema(db: Pool): Promise<void> {
     ON CONFLICT DO NOTHING
   `);
   await db.query(`ALTER TABLE products ADD COLUMN IF NOT EXISTS image TEXT`);
+  await db.query(`ALTER TABLE products ADD COLUMN IF NOT EXISTS active BOOLEAN NOT NULL DEFAULT TRUE`);
 
   // Auth — authorized users allowlist (source of truth for who may sign in)
   await db.query(`

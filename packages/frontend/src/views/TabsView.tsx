@@ -531,6 +531,8 @@ export default function TabsView() {
                   showSearch
                   soldCounts={soldCounts}
                   sortStorageKey="product-sort"
+                  showActiveFilter
+                  activeFilterStorageKey="product-active-filter"
                 />
               </div>
             </>

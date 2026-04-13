@@ -25,6 +25,7 @@ export const api = {
   updatePrice: (id: number, price: number) => req<Product>(`/products/${id}/price`, { method: 'PATCH', body: JSON.stringify({ price }) }),
   updateCost: (id: number, cost: number) => req<Product>(`/products/${id}/cost`, { method: 'PATCH', body: JSON.stringify({ cost }) }),
   updateImage: (id: number, image: string | null) => req<Product>(`/products/${id}/image`, { method: 'PATCH', body: JSON.stringify({ image }) }),
+  setProductActive: (id: number, active: boolean) => req<Product>(`/products/${id}/active`, { method: 'PATCH', body: JSON.stringify({ active }) }),
 
   // Register
   getSession: () => req<RegisterSession | null>('/register/session'),
@@ -84,7 +85,7 @@ export const api = {
 };
 
 // Types
-export interface Product { id: number; name: string; description: string; cost: number; price: number; units: number; image?: string | null; }
+export interface Product { id: number; name: string; description: string; cost: number; price: number; units: number; image?: string | null; active: boolean; }
 export interface RegisterSession { id: number; status: string; opening_cash: number; closing_cash?: number; opened_at: string; closed_at?: string; }
 export interface Cashout { id: number; session_id: number; amount: number; reason: string; created_at: string; }
 export interface OrderItem { product_id: number; quantity: number; }

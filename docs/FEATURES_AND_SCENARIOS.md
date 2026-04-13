@@ -120,6 +120,8 @@ This document lists all **features** and **scenarios** covered by the BDD test s
 
 **UI:** The product catalogue is displayed via the shared `ProductPicker` component. All three views — Checkout, Tabs Add Items, and Products — share a consistent **search input** (filters by name, case-insensitive) and **grid / list toggle** (⊞ / ☰). View preference is persisted per-view in `localStorage`.
 
+**Active / Inactive status:** Each product can be deactivated from the Products view. Inactive products appear at 55% opacity with an INACTIVE badge. The Add Items panel in Checkout and Tabs has a **● Active** filter toggle (on by default, shared `product-active-filter` key) that hides inactive products from the selling UI.
+
 | # | Scenario | Description |
 |---|----------|-------------|
 | 1 | List products | Fetch products; response is array; each product has id, name, description, cost, price, units. |
@@ -131,6 +133,9 @@ This document lists all **features** and **scenarios** covered by the BDD test s
 | 7 | Modify the cost of a product | Update cost via `PATCH /api/products/:id/cost`; new cost returned; no ledger entry created. |
 | 8 | Cannot set cost to zero or below | Attempt to set cost ≤ 0; request rejected with 400. |
 | 9 | Cannot modify cost when product is in an open tab | Product in open tab; cost update rejected with 409. |
+| 10 | Deactivate a product | `PATCH /api/products/:id/active` with `{ active: false }`; product returns with `active: false`. |
+| 11 | Reactivate a product | `PATCH /api/products/:id/active` with `{ active: true }`; product returns with `active: true`. |
+| 12 | Active filter hides inactive products in Add Items | Products with `active: false` are hidden in Checkout and Tabs when the ● Active filter is on (default). |
 
 ---
 

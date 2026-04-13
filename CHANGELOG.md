@@ -19,6 +19,14 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 - **Products**: now has a **search input** (filters the product catalogue by name); grid / list toggle already existed and is unchanged
 - Component is fully prop-driven — callers control view mode, search state, price display (`getPrice` / `getPriceNote` for at-cost tabs), add-button test-ID prefix, and stock-span test-ID prefix — so all existing BDD test IDs are preserved without changes
 
+#### Product active/inactive status
+- Products can now be **deactivated** from the Products view — each card (grid) and row (list) has a **Deactivate / Activate** button (`toggle-active-{id}` testid)
+- Inactive products are visually distinguished: 55% opacity and an **INACTIVE** badge; no page reload required — state updates in place
+- The Add Items panel in Checkout and Tabs has a new **● Active** filter toggle (on by default) that hides inactive products so they never clutter the selling UI
+- Filter preference is persisted to `localStorage` under the shared key `product-active-filter` — toggling it in Checkout carries over to Tabs and vice versa; survives page refreshes and navigation between views
+- Filter is implemented with `p.active !== false` so products loaded before the column migration (where `active` is `undefined`) are treated as active — no disruption on first deploy
+- Backend: `active BOOLEAN NOT NULL DEFAULT TRUE` column added to `products` (migration-safe `ALTER TABLE … ADD COLUMN IF NOT EXISTS`; existing products default to `true`); new `PATCH /api/products/:id/active` endpoint validates the boolean body and returns the updated product
+
 #### "Most Sold" sort in product picker
 - The **Add Items** panel in Checkout and Tabs now has a **↑ Most Sold** toggle button that re-orders products by all-time units sold (descending), so the most frequently ordered items appear first
 - Toggle is **on by default** — cashiers immediately see the most popular products without any setup
