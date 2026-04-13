@@ -59,6 +59,7 @@ export default function ProductsView() {
         price: Number(form.price),
         units: Number(form.units),
         image: formImage,
+        active: true,
       });
       setForm({ name: '', description: '', cost: '', price: '', units: '' });
       setFormImage(null);
