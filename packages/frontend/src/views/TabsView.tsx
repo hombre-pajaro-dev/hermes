@@ -27,6 +27,7 @@ export default function TabsView() {
   const [showPinForTab, setShowPinForTab] = useState(false);
   const [showPinForVoid, setShowPinForVoid] = useState(false);
   const [receipt, setReceipt] = useState<Receipt | null>(null);
+  const [soldCounts, setSoldCounts] = useState<Record<number, number>>({});
   const [addViewMode, setAddViewMode] = useState<'grid' | 'list'>(() => {
     return (localStorage.getItem('tabs-add-view') as 'grid' | 'list' | null) ?? 'list';
   });
@@ -36,6 +37,12 @@ export default function TabsView() {
   function setAddView(mode: 'grid' | 'list') {
     setAddViewMode(mode);
     localStorage.setItem('tabs-add-view', mode);
+  }
+
+  function refreshSoldCounts() {
+    api.getTopProducts().then(rows => {
+      setSoldCounts(Object.fromEntries(rows.map(r => [r.product_id, r.units_sold])));
+    }).catch(() => {});
   }
 
   async function loadTabs(resetPage = false) {
@@ -48,6 +55,7 @@ export default function TabsView() {
   useEffect(() => {
     loadTabs();
     api.getProducts().then(setProducts).catch(() => {});
+    refreshSoldCounts();
   }, []);
 
   async function openTab(t: Tab) {
@@ -132,6 +140,7 @@ export default function TabsView() {
       setReceipt({ timestamp: new Date(), lines: toReceiptLines(snapshot.items), total: snapshot.total, changeDue: null });
       setSelectedTab(null);
       await loadTabs(true);
+      refreshSoldCounts();
     } catch (e: unknown) { setError((e as Error).message); }
   }
 
@@ -146,6 +155,7 @@ export default function TabsView() {
       setSelectedTab(null);
       setCashReceived('');
       await loadTabs(true);
+      refreshSoldCounts();
     } catch (e: unknown) { setError((e as Error).message); }
   }
 
@@ -519,6 +529,8 @@ export default function TabsView() {
                   search={addSearch}
                   onSearchChange={setAddSearch}
                   showSearch
+                  soldCounts={soldCounts}
+                  sortStorageKey="product-sort"
                 />
               </div>
             </>

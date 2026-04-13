@@ -19,6 +19,15 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 - **Products**: now has a **search input** (filters the product catalogue by name); grid / list toggle already existed and is unchanged
 - Component is fully prop-driven — callers control view mode, search state, price display (`getPrice` / `getPriceNote` for at-cost tabs), add-button test-ID prefix, and stock-span test-ID prefix — so all existing BDD test IDs are preserved without changes
 
+#### "Most Sold" sort in product picker
+- The **Add Items** panel in Checkout and Tabs now has a **↑ Most Sold** toggle button that re-orders products by all-time units sold (descending), so the most frequently ordered items appear first
+- Toggle is **on by default** — cashiers immediately see the most popular products without any setup
+- Preference is persisted to `localStorage` under the shared key `product-sort`, so toggling it in one view carries over to the other; the setting survives page refreshes and navigation between views
+- Products with no sales history fall to the bottom; on a fresh install all products show at zero and the natural list order is preserved
+- Sort applies after search filtering — searching "lat" and having Most Sold on shows matching products sorted by popularity
+- Backend: new `GET /api/reports/top-products` endpoint — aggregates all-time paid units from `order_items` + `tab_items` per product using subquery joins to avoid double-counting; all products are included (zero-sales products get `units_sold: 0`)
+- Sold counts refresh automatically after each completed payment so the sort order stays accurate within a session
+
 #### Database seed script
 - New `pnpm seed` script (`packages/backend`) inserts 15 sample products (espresso drinks, cold brew, teas, juices, baked goods) using `ON CONFLICT … DO UPDATE`, making it safe to re-run at any time
 - Products include `Espresso` and `Latte` required by the BDD test suite

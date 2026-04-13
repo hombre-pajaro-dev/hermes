@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import type { ReactNode } from 'react';
 import type { Product } from '../api/client';
 import ProductThumb from './ProductThumb';
@@ -29,6 +30,10 @@ interface Props {
   showSearch?: boolean;
   /** Returns quantity in current order for a product (used for grid highlight) */
   orderQty?: (productId: number) => number | undefined;
+  /** Map of product_id → all-time units sold. Enables the "Most Sold" sort toggle. */
+  soldCounts?: Record<number, number>;
+  /** localStorage key for persisting the sort preference. If omitted the state is not persisted. */
+  sortStorageKey?: string;
 }
 
 const toSlug = (name: string) => name.toLowerCase().replace(/\s+/g, '-');
@@ -51,15 +56,46 @@ export default function ProductPicker({
   onSearchChange,
   showSearch = false,
   orderQty,
+  soldCounts,
+  sortStorageKey,
 }: Props) {
+  const [sortByMostSold, setSortByMostSold] = useState<boolean>(() => {
+    if (sortStorageKey) {
+      const stored = localStorage.getItem(sortStorageKey);
+      if (stored !== null) return stored === 'true';
+    }
+    return true; // on by default
+  });
+
+  function toggleSort() {
+    const next = !sortByMostSold;
+    setSortByMostSold(next);
+    if (sortStorageKey) localStorage.setItem(sortStorageKey, String(next));
+  }
+
+  const displayProducts = soldCounts && sortByMostSold
+    ? [...products].sort((a, b) => (soldCounts[b.id] ?? 0) - (soldCounts[a.id] ?? 0))
+    : products;
+
   const effectivePrice = (p: Product) => (getPrice ? getPrice(p) : p.price);
-  const hasHeader = title || (showViewToggle && onViewModeChange && viewToggleTestIds);
+  const hasHeader = title || (showViewToggle && onViewModeChange && viewToggleTestIds) || soldCounts;
 
   return (
     <div>
       {hasHeader && (
-        <div style={{ display: 'flex', alignItems: 'center', marginBottom: showSearch ? 4 : 8 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: showSearch ? 4 : 8 }}>
           {title && <div className="card__title" style={{ flex: 1, marginBottom: 0 }}>{title}</div>}
+          {soldCounts && (
+            <button
+              data-testid="sort-by-sold-btn"
+              className={`btn btn--sm ${sortByMostSold ? 'btn--primary' : 'btn--ghost'}`}
+              onClick={toggleSort}
+              title={sortByMostSold ? 'Sorted by most sold — click to disable' : 'Sort by most sold'}
+              style={{ fontSize: '0.72rem', padding: '4px 8px', whiteSpace: 'nowrap' }}
+            >
+              ↑ Most Sold
+            </button>
+          )}
           {showViewToggle && onViewModeChange && viewToggleTestIds && (
             <div className="view-toggle">
               <button
@@ -94,7 +130,7 @@ export default function ProductPicker({
       <div style={{ maxHeight: '45vh', overflowY: 'auto', overscrollBehavior: 'contain' }}>
         {viewMode === 'grid' ? (
           <div className="products-grid" data-testid={gridTestId}>
-            {products.map(p => {
+            {displayProducts.map(p => {
               const qty = orderQty?.(p.id);
               return (
                 <button
@@ -123,7 +159,7 @@ export default function ProductPicker({
           </div>
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }} data-testid={listTestId}>
-            {products.map(p => (
+            {displayProducts.map(p => (
               <div className="list-item" key={p.id} style={{ gap: 10 }}>
                 <ProductThumb image={p.image} name={p.name} size={40} />
                 <div className="list-item__main">

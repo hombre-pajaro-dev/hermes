@@ -29,13 +29,19 @@ export default function CheckoutView() {
     return (localStorage.getItem('checkout-view') as ViewMode | null) ?? 'grid';
   });
   const [search, setSearch] = useState('');
+  const [soldCounts, setSoldCounts] = useState<Record<number, number>>({});
 
   function setView(mode: ViewMode) {
     setViewMode(mode);
     localStorage.setItem('checkout-view', mode);
   }
 
-  useEffect(() => { api.getProducts().then(setProducts).catch(() => {}); }, []);
+  useEffect(() => {
+    api.getProducts().then(setProducts).catch(() => {});
+    api.getTopProducts().then(rows => {
+      setSoldCounts(Object.fromEntries(rows.map(r => [r.product_id, r.units_sold])));
+    }).catch(() => {});
+  }, []);
 
   const filteredProducts = search.trim()
     ? products.filter(p => p.name.toLowerCase().includes(search.toLowerCase()))
@@ -80,8 +86,9 @@ export default function CheckoutView() {
       await api.payOrder(order.id, 'card');
       setReceipt({ timestamp: new Date(), lines: toReceiptLines(snapshot.lines), total: snapshot.total, changeDue: null });
       setLines([]);
-      const updated = await api.getProducts();
+      const [updated, top] = await Promise.all([api.getProducts(), api.getTopProducts()]);
       setProducts(updated);
+      setSoldCounts(Object.fromEntries(top.map(r => [r.product_id, r.units_sold])));
     } catch (e: unknown) { setError((e as Error).message); }
     finally { setLoading(false); }
   }
@@ -95,8 +102,9 @@ export default function CheckoutView() {
       setReceipt({ timestamp: new Date(), lines: toReceiptLines(snapshot.lines), total: snapshot.total, changeDue: paid.change_due ?? null });
       setLines([]);
       setCashReceived('');
-      const updated = await api.getProducts();
+      const [updated, top] = await Promise.all([api.getProducts(), api.getTopProducts()]);
       setProducts(updated);
+      setSoldCounts(Object.fromEntries(top.map(r => [r.product_id, r.units_sold])));
     } catch (e: unknown) { setError((e as Error).message); }
     finally { setLoading(false); }
   }
@@ -257,6 +265,8 @@ export default function CheckoutView() {
               showSearch
               addTestIdPrefix="add"
               orderQty={id => lines.find(l => l.product.id === id)?.quantity}
+              soldCounts={soldCounts}
+              sortStorageKey="product-sort"
             />
           </div>
         </>

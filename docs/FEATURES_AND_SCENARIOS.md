@@ -8,7 +8,7 @@ This document lists all **features** and **scenarios** covered by the BDD test s
 
 **Feature:** As an employee, I want to create a checkout order and accept payment (cash or card) so that the customer can pay for selected items.
 
-**UI — Add Items panel:** Shared `ProductPicker` component with search input and grid / list toggle; preference persisted under `checkout-view`.
+**UI — Add Items panel:** Shared `ProductPicker` component with search input, grid / list toggle (persisted under `checkout-view`), and **↑ Most Sold** sort toggle (on by default, persisted under `product-sort` — shared with Tabs).
 
 | # | Scenario | Description |
 |---|----------|-------------|
@@ -24,7 +24,7 @@ This document lists all **features** and **scenarios** covered by the BDD test s
 
 **Feature:** As an employee, I want to open tabs for customers and add items so that the customer can pay at the end of the session. Multiple tabs can be open simultaneously. Tabs may optionally be created as at-cost (staff) tabs.
 
-**UI — Add Items panel:** Shared `ProductPicker` component with search input and grid / list toggle; preference persisted under `tabs-add-view`; defaults to list view. At-cost tabs display cost price with a `(cost)` label instead of the sale price.
+**UI — Add Items panel:** Shared `ProductPicker` component with search input, grid / list toggle (persisted under `tabs-add-view`, defaults to list), and **↑ Most Sold** sort toggle (on by default, persisted under `product-sort` — shared with Checkout). At-cost tabs display cost price with a `(cost)` label instead of the sale price.
 
 | # | Scenario | Description |
 |---|----------|-------------|
@@ -86,6 +86,7 @@ This document lists all **features** and **scenarios** covered by the BDD test s
 | 3 | Close brief includes revenue, cost, most sold and most profitable | Close brief has revenue, total_cost, most_sold, most_profitable, by_item. |
 | 4 | Daily range report for chart | Request daily range from today to today; response has at least one day with date, revenue, cost, order_count. |
 | 5 | Filter reports by date | Sales by item for a specific date; returns array without error. |
+| 6 | Top products by all-time units sold | `GET /api/reports/top-products` returns all products with `units_sold` aggregated from all paid orders and tabs, sorted descending; products with no sales appear with `units_sold: 0`. |
 
 ---
 

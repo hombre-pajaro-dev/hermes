@@ -119,6 +119,31 @@ router.get('/close-brief', async (req, res) => {
   });
 });
 
+router.get('/top-products', async (_req, res) => {
+  const db = await getDb();
+  const { rows } = await db.query<{ product_id: number; units_sold: number }>(`
+    SELECT p.id as product_id,
+           COALESCE(o.qty, 0) + COALESCE(t.qty, 0) as units_sold
+    FROM products p
+    LEFT JOIN (
+      SELECT oi.product_id, SUM(oi.quantity) as qty
+      FROM order_items oi
+      JOIN orders ord ON ord.id = oi.order_id
+      WHERE ord.status = 'paid'
+      GROUP BY oi.product_id
+    ) o ON o.product_id = p.id
+    LEFT JOIN (
+      SELECT ti.product_id, SUM(ti.quantity) as qty
+      FROM tab_items ti
+      JOIN tabs tab ON tab.id = ti.tab_id
+      WHERE tab.status = 'paid'
+      GROUP BY ti.product_id
+    ) t ON t.product_id = p.id
+    ORDER BY units_sold DESC
+  `);
+  res.json(rows.map(r => ({ product_id: r.product_id, units_sold: Number(r.units_sold) })));
+});
+
 router.get('/daily-range', async (req, res) => {
   const from = (req.query.from as string) || new Date().toISOString().slice(0, 10);
   const to = (req.query.to as string) || new Date().toISOString().slice(0, 10);
