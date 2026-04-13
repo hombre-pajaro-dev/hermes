@@ -8,6 +8,8 @@ This document lists all **features** and **scenarios** covered by the BDD test s
 
 **Feature:** As an employee, I want to create a checkout order and accept payment (cash or card) so that the customer can pay for selected items.
 
+**UI — Add Items panel:** Shared `ProductPicker` component with search input and grid / list toggle; preference persisted under `checkout-view`.
+
 | # | Scenario | Description |
 |---|----------|-------------|
 | 1 | Complete a sale with credit card | Order with items; pay with card; order completes; stock decreases. |
@@ -21,6 +23,8 @@ This document lists all **features** and **scenarios** covered by the BDD test s
 ## 2. Tabs (Long-lasting orders)
 
 **Feature:** As an employee, I want to open tabs for customers and add items so that the customer can pay at the end of the session. Multiple tabs can be open simultaneously. Tabs may optionally be created as at-cost (staff) tabs.
+
+**UI — Add Items panel:** Shared `ProductPicker` component with search input and grid / list toggle; preference persisted under `tabs-add-view`; defaults to list view. At-cost tabs display cost price with a `(cost)` label instead of the sale price.
 
 | # | Scenario | Description |
 |---|----------|-------------|
@@ -112,6 +116,8 @@ This document lists all **features** and **scenarios** covered by the BDD test s
 ## 8. Products
 
 **Feature:** Products have name, description, cost, price, and units (inventory). All products are sold by units with a sale price and a cost.
+
+**UI:** The product catalogue is displayed via the shared `ProductPicker` component. All three views — Checkout, Tabs Add Items, and Products — share a consistent **search input** (filters by name, case-insensitive) and **grid / list toggle** (⊞ / ☰). View preference is persisted per-view in `localStorage`.
 
 | # | Scenario | Description |
 |---|----------|-------------|

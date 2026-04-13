@@ -19,11 +19,16 @@ export default function ProductsView() {
   const [viewMode, setViewMode] = useState<ViewMode>(() => {
     return (localStorage.getItem('products-view') as ViewMode | null) ?? 'grid';
   });
+  const [search, setSearch] = useState('');
 
   function setView(mode: ViewMode) {
     setViewMode(mode);
     localStorage.setItem('products-view', mode);
   }
+
+  const filteredProducts = search.trim()
+    ? products.filter(p => p.name.toLowerCase().includes(search.toLowerCase()))
+    : products;
 
   async function load() {
     try {
@@ -143,7 +148,7 @@ export default function ProductsView() {
     <div>
       {error && <div className="error-banner" data-testid="error-banner">{error}</div>}
 
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 16 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
         <button data-testid="add-product-btn" className="btn btn--primary" style={{ flex: 1 }}
           onClick={() => setShowForm(!showForm)}>
           {showForm ? 'Cancel' : '+ Add Product'}
@@ -163,6 +168,16 @@ export default function ProductsView() {
           >☰</button>
         </div>
       </div>
+
+      <input
+        data-testid="product-search"
+        className="input"
+        type="search"
+        placeholder="Search products…"
+        value={search}
+        onChange={e => setSearch(e.target.value)}
+        style={{ marginBottom: 16 }}
+      />
 
       {showForm && (
         <div className="card" data-testid="product-form">
@@ -206,7 +221,7 @@ export default function ProductsView() {
 
       {viewMode === 'grid' ? (
         <div className="products-grid" data-testid="products-grid">
-          {products.length === 0 ? <div className="empty">No products yet</div> : products.map(p => {
+          {filteredProducts.length === 0 ? <div className="empty">No products yet</div> : filteredProducts.map(p => {
             const locked = lockedIds.has(p.id);
             return (
               <div className="product-card" key={p.id} data-testid="product-item">
@@ -234,7 +249,7 @@ export default function ProductsView() {
         </div>
       ) : (
         <div className="card" data-testid="products-list">
-          {products.length === 0 ? <div className="empty">No products yet</div> : products.map(p => {
+          {filteredProducts.length === 0 ? <div className="empty">No products yet</div> : filteredProducts.map(p => {
             const locked = lockedIds.has(p.id);
             return (
               <div className="list-item" key={p.id} data-testid="product-item" style={{ gap: 12 }}>

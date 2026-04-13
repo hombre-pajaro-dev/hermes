@@ -3,6 +3,7 @@ import { api } from '../api/client';
 import type { Product } from '../api/client';
 import ReceiptModal, { type ReceiptLine } from '../components/ReceiptModal';
 import ProductThumb from '../components/ProductThumb';
+import ProductPicker from '../components/ProductPicker';
 
 type ViewMode = 'list' | 'grid';
 type Step = 'order' | 'cash';
@@ -241,82 +242,22 @@ export default function CheckoutView() {
           </div>
 
           <div className="card">
-            <div style={{ display: 'flex', alignItems: 'center', marginBottom: 8 }}>
-              <div className="card__title" style={{ flex: 1, marginBottom: 0 }}>Add Items</div>
-              <div className="view-toggle">
-                <button
-                  data-testid="checkout-grid-view-btn"
-                  className={`view-toggle__btn${viewMode === 'grid' ? ' active' : ''}`}
-                  onClick={() => setView('grid')}
-                  title="Grid view"
-                >⊞</button>
-                <button
-                  data-testid="checkout-list-view-btn"
-                  className={`view-toggle__btn${viewMode === 'list' ? ' active' : ''}`}
-                  onClick={() => setView('list')}
-                  title="List view"
-                >☰</button>
-              </div>
-            </div>
-
-            <input
-              data-testid="product-search"
-              className="input"
-              type="search"
-              placeholder="Search products…"
-              value={search}
-              onChange={e => setSearch(e.target.value)}
-              style={{ marginBottom: 10 }}
+            <ProductPicker
+              title="Add Items"
+              products={filteredProducts}
+              onAdd={addProduct}
+              viewMode={viewMode}
+              onViewModeChange={setView}
+              showViewToggle
+              viewToggleTestIds={{ grid: 'checkout-grid-view-btn', list: 'checkout-list-view-btn' }}
+              gridTestId="checkout-products-grid"
+              listTestId="checkout-products-list"
+              search={search}
+              onSearchChange={setSearch}
+              showSearch
+              addTestIdPrefix="add"
+              orderQty={id => lines.find(l => l.product.id === id)?.quantity}
             />
-
-            <div style={{ maxHeight: '45vh', overflowY: 'auto', overscrollBehavior: 'contain' }}>
-            {viewMode === 'grid' ? (
-              <div className="products-grid" data-testid="checkout-products-grid">
-                {filteredProducts.map(p => {
-                  const inOrder = lines.find(l => l.product.id === p.id);
-                  return (
-                    <button
-                      key={p.id}
-                      data-testid={`add-${p.name.toLowerCase().replace(/\s+/g, '-')}`}
-                      className="product-card"
-                      style={{ border: inOrder ? '2px solid var(--primary)' : undefined, cursor: 'pointer', textAlign: 'left', width: '100%', padding: 0, overflow: 'hidden' }}
-                      onClick={() => addProduct(p)}
-                      disabled={p.units <= 0}
-                    >
-                      <div style={{ width: '100%', height: 72, background: '#f3f4f6', borderBottom: '1px solid var(--border)', flexShrink: 0, overflow: 'hidden' }}>
-                        {p.image
-                          ? <img src={p.image} alt={p.name} style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
-                          : <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#d1d5db', fontSize: '1.8rem' }}>📷</div>
-                        }
-                      </div>
-                      <div style={{ padding: '8px 10px', display: 'flex', flexDirection: 'column', gap: 3 }}>
-                        <div className="product-card__name">{p.name}</div>
-                        <div className="product-card__price">${p.price.toFixed(2)}</div>
-                        <div className="product-card__meta">{p.units > 0 ? `${p.units} in stock` : 'Out of stock'}</div>
-                        {inOrder && <div style={{ fontSize: '0.75rem', color: 'var(--primary)', fontWeight: 600 }}>× {inOrder.quantity} in order</div>}
-                      </div>
-                    </button>
-                  );
-                })}
-              </div>
-            ) : (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }} data-testid="checkout-products-list">
-                {filteredProducts.map(p => (
-                  <div className="list-item" key={p.id} style={{ gap: 10 }}>
-                    <ProductThumb image={p.image} name={p.name} size={40} />
-                    <div className="list-item__main">
-                      <div className="list-item__name">{p.name}</div>
-                      <div className="list-item__sub">{p.units} in stock</div>
-                    </div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                      <span>${p.price.toFixed(2)}</span>
-                      <button data-testid={`add-${p.name.toLowerCase().replace(/\s+/g, '-')}`} className="btn btn--sm btn--primary" onClick={() => addProduct(p)}>+</button>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-            </div>
           </div>
         </>
       )}

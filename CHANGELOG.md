@@ -9,6 +9,20 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+
+#### Shared ProductPicker component — unified product panel across all views
+- Extracted a reusable `ProductPicker` component (`src/components/ProductPicker.tsx`) that replaces the duplicated product listing code that existed independently in Checkout and Tabs
+- All three views — **Checkout**, **Tabs Add Items**, and **Products** — now share consistent UI patterns: search input and grid / list toggle
+- **Checkout**: no behaviour change; grid/list toggle and search were already present and are now powered by the shared component
+- **Tabs Add Items**: now has a **search input** (filters products by name as you type) and a **grid / list toggle** (⊞ / ☰); view preference persisted to `localStorage` under `tabs-add-view`; defaults to list so stock test IDs remain accessible
+- **Products**: now has a **search input** (filters the product catalogue by name); grid / list toggle already existed and is unchanged
+- Component is fully prop-driven — callers control view mode, search state, price display (`getPrice` / `getPriceNote` for at-cost tabs), add-button test-ID prefix, and stock-span test-ID prefix — so all existing BDD test IDs are preserved without changes
+
+#### Database seed script
+- New `pnpm seed` script (`packages/backend`) inserts 15 sample products (espresso drinks, cold brew, teas, juices, baked goods) using `ON CONFLICT … DO UPDATE`, making it safe to re-run at any time
+- Products include `Espresso` and `Latte` required by the BDD test suite
+
 ### Fixed
 - OAuth redirect after Google sign-in now correctly lands on the frontend (`pos.el-nido.mx`) instead of the backend URL — fixed trailing-slash mismatch in `trustedOrigins` validation and removed the trailing slash from `callbackURL`
 - Fixed "state mismatch" error on Google OAuth — the Better Auth client was making cross-origin requests without `credentials: 'include'`, so the browser discarded the state cookie; added `fetchOptions: { credentials: 'include' }` to `createAuthClient`

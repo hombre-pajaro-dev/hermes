@@ -4,6 +4,7 @@ import type { Tab, TabItem, Product } from '../api/client';
 import PinModal from '../components/PinModal';
 import ReceiptModal, { type ReceiptLine } from '../components/ReceiptModal';
 import ProductThumb from '../components/ProductThumb';
+import ProductPicker from '../components/ProductPicker';
 
 interface Receipt {
   timestamp: Date;
@@ -26,7 +27,16 @@ export default function TabsView() {
   const [showPinForTab, setShowPinForTab] = useState(false);
   const [showPinForVoid, setShowPinForVoid] = useState(false);
   const [receipt, setReceipt] = useState<Receipt | null>(null);
+  const [addViewMode, setAddViewMode] = useState<'grid' | 'list'>(() => {
+    return (localStorage.getItem('tabs-add-view') as 'grid' | 'list' | null) ?? 'list';
+  });
+  const [addSearch, setAddSearch] = useState('');
   const PAGE_SIZE = 10;
+
+  function setAddView(mode: 'grid' | 'list') {
+    setAddViewMode(mode);
+    localStorage.setItem('tabs-add-view', mode);
+  }
 
   async function loadTabs(resetPage = false) {
     try {
@@ -167,6 +177,10 @@ export default function TabsView() {
   const tabTotal = selectedTab?.total ?? 0;
   const cashNum = Number(cashReceived) || 0;
   const liveChange = cashReceived !== '' ? cashNum - tabTotal : null;
+
+  const filteredAddProducts = addSearch.trim()
+    ? products.filter(p => p.name.toLowerCase().includes(addSearch.toLowerCase()))
+    : products;
 
   const openTabs = tabs.filter(t => t.status === 'open');
   const closedTabs = tabs.filter(t => t.status !== 'open');
@@ -485,27 +499,27 @@ export default function TabsView() {
               </div>
 
               <div className="card">
-                <div className="card__title">Add Items</div>
-                <div style={{ maxHeight: '45vh', overflowY: 'auto', overscrollBehavior: 'contain' }}>
-                {products.map(p => (
-                  <div className="list-item" key={p.id} style={{ gap: 10 }}>
-                    <ProductThumb image={p.image} name={p.name} size={40} />
-                    <div className="list-item__main">
-                      <div className="list-item__name">{p.name}</div>
-                      <div className="list-item__sub">
-                        ${selectedTab.at_cost ? p.cost.toFixed(2) : p.price.toFixed(2)}
-                        {selectedTab.at_cost ? <span style={{ marginLeft: 4, fontSize: '0.75rem', color: '#92400e' }}>(cost)</span> : null}
-                        <span style={{ marginLeft: 8 }} data-testid={`tab-product-stock-${p.name.toLowerCase().replace(/\s+/g, '-')}`}>
-                          {p.units > 0 ? `· ${p.units} in stock` : <span style={{ color: 'var(--danger)' }}>· out of stock</span>}
-                        </span>
-                      </div>
-                    </div>
-                    <button data-testid={`tab-add-${p.name.toLowerCase().replace(/\s+/g, '-')}`}
-                      className="btn btn--sm btn--primary" onClick={() => handleAddProduct(p)}
-                      disabled={p.units <= 0}>+</button>
-                  </div>
-                ))}
-                </div>
+                <ProductPicker
+                  title="Add Items"
+                  products={filteredAddProducts}
+                  onAdd={handleAddProduct}
+                  addTestIdPrefix="tab-add"
+                  stockTestIdPrefix="tab-product-stock"
+                  getPrice={p => selectedTab.at_cost ? p.cost : p.price}
+                  getPriceNote={_p => selectedTab.at_cost
+                    ? <span style={{ marginLeft: 4, fontSize: '0.75rem', color: '#92400e' }}>(cost)</span>
+                    : null
+                  }
+                  viewMode={addViewMode}
+                  onViewModeChange={setAddView}
+                  showViewToggle
+                  viewToggleTestIds={{ grid: 'tabs-add-grid-view-btn', list: 'tabs-add-list-view-btn' }}
+                  gridTestId="tabs-add-products-grid"
+                  listTestId="tabs-add-products-list"
+                  search={addSearch}
+                  onSearchChange={setAddSearch}
+                  showSearch
+                />
               </div>
             </>
           )}
