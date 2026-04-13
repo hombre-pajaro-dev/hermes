@@ -9,6 +9,10 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+---
+
+## [1.0.0-beta.2] — 2026-04-13
+
 ### Added
 
 #### Shared ProductPicker component — unified product panel across all views
