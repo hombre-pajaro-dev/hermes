@@ -19,6 +19,12 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 - **Products**: now has a **search input** (filters the product catalogue by name); grid / list toggle already existed and is unchanged
 - Component is fully prop-driven — callers control view mode, search state, price display (`getPrice` / `getPriceNote` for at-cost tabs), add-button test-ID prefix, and stock-span test-ID prefix — so all existing BDD test IDs are preserved without changes
 
+#### "In Stock" filter in product picker
+- The Add Items panel in Checkout and Tabs now has a **◈ In Stock** filter toggle (on by default) that hides out-of-stock products (`units ≤ 0`) from the selling UI
+- Preference is persisted to `localStorage` under the shared key `product-stock-filter` — toggling in one view carries over to the other
+- Filter runs after the Active filter and before the Most Sold sort, so the full pipeline is: active → in-stock → most-sold → render
+- No backend changes required — filters entirely on the already-loaded `units` field
+
 #### Product active/inactive status
 - Products can now be **deactivated** from the Products view — each card (grid) and row (list) has a **Deactivate / Activate** button (`toggle-active-{id}` testid)
 - Inactive products are visually distinguished: 55% opacity and an **INACTIVE** badge; no page reload required — state updates in place

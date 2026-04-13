@@ -533,6 +533,8 @@ export default function TabsView() {
                   sortStorageKey="product-sort"
                   showActiveFilter
                   activeFilterStorageKey="product-active-filter"
+                  showStockFilter
+                  stockFilterStorageKey="product-stock-filter"
                 />
               </div>
             </>

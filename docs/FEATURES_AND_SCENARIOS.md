@@ -8,7 +8,7 @@ This document lists all **features** and **scenarios** covered by the BDD test s
 
 **Feature:** As an employee, I want to create a checkout order and accept payment (cash or card) so that the customer can pay for selected items.
 
-**UI — Add Items panel:** Shared `ProductPicker` component with search input, grid / list toggle (persisted under `checkout-view`), and **↑ Most Sold** sort toggle (on by default, persisted under `product-sort` — shared with Tabs).
+**UI — Add Items panel:** Shared `ProductPicker` component with search input, grid / list toggle (persisted under `checkout-view`), **● Active** filter (on by default, shared `product-active-filter`), **◈ In Stock** filter (on by default, shared `product-stock-filter`), and **↑ Most Sold** sort toggle (on by default, shared `product-sort`). Filter pipeline: active → in-stock → most-sold → render.
 
 | # | Scenario | Description |
 |---|----------|-------------|
@@ -24,7 +24,7 @@ This document lists all **features** and **scenarios** covered by the BDD test s
 
 **Feature:** As an employee, I want to open tabs for customers and add items so that the customer can pay at the end of the session. Multiple tabs can be open simultaneously. Tabs may optionally be created as at-cost (staff) tabs.
 
-**UI — Add Items panel:** Shared `ProductPicker` component with search input, grid / list toggle (persisted under `tabs-add-view`, defaults to list), and **↑ Most Sold** sort toggle (on by default, persisted under `product-sort` — shared with Checkout). At-cost tabs display cost price with a `(cost)` label instead of the sale price.
+**UI — Add Items panel:** Shared `ProductPicker` component with search input, grid / list toggle (persisted under `tabs-add-view`, defaults to list), **● Active** filter (on by default, shared `product-active-filter`), **◈ In Stock** filter (on by default, shared `product-stock-filter`), and **↑ Most Sold** sort toggle (on by default, shared `product-sort`). At-cost tabs display cost price with a `(cost)` label instead of the sale price.
 
 | # | Scenario | Description |
 |---|----------|-------------|
@@ -136,6 +136,7 @@ This document lists all **features** and **scenarios** covered by the BDD test s
 | 10 | Deactivate a product | `PATCH /api/products/:id/active` with `{ active: false }`; product returns with `active: false`. |
 | 11 | Reactivate a product | `PATCH /api/products/:id/active` with `{ active: true }`; product returns with `active: true`. |
 | 12 | Active filter hides inactive products in Add Items | Products with `active: false` are hidden in Checkout and Tabs when the ● Active filter is on (default). |
+| 13 | In-stock filter hides out-of-stock products in Add Items | Products with `units ≤ 0` are hidden in Checkout and Tabs when the ◈ In Stock filter is on (default). |
 
 ---
 

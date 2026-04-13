@@ -38,6 +38,10 @@ interface Props {
   showActiveFilter?: boolean;
   /** localStorage key for persisting the active-only filter. Shared across views. */
   activeFilterStorageKey?: string;
+  /** When true, renders an "In Stock" filter toggle that hides out-of-stock products. */
+  showStockFilter?: boolean;
+  /** localStorage key for persisting the in-stock filter. Shared across views. */
+  stockFilterStorageKey?: string;
 }
 
 const toSlug = (name: string) => name.toLowerCase().replace(/\s+/g, '-');
@@ -64,6 +68,8 @@ export default function ProductPicker({
   sortStorageKey,
   showActiveFilter = false,
   activeFilterStorageKey,
+  showStockFilter = false,
+  stockFilterStorageKey,
 }: Props) {
   const [sortByMostSold, setSortByMostSold] = useState<boolean>(() => {
     if (sortStorageKey) {
@@ -87,22 +93,40 @@ export default function ProductPicker({
     if (sortStorageKey) localStorage.setItem(sortStorageKey, String(next));
   }
 
+  const [inStockOnly, setInStockOnly] = useState<boolean>(() => {
+    if (stockFilterStorageKey) {
+      const stored = localStorage.getItem(stockFilterStorageKey);
+      if (stored !== null) return stored === 'true';
+    }
+    return true; // on by default
+  });
+
   function toggleActiveFilter() {
     const next = !activeOnly;
     setActiveOnly(next);
     if (activeFilterStorageKey) localStorage.setItem(activeFilterStorageKey, String(next));
   }
 
+  function toggleStockFilter() {
+    const next = !inStockOnly;
+    setInStockOnly(next);
+    if (stockFilterStorageKey) localStorage.setItem(stockFilterStorageKey, String(next));
+  }
+
   const activeFiltered = showActiveFilter && activeOnly
     ? products.filter(p => p.active !== false)
     : products;
 
-  const displayProducts = soldCounts && sortByMostSold
-    ? [...activeFiltered].sort((a, b) => (soldCounts[b.id] ?? 0) - (soldCounts[a.id] ?? 0))
+  const stockFiltered = showStockFilter && inStockOnly
+    ? activeFiltered.filter(p => p.units > 0)
     : activeFiltered;
 
+  const displayProducts = soldCounts && sortByMostSold
+    ? [...stockFiltered].sort((a, b) => (soldCounts[b.id] ?? 0) - (soldCounts[a.id] ?? 0))
+    : stockFiltered;
+
   const effectivePrice = (p: Product) => (getPrice ? getPrice(p) : p.price);
-  const hasHeader = title || (showViewToggle && onViewModeChange && viewToggleTestIds) || soldCounts || showActiveFilter;
+  const hasHeader = title || (showViewToggle && onViewModeChange && viewToggleTestIds) || soldCounts || showActiveFilter || showStockFilter;
 
   return (
     <div>
@@ -118,6 +142,17 @@ export default function ProductPicker({
               style={{ fontSize: '0.72rem', padding: '4px 8px', whiteSpace: 'nowrap' }}
             >
               ● Active
+            </button>
+          )}
+          {showStockFilter && (
+            <button
+              data-testid="stock-filter-btn"
+              className={`btn btn--sm ${inStockOnly ? 'btn--primary' : 'btn--ghost'}`}
+              onClick={toggleStockFilter}
+              title={inStockOnly ? 'Showing in-stock products only — click to show all' : 'Showing all products — click to show in-stock only'}
+              style={{ fontSize: '0.72rem', padding: '4px 8px', whiteSpace: 'nowrap' }}
+            >
+              ◈ In Stock
             </button>
           )}
           {soldCounts && (
