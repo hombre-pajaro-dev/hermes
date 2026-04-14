@@ -1,5 +1,7 @@
 import express from 'express';
 import cors from 'cors';
+import path from 'path';
+import { existsSync } from 'fs';
 import type { IncomingMessage, ServerResponse, IncomingHttpHeaders } from 'http';
 import { auth } from './auth.js';
 import productsRouter from './routes/products.js';
@@ -104,6 +106,13 @@ export function createApp() {
   app.use('/api/restock', restockRouter);
   app.use('/api/inventory', inventoryRouter);
   app.use('/api/admin', adminRouter);
+
+  // Serve the built frontend in production (Vercel bundles public/ via includeFiles)
+  const publicDir = path.join(process.cwd(), 'public');
+  if (existsSync(path.join(publicDir, 'index.html'))) {
+    app.use(express.static(publicDir));
+    app.get('*', (_req, res) => res.sendFile(path.join(publicDir, 'index.html')));
+  }
 
   return app;
 }
