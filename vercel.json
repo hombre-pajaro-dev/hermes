@@ -1,10 +1,15 @@
 {
   "version": 2,
   "installCommand": "npx --yes pnpm@9.15.9 install --no-frozen-lockfile",
-  "buildCommand": "pnpm run build",
+  "buildCommand": "npx --yes pnpm@9.15.9 --filter frontend build",
   "outputDirectory": "dist",
+  "functions": {
+    "api/index.ts": {
+      "runtime": "nodejs20.x",
+      "includeFiles": "public/**"
+    }
+  },
   "rewrites": [
-    { "source": "/api/(.*)", "destination": "/api/index.ts" },
-    { "source": "/((?!api/).*)", "destination": "/index.html" }
+    { "source": "/(.*)", "destination": "/api/index.ts" }
   ]
 }
