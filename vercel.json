@@ -2,7 +2,7 @@
   "version": 2,
   "installCommand": "npx --yes pnpm@9.15.9 install --no-frozen-lockfile",
   "buildCommand": "npx --yes pnpm@9.15.9 --filter frontend build",
-  "outputDirectory": "dist",
+  "outputDirectory": "packages/frontend/dist",
   "functions": {
     "api/index.ts": {
       "runtime": "nodejs20.x",
