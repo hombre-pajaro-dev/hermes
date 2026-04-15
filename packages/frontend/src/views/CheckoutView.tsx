@@ -1,9 +1,12 @@
 import { useEffect, useRef, useState } from 'react';
 import { api } from '../api/client';
-import type { Product } from '../api/client';
-import ReceiptModal, { type ReceiptLine } from '../components/ReceiptModal';
+import type { Discount, Product } from '../api/client';
+import ReceiptModal, { type ReceiptLine, type ReceiptDiscount } from '../components/ReceiptModal';
 import ProductThumb from '../components/ProductThumb';
 import ProductPicker from '../components/ProductPicker';
+import PinModal from '../components/PinModal';
+import { computeSavings, getBestAutoDiscount } from '../lib/discounts';
+import type { CartItem } from '../lib/discounts';
 
 type ViewMode = 'list' | 'grid';
 type Step = 'order' | 'cash';
@@ -13,6 +16,8 @@ interface LineItem { product: Product; quantity: number; }
 interface Receipt {
   timestamp: Date;
   lines: ReceiptLine[];
+  subtotal: number;
+  discountLine: ReceiptDiscount | null;
   total: number;
   changeDue: number | null;
 }
@@ -31,6 +36,15 @@ export default function CheckoutView() {
   const [search, setSearch] = useState('');
   const [soldCounts, setSoldCounts] = useState<Record<number, number>>({});
 
+  // Discounts
+  const [discounts, setDiscounts] = useState<Discount[]>([]);
+  // undefined = use auto, null = cashier explicitly removed, object = cashier explicitly chose
+  const [manualDiscountOverride, setManualDiscountOverride] = useState<
+    { discount: Discount; savings: number } | null | undefined
+  >(undefined);
+  const [showCourtesyPin, setShowCourtesyPin] = useState(false);
+  const [showManualPicker, setShowManualPicker] = useState(false);
+
   function setView(mode: ViewMode) {
     setViewMode(mode);
     localStorage.setItem('checkout-view', mode);
@@ -41,11 +55,8 @@ export default function CheckoutView() {
     api.getTopProducts().then(rows => {
       setSoldCounts(Object.fromEntries(rows.map(r => [r.product_id, r.units_sold])));
     }).catch(() => {});
+    api.getDiscounts().then(setDiscounts).catch(() => {});
   }, []);
-
-  const filteredProducts = search.trim()
-    ? products.filter(p => p.name.toLowerCase().includes(search.toLowerCase()))
-    : products;
 
   function addProduct(product: Product) {
     setLines(prev => {
@@ -62,57 +73,110 @@ export default function CheckoutView() {
     );
   }
 
-  const total = lines.reduce((s, l) => s + l.product.price * l.quantity, 0);
+  const subtotal = lines.reduce((s, l) => s + l.product.price * l.quantity, 0);
+
+  // Compute cart items for discount engine
+  const cartItems: CartItem[] = lines.map(l => ({
+    product_id: l.product.id,
+    price: l.product.price,
+    quantity: l.quantity,
+  }));
+
+  // Auto-discount (best eligible non-manual discount)
+  const autoDiscount = lines.length > 0 ? getBestAutoDiscount(discounts, cartItems) : null;
+
+  // Active discount: manual override takes priority, else auto
+  const rawActive = manualDiscountOverride !== undefined ? manualDiscountOverride : autoDiscount;
+  // Re-compute savings live so the amount stays accurate as items change
+  const activeDiscount = rawActive
+    ? { discount: rawActive.discount, savings: computeSavings(rawActive.discount, cartItems) }
+    : null;
+  const effectiveSavings = activeDiscount && activeDiscount.savings > 0 ? activeDiscount.savings : 0;
+  const effectiveTotal = Math.max(0, subtotal - effectiveSavings);
 
   const prevTotal = useRef<number | null>(null);
   const [totalBump, setTotalBump] = useState(0);
   useEffect(() => {
-    if (prevTotal.current !== null && prevTotal.current !== total) setTotalBump(b => b + 1);
-    prevTotal.current = total;
-  }, [total]);
+    if (prevTotal.current !== null && prevTotal.current !== subtotal) setTotalBump(b => b + 1);
+    prevTotal.current = subtotal;
+  }, [subtotal]);
 
   const cashNum = Number(cashReceived) || 0;
-  const liveChange = cashReceived !== '' ? cashNum - total : null;
+  const liveChange = cashReceived !== '' ? cashNum - effectiveTotal : null;
+
+  const manualDiscounts = discounts.filter(d => d.is_manual && d.active);
 
   function toReceiptLines(items: LineItem[]): ReceiptLine[] {
     return items.map(l => ({ id: l.product.id, name: l.product.name, quantity: l.quantity, unitPrice: l.product.price }));
   }
 
+  function resetOrder() {
+    setLines([]);
+    setManualDiscountOverride(undefined);
+    setCashReceived('');
+    setStep('order');
+    setError('');
+  }
+
   async function handlePayCard() {
     setError(''); setLoading(true);
-    const snapshot = { lines: [...lines], total };
+    const snapshot = { lines: [...lines], subtotal, activeDiscount };
     try {
       const order = await api.createOrder(snapshot.lines.map(l => ({ product_id: l.product.id, quantity: l.quantity })));
-      await api.payOrder(order.id, 'card');
-      setReceipt({ timestamp: new Date(), lines: toReceiptLines(snapshot.lines), total: snapshot.total, changeDue: null });
-      setLines([]);
-      const [updated, top] = await Promise.all([api.getProducts(), api.getTopProducts()]);
+      await api.payOrder(order.id, 'card', undefined, snapshot.activeDiscount?.discount.id);
+      const discountLine = snapshot.activeDiscount && snapshot.activeDiscount.savings > 0
+        ? { name: snapshot.activeDiscount.discount.name, savings: snapshot.activeDiscount.savings }
+        : null;
+      setReceipt({
+        timestamp: new Date(),
+        lines: toReceiptLines(snapshot.lines),
+        subtotal: snapshot.subtotal,
+        discountLine,
+        total: Math.max(0, snapshot.subtotal - (discountLine?.savings ?? 0)),
+        changeDue: null,
+      });
+      resetOrder();
+      const [updated, top, refreshedDiscounts] = await Promise.all([
+        api.getProducts(), api.getTopProducts(), api.getDiscounts(),
+      ]);
       setProducts(updated);
       setSoldCounts(Object.fromEntries(top.map(r => [r.product_id, r.units_sold])));
+      setDiscounts(refreshedDiscounts);
     } catch (e: unknown) { setError((e as Error).message); }
     finally { setLoading(false); }
   }
 
   async function handlePayCash() {
     setError(''); setLoading(true);
-    const snapshot = { lines: [...lines], total };
+    const snapshot = { lines: [...lines], subtotal, activeDiscount };
     try {
       const order = await api.createOrder(snapshot.lines.map(l => ({ product_id: l.product.id, quantity: l.quantity })));
-      const paid = await api.payOrder(order.id, 'cash', Number(cashReceived));
-      setReceipt({ timestamp: new Date(), lines: toReceiptLines(snapshot.lines), total: snapshot.total, changeDue: paid.change_due ?? null });
-      setLines([]);
-      setCashReceived('');
-      const [updated, top] = await Promise.all([api.getProducts(), api.getTopProducts()]);
+      const paid = await api.payOrder(order.id, 'cash', Number(cashReceived), snapshot.activeDiscount?.discount.id);
+      const discountLine = snapshot.activeDiscount && snapshot.activeDiscount.savings > 0
+        ? { name: snapshot.activeDiscount.discount.name, savings: snapshot.activeDiscount.savings }
+        : null;
+      const effectivePaid = Math.max(0, snapshot.subtotal - (discountLine?.savings ?? 0));
+      setReceipt({
+        timestamp: new Date(),
+        lines: toReceiptLines(snapshot.lines),
+        subtotal: snapshot.subtotal,
+        discountLine,
+        total: effectivePaid,
+        changeDue: paid.change_due ?? null,
+      });
+      resetOrder();
+      const [updated, top, refreshedDiscounts] = await Promise.all([
+        api.getProducts(), api.getTopProducts(), api.getDiscounts(),
+      ]);
       setProducts(updated);
       setSoldCounts(Object.fromEntries(top.map(r => [r.product_id, r.units_sold])));
+      setDiscounts(refreshedDiscounts);
     } catch (e: unknown) { setError((e as Error).message); }
     finally { setLoading(false); }
   }
 
   function handleCloseReceipt() {
     setReceipt(null);
-    setStep('order');
-    setError('');
   }
 
   return (
@@ -121,10 +185,56 @@ export default function CheckoutView() {
         <ReceiptModal
           timestamp={receipt.timestamp}
           lines={receipt.lines}
+          subtotal={receipt.subtotal}
+          discountLine={receipt.discountLine}
           total={receipt.total}
           changeDue={receipt.changeDue}
           onClose={handleCloseReceipt}
         />
+      )}
+
+      {showCourtesyPin && (
+        <PinModal
+          title="Courtesy Discount — Enter PIN"
+          onConfirm={async (pin) => {
+            await api.verifyPin(pin);
+            setShowCourtesyPin(false);
+            setShowManualPicker(true);
+          }}
+          onCancel={() => setShowCourtesyPin(false)}
+        />
+      )}
+
+      {showManualPicker && (
+        <div style={{
+          position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.55)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          zIndex: 1000, padding: 16,
+        }}>
+          <div className="card" style={{ width: '100%', maxWidth: 360, margin: 0 }}>
+            <div className="card__title">Apply Courtesy Discount</div>
+            {manualDiscounts.map(d => (
+              <button
+                key={d.id}
+                className="btn btn--ghost"
+                style={{ marginBottom: 8, textAlign: 'left', justifyContent: 'flex-start' }}
+                onClick={() => {
+                  const savings = computeSavings(d, cartItems);
+                  setManualDiscountOverride({ discount: d, savings });
+                  setShowManualPicker(false);
+                }}
+              >
+                <div>
+                  <div style={{ fontWeight: 600 }}>{d.name}</div>
+                  {d.description && <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>{d.description}</div>}
+                </div>
+              </button>
+            ))}
+            <button className="btn btn--ghost" style={{ marginTop: 4 }} onClick={() => setShowManualPicker(false)}>
+              Cancel
+            </button>
+          </div>
+        </div>
       )}
 
       {error && <div className="error-banner" data-testid="error-banner">{error}</div>}
@@ -143,9 +253,16 @@ export default function CheckoutView() {
             </div>
           ))}
 
+          {effectiveSavings > 0 && activeDiscount && (
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.9rem', color: 'var(--success)', fontWeight: 600, margin: '4px 0' }}>
+              <span>🏷 {activeDiscount.discount.name}</span>
+              <span>−${effectiveSavings.toFixed(2)}</span>
+            </div>
+          )}
+
           <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 700, fontSize: '1.1rem', margin: '12px 0 16px' }}>
             <span>Total Due</span>
-            <span>${total.toFixed(2)}</span>
+            <span>${effectiveTotal.toFixed(2)}</span>
           </div>
 
           <div className="field">
@@ -166,10 +283,7 @@ export default function CheckoutView() {
             <div
               data-testid="live-change-amount"
               style={{
-                fontSize: '1.6rem',
-                fontWeight: 700,
-                textAlign: 'center',
-                padding: '14px 0',
+                fontSize: '1.6rem', fontWeight: 700, textAlign: 'center', padding: '14px 0',
                 color: liveChange >= 0 ? 'var(--success)' : 'var(--danger)',
               }}
             >
@@ -192,7 +306,7 @@ export default function CheckoutView() {
               className="btn btn--success"
               style={{ flex: 1 }}
               onClick={handlePayCash}
-              disabled={loading || !cashReceived || Number(cashReceived) < total}
+              disabled={loading || !cashReceived || Number(cashReceived) < effectiveTotal}
             >
               {loading ? 'Processing…' : 'Confirm Payment'}
             </button>
@@ -223,10 +337,59 @@ export default function CheckoutView() {
                 ))
               )}
             </div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 700, marginTop: 12, marginBottom: 14 }}>
-              <span>Total</span>
-              <span key={totalBump} className="value-bump" data-testid="order-total">${total.toFixed(2)}</span>
+
+            {/* Totals + discount */}
+            <div style={{ borderTop: '1px solid var(--border)', marginTop: 8, paddingTop: 8 }}>
+              {effectiveSavings > 0 && activeDiscount ? (
+                <>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--text-secondary)', fontSize: '0.9rem', marginBottom: 4 }}>
+                    <span>Subtotal</span>
+                    <span key={totalBump} className="value-bump" data-testid="order-total">${subtotal.toFixed(2)}</span>
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', color: 'var(--success)', fontWeight: 600, fontSize: '0.9rem', marginBottom: 4 }}>
+                    <span>🏷 {activeDiscount.discount.name}</span>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                      <span>−${effectiveSavings.toFixed(2)}</span>
+                      <button
+                        className="btn btn--sm btn--ghost"
+                        style={{ padding: '2px 6px', fontSize: '0.75rem', color: 'var(--text-secondary)' }}
+                        onClick={() => setManualDiscountOverride(null)}
+                        title="Remove discount"
+                      >✕</button>
+                    </div>
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 700, marginBottom: 14 }}>
+                    <span>Total</span>
+                    <span>${effectiveTotal.toFixed(2)}</span>
+                  </div>
+                </>
+              ) : (
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 700, marginBottom: 14 }}>
+                  <span>Total</span>
+                  <span key={totalBump} className="value-bump" data-testid="order-total">${subtotal.toFixed(2)}</span>
+                </div>
+              )}
+
+              {/* Courtesy discount button */}
+              {lines.length > 0 && manualDiscounts.length > 0 && (
+                <div style={{ marginBottom: 10 }}>
+                  <button
+                    className="btn btn--sm btn--ghost"
+                    style={{ fontSize: '0.8rem' }}
+                    onClick={() => {
+                      if (manualDiscounts.some(d => d.requires_pin)) {
+                        setShowCourtesyPin(true);
+                      } else {
+                        setShowManualPicker(true);
+                      }
+                    }}
+                  >
+                    🎁 Apply courtesy…
+                  </button>
+                </div>
+              )}
             </div>
+
             <div style={{ display: 'flex', gap: 8 }}>
               <button
                 data-testid="pay-card-btn"
@@ -252,7 +415,7 @@ export default function CheckoutView() {
           <div className="card">
             <ProductPicker
               title="Add Items"
-              products={filteredProducts}
+              products={products}
               onAdd={addProduct}
               viewMode={viewMode}
               onViewModeChange={setView}

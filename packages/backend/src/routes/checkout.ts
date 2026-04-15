@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { getDb, pool } from '../db/database.js';
 import { requireOpenRegister } from '../middleware/requireOpenRegister.js';
+import { isDiscountEligibleNow, computeDiscountAmount } from '../lib/discount-engine.js';
 
 const router = Router();
 
@@ -55,22 +56,53 @@ router.post('/orders/:id/pay', async (req, res) => {
   const order = rows[0] as { id: number; status: string; total: number; session_id: number } | undefined;
   if (!order) return res.status(404).json({ error: 'Order not found' });
   if (order.status === 'paid') return res.status(409).json({ error: 'Order already paid' });
-  const { payment_method, amount_received } = req.body as { payment_method: string; amount_received?: number };
+
+  const { payment_method, amount_received, discount_id } = req.body as {
+    payment_method: string; amount_received?: number; discount_id?: number;
+  };
   if (!payment_method) return res.status(400).json({ error: 'payment_method is required' });
+
+  // Resolve discount
+  let discountAmount = 0;
+  let discountRow: { id: number; name: string; type: string } | null = null;
+  if (discount_id) {
+    const { rows: [d] } = await db.query('SELECT * FROM discounts WHERE id = $1', [discount_id]);
+    if (!d) return res.status(404).json({ error: 'Discount not found' });
+    if (!isDiscountEligibleNow(d)) return res.status(409).json({ error: 'Discount is not currently eligible' });
+    const { rows: dps } = await db.query('SELECT product_id FROM discount_products WHERE discount_id = $1', [discount_id]);
+    const productIds = dps.map((dp: { product_id: number }) => dp.product_id);
+    const { rows: items } = await db.query('SELECT * FROM order_items WHERE order_id = $1', [order.id]);
+    discountAmount = computeDiscountAmount(d, productIds, items);
+    discountRow = d;
+  }
+
+  const effectiveTotal = Math.max(0, order.total - discountAmount);
+
   if (payment_method === 'cash') {
     if (amount_received == null) return res.status(400).json({ error: 'amount_received is required for cash payments' });
-    if (amount_received < order.total) return res.status(400).json({ error: `Insufficient payment: received ${amount_received.toFixed(2)}, total is ${order.total.toFixed(2)}` });
+    if (amount_received < effectiveTotal) return res.status(400).json({ error: `Insufficient payment: received ${amount_received.toFixed(2)}, total is ${effectiveTotal.toFixed(2)}` });
   }
+
   const account = payment_method === 'card' ? 'credit_card' : 'cash';
-  const changeDue = payment_method === 'cash' ? (amount_received! - order.total) : null;
+  const changeDue = payment_method === 'cash' ? (amount_received! - effectiveTotal) : null;
+
   const { rows: [updated] } = await db.query(
-    "UPDATE orders SET status = 'paid', payment_method = $1, amount_received = $2, change_due = $3, paid_at = NOW() WHERE id = $4 RETURNING *",
-    [payment_method === 'card' ? 'card' : payment_method, amount_received ?? null, changeDue, order.id]
+    "UPDATE orders SET status = 'paid', payment_method = $1, amount_received = $2, change_due = $3, discount_amount = $4, paid_at = NOW() WHERE id = $5 RETURNING *",
+    [payment_method === 'card' ? 'card' : payment_method, amount_received ?? null, changeDue, discountAmount, order.id],
   );
   await db.query(
     "INSERT INTO ledger_entries (entry_type, account, amount, description, ref_id, ref_type) VALUES ('sale', $1, $2, $3, $4, 'order')",
-    [account, order.total, `Order #${order.id} paid with ${payment_method}`, order.id]
+    [account, effectiveTotal, `Order #${order.id} paid with ${payment_method}`, order.id],
   );
+
+  if (discountRow && discountAmount > 0) {
+    await db.query(
+      'INSERT INTO applied_discounts (discount_id, order_id, snapshot_name, snapshot_type, amount) VALUES ($1,$2,$3,$4,$5)',
+      [discountRow.id, order.id, discountRow.name, discountRow.type, discountAmount],
+    );
+    await db.query('UPDATE discounts SET redemptions = redemptions + 1 WHERE id = $1', [discountRow.id]);
+  }
+
   res.json(updated);
 });
 

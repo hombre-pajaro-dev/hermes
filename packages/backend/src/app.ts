@@ -13,6 +13,7 @@ import reportsRouter from './routes/reports.js';
 import restockRouter from './routes/restock.js';
 import inventoryRouter from './routes/inventory.js';
 import adminRouter from './routes/admin.js';
+import discountsRouter from './routes/discounts.js';
 import { resetDb } from './db/database.js';
 
 function fromNodeHeaders(nodeHeaders: IncomingHttpHeaders): Headers {
@@ -106,6 +107,7 @@ export function createApp() {
   app.use('/api/restock', restockRouter);
   app.use('/api/inventory', inventoryRouter);
   app.use('/api/admin', adminRouter);
+  app.use('/api/discounts', discountsRouter);
 
   // Serve the built frontend in production (Vercel bundles public/ via includeFiles)
   const publicDir = path.join(process.cwd(), 'public');

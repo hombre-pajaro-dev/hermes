@@ -5,15 +5,22 @@ export interface ReceiptLine {
   unitPrice: number;
 }
 
+export interface ReceiptDiscount {
+  name: string;
+  savings: number;
+}
+
 interface Props {
   timestamp: Date;
   lines: ReceiptLine[];
+  subtotal: number;
+  discountLine?: ReceiptDiscount | null;
   total: number;
   changeDue: number | null;
   onClose: () => void;
 }
 
-export default function ReceiptModal({ timestamp, lines, total, changeDue, onClose }: Props) {
+export default function ReceiptModal({ timestamp, lines, subtotal, discountLine, total, changeDue, onClose }: Props) {
   return (
     <div className="modal-overlay" data-testid="receipt-modal">
       <div className="modal">
@@ -44,8 +51,14 @@ export default function ReceiptModal({ timestamp, lines, total, changeDue, onClo
 
         <div style={{ marginTop: 12, paddingTop: 12 }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.9rem', color: 'var(--text-secondary)', marginBottom: 4 }}>
-            <span>Subtotal</span><span>${total.toFixed(2)}</span>
+            <span>Subtotal</span><span>${subtotal.toFixed(2)}</span>
           </div>
+          {discountLine && (
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.9rem', color: 'var(--success)', fontWeight: 600, marginBottom: 4 }} data-testid="receipt-discount">
+              <span>🏷 {discountLine.name}</span>
+              <span>−${discountLine.savings.toFixed(2)}</span>
+            </div>
+          )}
           <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 700, fontSize: '1.15rem' }}>
             <span>Total</span><span>${total.toFixed(2)}</span>
           </div>

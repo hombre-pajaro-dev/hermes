@@ -36,8 +36,8 @@ export const api = {
 
   // Checkout
   createOrder: (items: OrderItem[]) => req<Order>('/checkout/orders', { method: 'POST', body: JSON.stringify({ items }) }),
-  payOrder: (id: number, payment_method: string, amount_received?: number) =>
-    req<Order>(`/checkout/orders/${id}/pay`, { method: 'POST', body: JSON.stringify({ payment_method, amount_received }) }),
+  payOrder: (id: number, payment_method: string, amount_received?: number, discount_id?: number) =>
+    req<Order>(`/checkout/orders/${id}/pay`, { method: 'POST', body: JSON.stringify({ payment_method, amount_received, discount_id }) }),
 
   // Tabs
   getTabs: () => req<Tab[]>('/tabs'),
@@ -47,8 +47,8 @@ export const api = {
   addTabItems: (id: number, items: OrderItem[]) => req<Tab & { items: TabItem[] }>(`/tabs/${id}/items`, { method: 'POST', body: JSON.stringify({ items }) }),
   updateTabItem: (tabId: number, itemId: number, quantity: number) =>
     req<Tab & { items: TabItem[] }>(`/tabs/${tabId}/items/${itemId}`, { method: 'PATCH', body: JSON.stringify({ quantity }) }),
-  payTab: (id: number, payment_method: string, amount_received?: number) =>
-    req<Tab>(`/tabs/${id}/pay`, { method: 'POST', body: JSON.stringify({ payment_method, amount_received }) }),
+  payTab: (id: number, payment_method: string, amount_received?: number, discount_id?: number) =>
+    req<Tab>(`/tabs/${id}/pay`, { method: 'POST', body: JSON.stringify({ payment_method, amount_received, discount_id }) }),
   voidTab: (id: number) => req<Tab>(`/tabs/${id}/void`, { method: 'POST' }),
 
   // Ledger
@@ -82,6 +82,14 @@ export const api = {
   addAuthorizedUser: (email: string, role: 'staff' | 'admin') => req<AuthorizedUser>('/admin/users', { method: 'POST', body: JSON.stringify({ email, role }) }),
   updateAuthorizedUserRole: (id: number, role: 'staff' | 'admin') => req<AuthorizedUser>(`/admin/users/${id}`, { method: 'PATCH', body: JSON.stringify({ role }) }),
   removeAuthorizedUser: (id: number) => req<{ ok: true }>(`/admin/users/${id}`, { method: 'DELETE' }),
+
+  // Discounts
+  getDiscounts: () => req<Discount[]>('/discounts'),
+  createDiscount: (body: Omit<Discount, 'id' | 'redemptions' | 'created_at'>) =>
+    req<Discount>('/discounts', { method: 'POST', body: JSON.stringify(body) }),
+  updateDiscount: (id: number, body: Partial<Omit<Discount, 'id' | 'created_at'>>) =>
+    req<Discount>(`/discounts/${id}`, { method: 'PATCH', body: JSON.stringify(body) }),
+  deleteDiscount: (id: number) => req<{ ok: true }>(`/discounts/${id}`, { method: 'DELETE' }),
 };
 
 // Types
@@ -89,8 +97,8 @@ export interface Product { id: number; name: string; description: string; cost: 
 export interface RegisterSession { id: number; status: string; opening_cash: number; closing_cash?: number; opened_at: string; closed_at?: string; }
 export interface Cashout { id: number; session_id: number; amount: number; reason: string; created_at: string; }
 export interface OrderItem { product_id: number; quantity: number; }
-export interface Order { id: number; status: string; total: number; payment_method?: string; amount_received?: number; change_due?: number; items?: unknown[]; }
-export interface Tab { id: number; name: string; status: string; at_cost: number; total: number; payment_method?: string; created_at: string; paid_at?: string; }
+export interface Order { id: number; status: string; total: number; discount_amount?: number; payment_method?: string; amount_received?: number; change_due?: number; items?: unknown[]; }
+export interface Tab { id: number; name: string; status: string; at_cost: number; total: number; discount_amount?: number; payment_method?: string; created_at: string; paid_at?: string; }
 export interface TabItem { id: number; product_id: number; quantity: number; unit_price: number; subtotal: number; }
 export interface TabsSummary { open_count: number; total_amount: number; }
 export interface LedgerEntry { id: number; entry_type: string; account?: string; amount: number; description: string; ref_id?: number; ref_type?: string; created_at: string; }
@@ -105,3 +113,22 @@ export interface CloseBrief { session_id: number; revenue: number; total_cost: n
 export interface RestockOrder { id: number; session_id: number; items: { product_id: number; name: string; quantity: number; new_units: number }[]; }
 export interface AdjustResult { adjustments: { product_id: number; name: string; previous_units: number; physical_count: number; delta: number; new_units: number }[]; }
 export interface AuthorizedUser { id: number; email: string; role: 'staff' | 'admin'; created_at: string; }
+export interface Discount {
+  id: number;
+  name: string;
+  description: string;
+  active: boolean;
+  type: 'percentage' | 'bxgy';
+  value: number | null;
+  buy_qty: number | null;
+  get_qty: number | null;
+  is_manual: boolean;
+  requires_pin: boolean;
+  days_of_week: number[] | null;
+  valid_from: string | null;
+  valid_until: string | null;
+  max_redemptions: number | null;
+  redemptions: number;
+  product_ids: number[];
+  created_at: string;
+}

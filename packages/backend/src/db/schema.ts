@@ -132,6 +132,49 @@ export async function applySchema(db: Pool): Promise<void> {
   await db.query(`ALTER TABLE products ADD COLUMN IF NOT EXISTS image TEXT`);
   await db.query(`ALTER TABLE products ADD COLUMN IF NOT EXISTS active BOOLEAN NOT NULL DEFAULT TRUE`);
 
+  // Discounts
+  await db.query(`
+    CREATE TABLE IF NOT EXISTS discounts (
+      id              SERIAL PRIMARY KEY,
+      name            TEXT NOT NULL,
+      description     TEXT NOT NULL DEFAULT '',
+      active          BOOLEAN NOT NULL DEFAULT TRUE,
+      type            TEXT NOT NULL,
+      value           DOUBLE PRECISION,
+      buy_qty         INTEGER,
+      get_qty         INTEGER,
+      is_manual       BOOLEAN NOT NULL DEFAULT FALSE,
+      requires_pin    BOOLEAN NOT NULL DEFAULT FALSE,
+      days_of_week    INTEGER[],
+      valid_from      TIMESTAMPTZ,
+      valid_until     TIMESTAMPTZ,
+      max_redemptions INTEGER,
+      redemptions     INTEGER NOT NULL DEFAULT 0,
+      created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    )
+  `);
+  await db.query(`
+    CREATE TABLE IF NOT EXISTS discount_products (
+      discount_id  INTEGER NOT NULL REFERENCES discounts(id) ON DELETE CASCADE,
+      product_id   INTEGER NOT NULL REFERENCES products(id) ON DELETE CASCADE,
+      PRIMARY KEY (discount_id, product_id)
+    )
+  `);
+  await db.query(`
+    CREATE TABLE IF NOT EXISTS applied_discounts (
+      id             SERIAL PRIMARY KEY,
+      discount_id    INTEGER REFERENCES discounts(id) ON DELETE SET NULL,
+      order_id       INTEGER REFERENCES orders(id),
+      tab_id         INTEGER REFERENCES tabs(id),
+      snapshot_name  TEXT NOT NULL,
+      snapshot_type  TEXT NOT NULL,
+      amount         DOUBLE PRECISION NOT NULL,
+      applied_at     TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    )
+  `);
+  await db.query(`ALTER TABLE orders ADD COLUMN IF NOT EXISTS discount_amount DOUBLE PRECISION NOT NULL DEFAULT 0`);
+  await db.query(`ALTER TABLE tabs   ADD COLUMN IF NOT EXISTS discount_amount DOUBLE PRECISION NOT NULL DEFAULT 0`);
+
   // Auth — authorized users allowlist (source of truth for who may sign in)
   await db.query(`
     CREATE TABLE IF NOT EXISTS authorized_users (
