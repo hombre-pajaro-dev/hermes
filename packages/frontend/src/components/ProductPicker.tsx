@@ -128,58 +128,71 @@ export default function ProductPicker({
   const effectivePrice = (p: Product) => (getPrice ? getPrice(p) : p.price);
   const hasHeader = title || (showViewToggle && onViewModeChange && viewToggleTestIds) || soldCounts || showActiveFilter || showStockFilter;
 
+  const hasFilters = showActiveFilter || showStockFilter || !!soldCounts;
+  const hasViewToggle = showViewToggle && onViewModeChange && viewToggleTestIds;
+
   return (
     <div>
       {hasHeader && (
-        <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: showSearch ? 4 : 8 }}>
-          {title && <div className="card__title" style={{ flex: 1, marginBottom: 0 }}>{title}</div>}
-          {showActiveFilter && (
-            <button
-              data-testid="active-filter-btn"
-              className={`btn btn--sm ${activeOnly ? 'btn--primary' : 'btn--ghost'}`}
-              onClick={toggleActiveFilter}
-              title={activeOnly ? 'Showing active products only — click to show all' : 'Showing all products — click to show active only'}
-              style={{ fontSize: '0.72rem', padding: '4px 8px', whiteSpace: 'nowrap' }}
-            >
-              ● Active
-            </button>
+        <div style={{ marginBottom: showSearch ? 4 : 8 }}>
+          {/* Row 1: title + view toggle */}
+          {(title || hasViewToggle) && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: hasFilters ? 4 : 0 }}>
+              {title && <div className="card__title" style={{ flex: 1, marginBottom: 0 }}>{title}</div>}
+              {hasViewToggle && (
+                <div className="view-toggle" style={{ flexShrink: 0 }}>
+                  <button
+                    data-testid={viewToggleTestIds!.grid}
+                    className={`view-toggle__btn${viewMode === 'grid' ? ' active' : ''}`}
+                    onClick={() => onViewModeChange!('grid')}
+                    title="Grid view"
+                  >⊞</button>
+                  <button
+                    data-testid={viewToggleTestIds!.list}
+                    className={`view-toggle__btn${viewMode === 'list' ? ' active' : ''}`}
+                    onClick={() => onViewModeChange!('list')}
+                    title="List view"
+                  >☰</button>
+                </div>
+              )}
+            </div>
           )}
-          {showStockFilter && (
-            <button
-              data-testid="stock-filter-btn"
-              className={`btn btn--sm ${inStockOnly ? 'btn--primary' : 'btn--ghost'}`}
-              onClick={toggleStockFilter}
-              title={inStockOnly ? 'Showing in-stock products only — click to show all' : 'Showing all products — click to show in-stock only'}
-              style={{ fontSize: '0.72rem', padding: '4px 8px', whiteSpace: 'nowrap' }}
-            >
-              ◈ In Stock
-            </button>
-          )}
-          {soldCounts && (
-            <button
-              data-testid="sort-by-sold-btn"
-              className={`btn btn--sm ${sortByMostSold ? 'btn--primary' : 'btn--ghost'}`}
-              onClick={toggleSort}
-              title={sortByMostSold ? 'Sorted by most sold — click to disable' : 'Sort by most sold'}
-              style={{ fontSize: '0.72rem', padding: '4px 8px', whiteSpace: 'nowrap' }}
-            >
-              ↑ Most Sold
-            </button>
-          )}
-          {showViewToggle && onViewModeChange && viewToggleTestIds && (
-            <div className="view-toggle">
-              <button
-                data-testid={viewToggleTestIds.grid}
-                className={`view-toggle__btn${viewMode === 'grid' ? ' active' : ''}`}
-                onClick={() => onViewModeChange('grid')}
-                title="Grid view"
-              >⊞</button>
-              <button
-                data-testid={viewToggleTestIds.list}
-                className={`view-toggle__btn${viewMode === 'list' ? ' active' : ''}`}
-                onClick={() => onViewModeChange('list')}
-                title="List view"
-              >☰</button>
+          {/* Row 2: filter buttons — wrap so they never cause horizontal scroll */}
+          {hasFilters && (
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+              {showActiveFilter && (
+                <button
+                  data-testid="active-filter-btn"
+                  className={`btn btn--sm ${activeOnly ? 'btn--primary' : 'btn--ghost'}`}
+                  onClick={toggleActiveFilter}
+                  title={activeOnly ? 'Showing active products only — click to show all' : 'Showing all products — click to show active only'}
+                  style={{ fontSize: '0.72rem', padding: '4px 8px', whiteSpace: 'nowrap' }}
+                >
+                  ● Active
+                </button>
+              )}
+              {showStockFilter && (
+                <button
+                  data-testid="stock-filter-btn"
+                  className={`btn btn--sm ${inStockOnly ? 'btn--primary' : 'btn--ghost'}`}
+                  onClick={toggleStockFilter}
+                  title={inStockOnly ? 'Showing in-stock products only — click to show all' : 'Showing all products — click to show in-stock only'}
+                  style={{ fontSize: '0.72rem', padding: '4px 8px', whiteSpace: 'nowrap' }}
+                >
+                  ◈ In Stock
+                </button>
+              )}
+              {soldCounts && (
+                <button
+                  data-testid="sort-by-sold-btn"
+                  className={`btn btn--sm ${sortByMostSold ? 'btn--primary' : 'btn--ghost'}`}
+                  onClick={toggleSort}
+                  title={sortByMostSold ? 'Sorted by most sold — click to disable' : 'Sort by most sold'}
+                  style={{ fontSize: '0.72rem', padding: '4px 8px', whiteSpace: 'nowrap' }}
+                >
+                  ↑ Most Sold
+                </button>
+              )}
             </div>
           )}
         </div>

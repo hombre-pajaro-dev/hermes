@@ -157,12 +157,23 @@ export default function ProductsView() {
     <div>
       {error && <div className="error-banner" data-testid="error-banner">{error}</div>}
 
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
-        <button data-testid="add-product-btn" className="btn btn--primary" style={{ flex: 1 }}
-          onClick={() => setShowForm(!showForm)}>
-          {showForm ? 'Cancel' : '+ Add Product'}
-        </button>
-        <div className="view-toggle">
+      <button data-testid="add-product-btn" className="btn btn--primary"
+        style={{ marginBottom: 8 }}
+        onClick={() => setShowForm(!showForm)}>
+        {showForm ? 'Cancel' : '+ Add Product'}
+      </button>
+
+      <div style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 8, marginBottom: 16 }}>
+        <input
+          data-testid="product-search"
+          className="input"
+          type="search"
+          placeholder="Search products…"
+          value={search}
+          onChange={e => setSearch(e.target.value)}
+          style={{ flex: 1, minWidth: 120, marginBottom: 0 }}
+        />
+        <div className="view-toggle" style={{ flexShrink: 0 }}>
           <button
             data-testid="grid-view-btn"
             className={`view-toggle__btn${viewMode === 'grid' ? ' active' : ''}`}
@@ -177,16 +188,6 @@ export default function ProductsView() {
           >☰</button>
         </div>
       </div>
-
-      <input
-        data-testid="product-search"
-        className="input"
-        type="search"
-        placeholder="Search products…"
-        value={search}
-        onChange={e => setSearch(e.target.value)}
-        style={{ marginBottom: 16 }}
-      />
 
       {showForm && (
         <div className="card" data-testid="product-form">
@@ -272,14 +273,14 @@ export default function ProductsView() {
           {filteredProducts.length === 0 ? <div className="empty">No products yet</div> : filteredProducts.map(p => {
             const locked = lockedIds.has(p.id);
             return (
-              <div className="list-item" key={p.id} data-testid="product-item" style={{ gap: 12, opacity: p.active ? 1 : 0.55 }}>
+              <div className="list-item" key={p.id} data-testid="product-item" style={{ gap: 12, opacity: p.active ? 1 : 0.55, minWidth: 0 }}>
                 <ImagePicker
                   image={p.image}
                   testId={`product-thumbnail-${p.id}`}
                   size={56}
                   onChange={dataUrl => handleImageChange(p.id, dataUrl)}
                 />
-                <div className="list-item__main">
+                <div className="list-item__main" style={{ minWidth: 0 }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                     <div className="list-item__name" data-testid="product-name">{p.name}</div>
                     {!p.active && <span className="badge badge--void" style={{ fontSize: '0.65rem' }}>INACTIVE</span>}

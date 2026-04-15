@@ -9,6 +9,13 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Fixed
+
+#### Mobile layout — ProductsView controls and ProductPicker filter bar
+- **ProductsView**: Separated the `+ Add Product` button onto its own full-width row; the search input and grid/list toggle now share the row below it, with `flex-wrap: wrap` so the toggle drops below the search on very narrow screens instead of scrolling off-screen
+- **ProductPicker**: Split the header into two rows — title + view toggle on row 1, filter buttons (● Active, ◈ In Stock, ↑ Most Sold) on row 2 with `flex-wrap: wrap`; any combination of filters now stacks cleanly on small viewports with no horizontal scroll
+- Added `min-width: 0` to `list-item__main` and list-item rows in ProductsView to prevent long product names or inline price-edit controls from pushing content beyond the viewport width
+
 ---
 
 ## [1.0.0-beta.2] — 2026-04-13
