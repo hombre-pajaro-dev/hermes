@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { getDb, pool } from '../db/database.js';
 import { requireOpenRegister } from '../middleware/requireOpenRegister.js';
+import { productUsesSupplies } from '../lib/supply-utils.js';
 
 const router = Router();
 
@@ -21,6 +22,8 @@ router.post('/', requireOpenRegister, async (req, res) => {
     for (const item of items) {
       const { rows: [product] } = await client.query('SELECT * FROM products WHERE id = $1', [item.product_id]);
       if (!product) throw new Error(`Product ${item.product_id} not found`);
+      const usesSupplies = await productUsesSupplies(client, item.product_id);
+      if (usesSupplies) throw new Error(`'${product.name}' is supply-based — restock it via its supplies instead`);
       await client.query('INSERT INTO restock_items (restock_order_id, product_id, quantity, unit_cost) VALUES ($1, $2, $3, $4)', [restockId, item.product_id, item.quantity, product.cost]);
       await client.query('UPDATE products SET units = units + $1 WHERE id = $2', [item.quantity, item.product_id]);
       const { rows: [updated] } = await client.query('SELECT units FROM products WHERE id = $1', [item.product_id]);

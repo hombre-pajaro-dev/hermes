@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { getDb, pool } from '../db/database.js';
 import { requireOpenRegister } from '../middleware/requireOpenRegister.js';
 import { isDiscountEligibleNow, computeDiscountAmount } from '../lib/discount-engine.js';
+import { getProductAvailableUnits, deductProductStock, restoreProductStock } from '../lib/supply-utils.js';
 
 const router = Router();
 
@@ -49,7 +50,8 @@ router.post('/:id/items', async (req, res) => {
   for (const item of items) {
     const { rows: [product] } = await db.query('SELECT * FROM products WHERE id = $1', [item.product_id]);
     if (!product) return res.status(404).json({ error: `Product ${item.product_id} not found` });
-    if (product.units < item.quantity) return res.status(409).json({ error: `Insufficient stock for '${product.name}': requested ${item.quantity}, available ${product.units}` });
+    const available = await getProductAvailableUnits(db, item.product_id);
+    if (available < item.quantity) return res.status(409).json({ error: `Insufficient stock for '${product.name}': requested ${item.quantity}, available ${available}` });
   }
 
   const client = await pool.connect();
@@ -68,7 +70,7 @@ router.post('/:id/items', async (req, res) => {
       } else {
         await client.query('INSERT INTO tab_items (tab_id, product_id, quantity, unit_price, unit_cost, subtotal) VALUES ($1, $2, $3, $4, $5, $6)', [tab.id, item.product_id, item.quantity, unitPrice, product.cost, subtotal]);
       }
-      await client.query('UPDATE products SET units = units - $1 WHERE id = $2', [item.quantity, item.product_id]);
+      await deductProductStock(client, item.product_id, item.quantity);
     }
     await client.query('UPDATE tabs SET total = total + $1 WHERE id = $2', [additionalTotal, tab.id]);
     await client.query('COMMIT');
@@ -106,9 +108,10 @@ router.patch('/:id/items/:itemId', async (req, res) => {
   const qtyDelta = newQty - oldQty; // positive = more units needed, negative = units restored
 
   if (qtyDelta > 0) {
-    const { rows: [product] } = await db.query('SELECT units, name FROM products WHERE id = $1', [item.product_id]);
-    if (product.units < qtyDelta) {
-      return res.status(409).json({ error: `Insufficient stock for '${product.name}': requested ${qtyDelta} more, available ${product.units}` });
+    const { rows: [product] } = await db.query('SELECT name FROM products WHERE id = $1', [item.product_id]);
+    const available = await getProductAvailableUnits(db, item.product_id);
+    if (available < qtyDelta) {
+      return res.status(409).json({ error: `Insufficient stock for '${product.name}': requested ${qtyDelta} more, available ${available}` });
     }
   }
 
@@ -124,7 +127,11 @@ router.patch('/:id/items/:itemId', async (req, res) => {
     }
     await client.query('UPDATE tabs SET total = GREATEST(0, total - $1 + $2) WHERE id = $3', [oldSubtotal, newSubtotal, tab.id]);
     if (qtyDelta !== 0) {
-      await client.query('UPDATE products SET units = units - $1 WHERE id = $2', [qtyDelta, item.product_id]);
+      if (qtyDelta > 0) {
+        await deductProductStock(client, item.product_id, qtyDelta);
+      } else {
+        await restoreProductStock(client, item.product_id, -qtyDelta);
+      }
     }
     await client.query('COMMIT');
   } catch (err: unknown) {

@@ -175,6 +175,25 @@ export async function applySchema(db: Pool): Promise<void> {
   await db.query(`ALTER TABLE orders ADD COLUMN IF NOT EXISTS discount_amount DOUBLE PRECISION NOT NULL DEFAULT 0`);
   await db.query(`ALTER TABLE tabs   ADD COLUMN IF NOT EXISTS discount_amount DOUBLE PRECISION NOT NULL DEFAULT 0`);
 
+  // Supplies
+  await db.query(`
+    CREATE TABLE IF NOT EXISTS supplies (
+      id         SERIAL PRIMARY KEY,
+      name       TEXT NOT NULL UNIQUE,
+      unit       TEXT NOT NULL DEFAULT 'units',
+      quantity   DOUBLE PRECISION NOT NULL DEFAULT 0,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    )
+  `);
+  await db.query(`
+    CREATE TABLE IF NOT EXISTS product_supplies (
+      product_id        INTEGER NOT NULL REFERENCES products(id) ON DELETE CASCADE,
+      supply_id         INTEGER NOT NULL REFERENCES supplies(id) ON DELETE CASCADE,
+      quantity_per_unit DOUBLE PRECISION NOT NULL,
+      PRIMARY KEY (product_id, supply_id)
+    )
+  `);
+
   // Auth — authorized users allowlist (source of truth for who may sign in)
   await db.query(`
     CREATE TABLE IF NOT EXISTS authorized_users (

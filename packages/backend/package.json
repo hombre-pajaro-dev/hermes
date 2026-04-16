@@ -10,7 +10,7 @@
     "test:server": "cross-env PORT=3002 NODE_ENV=test DATABASE_URL=postgresql://hermes:hermes@localhost:5432/hermes tsx src/index.ts",
     "build": "tsc -p tsconfig.build.json",
     "start": "node dist/index.js",
-    "test": "DATABASE_URL=postgresql://hermes:hermes@localhost:5432/hermes NODE_ENV=test cucumber-js --config cucumber.cjs",
+    "test": "cross-env DATABASE_URL=postgresql://hermes:hermes@localhost:5432/hermes NODE_ENV=test cucumber-js --config cucumber.cjs",
     "test:doc": "NODE_ENV=test tsx src/scripts/generate-bdd-doc.ts"
   },
   "dependencies": {

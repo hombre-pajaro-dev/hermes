@@ -21,7 +21,8 @@ export const api = {
   // Products
   getProducts: () => req<Product[]>('/products'),
   getProduct: (name: string) => req<Product>(`/products?name=${encodeURIComponent(name)}`),
-  createProduct: (body: Omit<Product, 'id'>) => req<Product>('/products', { method: 'POST', body: JSON.stringify(body) }),
+  createProduct: (body: Omit<Product, 'id' | 'uses_supplies' | 'supply_ingredients'> & { supply_ingredients?: { supply_id: number; quantity_per_unit: number }[] }) =>
+    req<Product>('/products', { method: 'POST', body: JSON.stringify(body) }),
   updatePrice: (id: number, price: number) => req<Product>(`/products/${id}/price`, { method: 'PATCH', body: JSON.stringify({ price }) }),
   updateCost: (id: number, cost: number) => req<Product>(`/products/${id}/cost`, { method: 'PATCH', body: JSON.stringify({ cost }) }),
   updateImage: (id: number, image: string | null) => req<Product>(`/products/${id}/image`, { method: 'PATCH', body: JSON.stringify({ image }) }),
@@ -83,6 +84,18 @@ export const api = {
   updateAuthorizedUserRole: (id: number, role: 'staff' | 'admin') => req<AuthorizedUser>(`/admin/users/${id}`, { method: 'PATCH', body: JSON.stringify({ role }) }),
   removeAuthorizedUser: (id: number) => req<{ ok: true }>(`/admin/users/${id}`, { method: 'DELETE' }),
 
+  // Supplies
+  getSupplies: () => req<Supply[]>('/supplies'),
+  createSupply: (body: { name: string; unit: string; quantity: number }) =>
+    req<Supply>('/supplies', { method: 'POST', body: JSON.stringify(body) }),
+  updateSupply: (id: number, body: Partial<{ name: string; unit: string; quantity: number }>) =>
+    req<Supply>(`/supplies/${id}`, { method: 'PATCH', body: JSON.stringify(body) }),
+  deleteSupply: (id: number) => req<{ ok: true }>(`/supplies/${id}`, { method: 'DELETE' }),
+  restockSupply: (id: number, quantity: number) =>
+    req<Supply>(`/supplies/${id}/restock`, { method: 'POST', body: JSON.stringify({ quantity }) }),
+  setProductSupplies: (productId: number, supply_ingredients: { supply_id: number; quantity_per_unit: number }[]) =>
+    req<Product>(`/products/${productId}/supplies`, { method: 'PATCH', body: JSON.stringify({ supply_ingredients }) }),
+
   // Discounts
   getDiscounts: () => req<Discount[]>('/discounts'),
   createDiscount: (body: Omit<Discount, 'id' | 'redemptions' | 'created_at'>) =>
@@ -93,7 +106,9 @@ export const api = {
 };
 
 // Types
-export interface Product { id: number; name: string; description: string; cost: number; price: number; units: number; image?: string | null; active: boolean; }
+export interface SupplyIngredient { supply_id: number; quantity_per_unit: number; supply_name: string; unit: string; }
+export interface Product { id: number; name: string; description: string; cost: number; price: number; units: number; image?: string | null; active: boolean; uses_supplies: boolean; supply_ingredients: SupplyIngredient[]; }
+export interface Supply { id: number; name: string; unit: string; quantity: number; created_at: string; }
 export interface RegisterSession { id: number; status: string; opening_cash: number; closing_cash?: number; opened_at: string; closed_at?: string; }
 export interface Cashout { id: number; session_id: number; amount: number; reason: string; created_at: string; }
 export interface OrderItem { product_id: number; quantity: number; }

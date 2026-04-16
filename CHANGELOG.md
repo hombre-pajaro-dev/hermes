@@ -11,6 +11,23 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+#### Supplies module
+- New **Supplies** entity: each supply has a name, a unit label (e.g. `g`, `ml`, `units`), and a current quantity
+- Products can now be **supply-based**: link a product to one or more supplies and specify how much of each supply is consumed per unit sold (e.g. "Espresso" uses 20 g of "Coffee grounds")
+- Products that are not linked to any supply continue to track stock directly via `product.units` — existing behaviour is fully preserved
+- **Computed stock**: for supply-based products, available units are computed server-side as `floor(min(supply.quantity / qty_per_unit))` across all ingredients; the same computed value is returned by every `GET /api/products` response so the rest of the app requires no changes
+- **Stock deduction on sale**: when an order or tab item is paid/added, deductions go to the underlying supplies (not product.units) for supply-based products; unit-based products continue to decrement `products.units` as before
+- **Tab quantity changes**: increasing or decreasing a tab item for a supply-based product adjusts supply quantities proportionally
+- **Restock blocked for supply-based products**: attempting to directly restock a supply-based product returns a 400 error with a clear message directing the user to restock via the supply
+- **Inventory adjustment blocked for supply-based products**: physical-count adjustments are rejected for supply-based products for the same reason
+- `GET/POST/PATCH/DELETE /api/supplies` — full CRUD for supplies; `DELETE` blocked if any product uses the supply
+- `POST /api/supplies/:id/restock` — adds quantity to a supply
+- `PATCH /api/products/:id/supplies` — replaces the supply ingredient list for a product (empty array reverts to unit-based)
+- `POST /api/products` accepts optional `supply_ingredients` to link supplies at creation time
+- **Admin → Supplies card** (admin-only): create/edit/delete supplies; shows current quantity and unit
+- **Products view**: supply-based products show a `SUPPLY` badge and list their ingredients (e.g. `20g Coffee grounds`); each product has an "Edit Supplies" / "Link Supplies" button for inline ingredient editing (supply picker + qty per unit); the create-product form has a "Uses supplies" checkbox that replaces the units field with an ingredient picker
+- **Restock view**: split into two sections — **Products** (unit-based products only, existing direct restock) and **Supplies** (all supplies with quantity inputs); both are submitted with a single button
+
 #### Discount engine
 - New discount module with two types: **Percentage** (X% off a set of products or the whole order) and **Buy X Get Y Free** (every N qualifying items = cheapest M are free, mixed products allowed)
 - Discounts are configured in **Admin → Discounts** (admin-only); each discount defines its reward, qualifying products, trigger conditions, and optional limits

@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { getDb, pool } from '../db/database.js';
 import { requireOpenRegister } from '../middleware/requireOpenRegister.js';
 import { isDiscountEligibleNow, computeDiscountAmount } from '../lib/discount-engine.js';
+import { getProductAvailableUnits, deductProductStock } from '../lib/supply-utils.js';
 
 const router = Router();
 
@@ -15,7 +16,8 @@ router.post('/orders', requireOpenRegister, async (req, res) => {
     const { rows } = await db.query('SELECT * FROM products WHERE id = $1', [item.product_id]);
     const product = rows[0] as { id: number; name: string; units: number; price: number; cost: number } | undefined;
     if (!product) return res.status(404).json({ error: `Product ${item.product_id} not found` });
-    if (product.units < item.quantity) return res.status(409).json({ error: `Insufficient stock for product '${product.name}': requested ${item.quantity}, available ${product.units}` });
+    const available = await getProductAvailableUnits(db, item.product_id);
+    if (available < item.quantity) return res.status(409).json({ error: `Insufficient stock for product '${product.name}': requested ${item.quantity}, available ${available}` });
   }
 
   const client = await pool.connect();
@@ -36,7 +38,7 @@ router.post('/orders', requireOpenRegister, async (req, res) => {
         'INSERT INTO order_items (order_id, product_id, quantity, unit_price, unit_cost, subtotal) VALUES ($1, $2, $3, $4, $5, $6) RETURNING *',
         [orderId, item.product_id, item.quantity, product.price, product.cost, subtotal]
       );
-      await client.query('UPDATE products SET units = units - $1 WHERE id = $2', [item.quantity, item.product_id]);
+      await deductProductStock(client, item.product_id, item.quantity);
       insertedItems.push(itemRow);
     }
     const { rows: [updatedOrder] } = await client.query('UPDATE orders SET total = $1 WHERE id = $2 RETURNING *', [total, orderId]);

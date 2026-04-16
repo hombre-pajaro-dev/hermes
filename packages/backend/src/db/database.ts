@@ -25,7 +25,8 @@ export async function resetDb(): Promise<void> {
   await db.query(`
     TRUNCATE products, register_sessions, orders, order_items, tabs, tab_items,
     cashouts, restock_orders, restock_items, inventory_adjustments, ledger_entries,
-    accounts, settings, discounts, discount_products, applied_discounts
+    accounts, settings, discounts, discount_products, applied_discounts,
+    supplies, product_supplies
     RESTART IDENTITY CASCADE
   `);
   await db.query(`

@@ -1,21 +1,37 @@
 import { useEffect, useState } from 'react';
 import { api } from '../api/client';
-import type { Product, Tab } from '../api/client';
+import type { Product, Supply, Tab } from '../api/client';
 import ImagePicker from '../components/ImagePicker';
 
 type EditField = 'price' | 'cost';
 type ViewMode = 'list' | 'grid';
 
+interface SupplyIngredientDraft {
+  supply_id: number;
+  quantity_per_unit: string;
+}
+
 export default function ProductsView() {
   const [products, setProducts] = useState<Product[]>([]);
+  const [supplies, setSupplies] = useState<Supply[]>([]);
   const [lockedIds, setLockedIds] = useState<Set<number>>(new Set());
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [showForm, setShowForm] = useState(false);
+
+  // Create form state
   const [form, setForm] = useState({ name: '', description: '', cost: '', price: '', units: '' });
   const [formImage, setFormImage] = useState<string | null>(null);
+  const [formUsesSupplies, setFormUsesSupplies] = useState(false);
+  const [formSupplyIngredients, setFormSupplyIngredients] = useState<SupplyIngredientDraft[]>([]);
+
   const [editingPrice, setEditingPrice] = useState<Record<number, string>>({});
   const [editingCost, setEditingCost] = useState<Record<number, string>>({});
+
+  // Supply ingredient editing per product
+  const [editingSupplyIds, setEditingSupplyIds] = useState<Set<number>>(new Set());
+  const [supplyDrafts, setSupplyDrafts] = useState<Record<number, SupplyIngredientDraft[]>>({});
+
   const [viewMode, setViewMode] = useState<ViewMode>(() => {
     return (localStorage.getItem('products-view') as ViewMode | null) ?? 'grid';
   });
@@ -32,8 +48,9 @@ export default function ProductsView() {
 
   async function load() {
     try {
-      const [ps, tabs] = await Promise.all([api.getProducts(), api.getTabs()]);
+      const [ps, tabs, ss] = await Promise.all([api.getProducts(), api.getTabs(), api.getSupplies()]);
       setProducts(ps);
+      setSupplies(ss);
       const openTabs = (tabs as Tab[]).filter(t => t.status === 'open');
       const locked = new Set<number>();
       await Promise.all(openTabs.map(async t => {
@@ -52,17 +69,26 @@ export default function ProductsView() {
   async function handleCreate() {
     setError('');
     try {
+      const supply_ingredients = formUsesSupplies
+        ? formSupplyIngredients
+            .filter(si => si.supply_id > 0 && Number(si.quantity_per_unit) > 0)
+            .map(si => ({ supply_id: si.supply_id, quantity_per_unit: Number(si.quantity_per_unit) }))
+        : undefined;
+
       await api.createProduct({
         name: form.name,
         description: form.description,
         cost: Number(form.cost),
         price: Number(form.price),
-        units: Number(form.units),
+        units: formUsesSupplies ? 0 : Number(form.units),
         image: formImage,
         active: true,
+        supply_ingredients,
       });
       setForm({ name: '', description: '', cost: '', price: '', units: '' });
       setFormImage(null);
+      setFormUsesSupplies(false);
+      setFormSupplyIngredients([]);
       setShowForm(false);
       load();
     } catch (e: unknown) { setError((e as Error).message); }
@@ -107,6 +133,93 @@ export default function ProductsView() {
     } catch (e: unknown) { setError((e as Error).message); }
   }
 
+  function openSupplyEdit(p: Product) {
+    setSupplyDrafts(prev => ({
+      ...prev,
+      [p.id]: p.supply_ingredients.map(si => ({
+        supply_id: si.supply_id,
+        quantity_per_unit: String(si.quantity_per_unit),
+      })),
+    }));
+    setEditingSupplyIds(prev => new Set([...prev, p.id]));
+  }
+
+  function cancelSupplyEdit(id: number) {
+    setEditingSupplyIds(prev => { const s = new Set(prev); s.delete(id); return s; });
+    setSupplyDrafts(prev => { const n = { ...prev }; delete n[id]; return n; });
+  }
+
+  async function saveSupplyEdit(id: number) {
+    setError('');
+    const drafts = supplyDrafts[id] ?? [];
+    const supply_ingredients = drafts
+      .filter(d => d.supply_id > 0 && Number(d.quantity_per_unit) > 0)
+      .map(d => ({ supply_id: d.supply_id, quantity_per_unit: Number(d.quantity_per_unit) }));
+    try {
+      await api.setProductSupplies(id, supply_ingredients);
+      cancelSupplyEdit(id);
+      load();
+    } catch (e: unknown) { setError((e as Error).message); }
+  }
+
+  function addSupplyIngredientDraft(drafts: SupplyIngredientDraft[], setter: (d: SupplyIngredientDraft[]) => void) {
+    setter([...drafts, { supply_id: 0, quantity_per_unit: '' }]);
+  }
+
+  function renderSupplyIngredients(
+    drafts: SupplyIngredientDraft[],
+    setDrafts: (d: SupplyIngredientDraft[]) => void,
+  ) {
+    return (
+      <div>
+        {drafts.map((d, i) => (
+          <div key={i} style={{ display: 'flex', gap: 6, alignItems: 'center', marginBottom: 6 }}>
+            <select
+              className="input"
+              style={{ flex: 2 }}
+              value={d.supply_id}
+              onChange={e => {
+                const updated = [...drafts];
+                updated[i] = { ...updated[i], supply_id: Number(e.target.value) };
+                setDrafts(updated);
+              }}
+            >
+              <option value={0}>— select supply —</option>
+              {supplies.map(s => (
+                <option key={s.id} value={s.id}>{s.name} ({s.unit})</option>
+              ))}
+            </select>
+            <input
+              className="input"
+              type="number"
+              min="0.001"
+              step="0.001"
+              placeholder="qty / unit"
+              style={{ flex: 1, minWidth: 80 }}
+              value={d.quantity_per_unit}
+              onChange={e => {
+                const updated = [...drafts];
+                updated[i] = { ...updated[i], quantity_per_unit: e.target.value };
+                setDrafts(updated);
+              }}
+            />
+            <button
+              className="btn btn--sm btn--ghost"
+              onClick={() => setDrafts(drafts.filter((_, j) => j !== i))}
+            >✕</button>
+          </div>
+        ))}
+        <button
+          className="btn btn--sm btn--ghost"
+          style={{ fontSize: '0.8rem', marginTop: 4 }}
+          onClick={() => addSupplyIngredientDraft(drafts, setDrafts)}
+        >
+          + Add ingredient
+        </button>
+      </div>
+    );
+  }
+
   function renderEditableField(p: Product, field: EditField, value: number, locked: boolean) {
     const isEditing = field === 'price' ? p.id in editingPrice : p.id in editingCost;
     const editVal = field === 'price' ? editingPrice[p.id] : editingCost[p.id];
@@ -147,6 +260,45 @@ export default function ProductsView() {
             Edit
           </button>
         )}
+      </div>
+    );
+  }
+
+  function renderSupplySection(p: Product) {
+    const isEditing = editingSupplyIds.has(p.id);
+    const drafts = supplyDrafts[p.id] ?? [];
+
+    if (!isEditing) {
+      return (
+        <div style={{ marginTop: 6 }}>
+          {p.uses_supplies ? (
+            <div style={{ fontSize: '0.78rem', color: 'var(--text-secondary)' }}>
+              {p.supply_ingredients.map(si => (
+                <span key={si.supply_id} style={{ marginRight: 8 }}>
+                  {si.quantity_per_unit}{si.unit} {si.supply_name}
+                </span>
+              ))}
+            </div>
+          ) : null}
+          <button
+            className="btn btn--sm btn--ghost"
+            style={{ fontSize: '0.72rem', marginTop: 4 }}
+            onClick={() => openSupplyEdit(p)}
+          >
+            {p.uses_supplies ? 'Edit Supplies' : 'Link Supplies'}
+          </button>
+        </div>
+      );
+    }
+
+    return (
+      <div style={{ marginTop: 6, padding: '8px', background: 'var(--surface-raised, #f5f5f5)', borderRadius: 8 }}>
+        <div style={{ fontSize: '0.8rem', fontWeight: 600, marginBottom: 6 }}>Supply Ingredients</div>
+        {renderSupplyIngredients(drafts, d => setSupplyDrafts(prev => ({ ...prev, [p.id]: d })))}
+        <div style={{ display: 'flex', gap: 6, marginTop: 8 }}>
+          <button className="btn btn--sm btn--ghost" style={{ flex: 1 }} onClick={() => cancelSupplyEdit(p.id)}>Cancel</button>
+          <button className="btn btn--sm btn--success" style={{ flex: 1 }} onClick={() => saveSupplyEdit(p.id)}>Save</button>
+        </div>
       </div>
     );
   }
@@ -212,16 +364,57 @@ export default function ProductsView() {
             )}
           </div>
 
-          {(['name', 'description', 'cost', 'price', 'units'] as const).map(f => (
+          {(['name', 'description', 'cost', 'price'] as const).map(f => (
             <div className="field" key={f}>
               <label className="label">{f.charAt(0).toUpperCase() + f.slice(1)}</label>
               <input data-testid={`product-${f}-input`} className="input"
-                type={['cost', 'price', 'units'].includes(f) ? 'number' : 'text'}
+                type={['cost', 'price'].includes(f) ? 'number' : 'text'}
                 min={['cost', 'price'].includes(f) ? '0.01' : undefined}
                 step={['cost', 'price'].includes(f) ? '0.01' : undefined}
                 value={form[f]} onChange={e => setForm(prev => ({ ...prev, [f]: e.target.value }))} />
             </div>
           ))}
+
+          <div className="field">
+            <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}>
+              <input
+                type="checkbox"
+                checked={formUsesSupplies}
+                onChange={e => {
+                  setFormUsesSupplies(e.target.checked);
+                  if (!e.target.checked) setFormSupplyIngredients([]);
+                }}
+                style={{ width: 16, height: 16, accentColor: 'var(--primary)' }}
+              />
+              <span className="label" style={{ margin: 0 }}>Uses supplies (stock computed from ingredients)</span>
+            </label>
+          </div>
+
+          {!formUsesSupplies && (
+            <div className="field">
+              <label className="label">Units</label>
+              <input data-testid="product-units-input" className="input"
+                type="number" min="0"
+                value={form.units} onChange={e => setForm(prev => ({ ...prev, units: e.target.value }))} />
+            </div>
+          )}
+
+          {formUsesSupplies && (
+            <div className="field">
+              <label className="label">Supply ingredients</label>
+              {supplies.length === 0 ? (
+                <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
+                  No supplies defined yet — create them in Admin first.
+                </p>
+              ) : (
+                renderSupplyIngredients(
+                  formSupplyIngredients,
+                  setFormSupplyIngredients,
+                )
+              )}
+            </div>
+          )}
+
           <button data-testid="create-product-btn" className="btn btn--success"
             onClick={handleCreate} disabled={!form.name || !form.cost || !form.price}>
             Create Product
@@ -246,6 +439,7 @@ export default function ProductsView() {
                 <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4 }}>
                   <div className="product-card__name" data-testid="product-name" style={{ flex: 1 }}>{p.name}</div>
                   {!p.active && <span className="badge badge--void" style={{ fontSize: '0.65rem' }}>INACTIVE</span>}
+                  {p.uses_supplies && <span className="badge badge--pending" style={{ fontSize: '0.65rem' }}>SUPPLY</span>}
                 </div>
                 <div className="product-card__meta">Price</div>
                 <div className="product-card__field">
@@ -256,6 +450,7 @@ export default function ProductsView() {
                   {renderEditableField(p, 'cost', p.cost, locked)}
                 </div>
                 <div className="product-card__meta" data-testid="product-units">{p.units} units</div>
+                {renderSupplySection(p)}
                 <button
                   data-testid={`toggle-active-${p.id}`}
                   className={`btn btn--sm ${p.active ? 'btn--ghost' : 'btn--success'}`}
@@ -273,36 +468,40 @@ export default function ProductsView() {
           {filteredProducts.length === 0 ? <div className="empty">No products yet</div> : filteredProducts.map(p => {
             const locked = lockedIds.has(p.id);
             return (
-              <div className="list-item" key={p.id} data-testid="product-item" style={{ gap: 12, opacity: p.active ? 1 : 0.55, minWidth: 0 }}>
-                <ImagePicker
-                  image={p.image}
-                  testId={`product-thumbnail-${p.id}`}
-                  size={56}
-                  onChange={dataUrl => handleImageChange(p.id, dataUrl)}
-                />
-                <div className="list-item__main" style={{ minWidth: 0 }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                    <div className="list-item__name" data-testid="product-name">{p.name}</div>
-                    {!p.active && <span className="badge badge--void" style={{ fontSize: '0.65rem' }}>INACTIVE</span>}
+              <div key={p.id} data-testid="product-item" style={{ gap: 12, opacity: p.active ? 1 : 0.55, minWidth: 0 }}>
+                <div className="list-item" style={{ gap: 12, minWidth: 0 }}>
+                  <ImagePicker
+                    image={p.image}
+                    testId={`product-thumbnail-${p.id}`}
+                    size={56}
+                    onChange={dataUrl => handleImageChange(p.id, dataUrl)}
+                  />
+                  <div className="list-item__main" style={{ minWidth: 0 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                      <div className="list-item__name" data-testid="product-name">{p.name}</div>
+                      {!p.active && <span className="badge badge--void" style={{ fontSize: '0.65rem' }}>INACTIVE</span>}
+                      {p.uses_supplies && <span className="badge badge--pending" style={{ fontSize: '0.65rem' }}>SUPPLY</span>}
+                    </div>
+                    <div className="list-item__sub" style={{ marginTop: 4 }}>
+                      <span style={{ marginRight: 8 }}>Cost:</span>
+                      {renderEditableField(p, 'cost', p.cost, locked)}
+                    </div>
                   </div>
-                  <div className="list-item__sub" style={{ marginTop: 4 }}>
-                    <span style={{ marginRight: 8 }}>Cost:</span>
-                    {renderEditableField(p, 'cost', p.cost, locked)}
+                  <div className="list-item__right" style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 4 }}>
+                    <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginBottom: 2 }}>Price</div>
+                    {renderEditableField(p, 'price', p.price, locked)}
+                    <div className="list-item__sub" data-testid="product-units">{p.units} units</div>
+                    <button
+                      data-testid={`toggle-active-${p.id}`}
+                      className={`btn btn--sm ${p.active ? 'btn--ghost' : 'btn--success'}`}
+                      style={{ fontSize: '0.72rem', marginTop: 2 }}
+                      onClick={() => handleToggleActive(p)}
+                    >
+                      {p.active ? 'Deactivate' : 'Activate'}
+                    </button>
                   </div>
                 </div>
-                <div className="list-item__right" style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 4 }}>
-                  <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginBottom: 2 }}>Price</div>
-                  {renderEditableField(p, 'price', p.price, locked)}
-                  <div className="list-item__sub" data-testid="product-units">{p.units} units</div>
-                  <button
-                    data-testid={`toggle-active-${p.id}`}
-                    className={`btn btn--sm ${p.active ? 'btn--ghost' : 'btn--success'}`}
-                    style={{ fontSize: '0.72rem', marginTop: 2 }}
-                    onClick={() => handleToggleActive(p)}
-                  >
-                    {p.active ? 'Deactivate' : 'Activate'}
-                  </button>
-                </div>
+                {renderSupplySection(p)}
               </div>
             );
           })}

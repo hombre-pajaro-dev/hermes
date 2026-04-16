@@ -94,7 +94,9 @@ This document lists all **features** and **scenarios** covered by the BDD test s
 
 ## 6. Restock inventory
 
-**Feature:** As an employee, I want to insert a restock order to increase product units so that inventory reflects new stock.
+**Feature:** As an employee, I want to insert a restock order to increase product units and restock supplies so that inventory reflects new stock.
+
+> **Unit-based products** (no supply ingredients) are restocked directly via the Products section. **Supply-based products** cannot be directly restocked — their available units are computed from supplies. Use the Supplies section to restock the underlying supplies instead.
 
 | # | Scenario | Description |
 |---|----------|-------------|
@@ -108,6 +110,8 @@ This document lists all **features** and **scenarios** covered by the BDD test s
 
 **Feature:** As an admin employee, I want to set physical count per product to match actual inventory so that discrepancies are recorded and losses appear on the ledger.
 
+> Inventory adjustments apply to **unit-based products only**. Supply-based products have computed stock derived from their supplies; adjust the supplies directly instead.
+
 | # | Scenario | Description |
 |---|----------|-------------|
 | 1 | Adjust inventory to match physical count (loss) | Set physical count below current; adjustment applied; product units updated; ledger has adjustment with loss. |
@@ -118,11 +122,13 @@ This document lists all **features** and **scenarios** covered by the BDD test s
 
 ## 8. Products
 
-**Feature:** Products have name, description, cost, price, and units (inventory). All products are sold by units with a sale price and a cost.
+**Feature:** Products have name, description, cost, price, and available units (inventory). Products are either **unit-based** (stock tracked directly) or **supply-based** (stock computed from linked supply ingredients).
 
 **UI:** The product catalogue is displayed via the shared `ProductPicker` component. All three views — Checkout, Tabs Add Items, and Products — share a consistent **search input** (filters by name, case-insensitive) and **grid / list toggle** (⊞ / ☰). View preference is persisted per-view in `localStorage`.
 
 **Active / Inactive status:** Each product can be deactivated from the Products view. Inactive products appear at 55% opacity with an INACTIVE badge. The Add Items panel in Checkout and Tabs has a **● Active** filter toggle (on by default, shared `product-active-filter` key) that hides inactive products from the selling UI.
+
+**Supply-based products:** Products linked to supplies show a `SUPPLY` badge and display their ingredient list (e.g. `20g Coffee grounds`). Their `units` value is computed server-side; they cannot be directly restocked or inventory-adjusted — manage their stock via their supplies.
 
 | # | Scenario | Description |
 |---|----------|-------------|
@@ -142,13 +148,64 @@ This document lists all **features** and **scenarios** covered by the BDD test s
 
 ---
 
-## 9. Admin
+## 9. Supplies
 
-**Feature:** As an admin, I want to manage the security PIN, control register open/close, and manage which users can access the system so that operations are secure and only authorised staff can sign in.
+**Feature:** As an admin, I want to manage raw supplies (e.g. coffee grounds, milk) and link them to products so that product stock is automatically computed from what is physically available.
+
+**How it works:** Each supply has a name, a unit label (e.g. `g`, `ml`, `units`), and a current quantity. A product can be linked to one or more supplies with a `quantity_per_unit` (how much of the supply is consumed per sale). The product’s available units become `floor(min(supply.quantity / qty_per_unit))` across all its ingredients. When the product is sold, the corresponding supply quantities are deducted automatically.
+
+**Admin — Supplies card:** Create, edit, and delete supplies. A supply cannot be deleted while any product uses it.
+
+**Products view — supply ingredients:** Each product card/row has an "Edit Supplies" / "Link Supplies" button for inline ingredient editing. The create-product form has a "Uses supplies" checkbox that switches the units field to an ingredient picker.
+
+**Restock view:** The Supplies section lists all supplies with quantity inputs; restocking a supply increases its quantity directly.
+
+| # | Scenario | Description |
+|---|----------|-------------|
+| — | *(no BDD scenarios yet — covered by manual testing and the existing stock/checkout/tabs scenarios)* | |
+
+---
+
+## 10. Discounts
+
+**Feature:** As an admin, I want to configure automatic and manual discounts so that qualifying orders receive a price reduction.
+
+**Discount types:**
+- **Percentage** — X% off a set of qualifying products (or the whole order if no products are specified)
+- **Buy X Get Y Free** (BXGY) — every N qualifying items means the cheapest M are free; qualifying products must be specified
+
+**Auto vs. manual:**
+- **Auto-discounts** activate automatically when all configured conditions match (active flag, day of week, date range, redemption cap); the discount with the highest computed savings is applied; cashier can remove it
+- **Manual / courtesy discounts** (`is_manual: true`) are never auto-applied; the cashier triggers them via "🎁 Apply courtesy…"; optionally protected by PIN
+
+**Rules:**
+- Only one discount per order/tab at a time; manual override replaces the auto-selected discount
+- At-cost tabs are mutually exclusive with discounts
+- Server re-validates eligibility at payment time; discount amount is recorded on `orders.discount_amount` / `tabs.discount_amount` and in `applied_discounts` with a name snapshot; `redemptions` counter is incremented atomically
+
+| # | Scenario | Description |
+|---|----------|-------------|
+| 1 | Create a discount | `POST /api/discounts` with valid body; discount created with correct fields. |
+| 2 | Delete a discount | `DELETE /api/discounts/:id`; discount removed. |
+| 3 | Percentage discount applied on checkout | Create 20% discount on Espresso; pay order with that discount; `discount_amount` equals 20% of Espresso price. |
+| 4 | BXGY discount applied on checkout | Create buy-2-get-1-free discount; order with 3 eligible items; cheapest item is free. |
+| 5 | Discount applied on tab payment | Add items to tab; pay tab with discount; `discount_amount` recorded on tab. |
+| 6 | At-cost tab rejects discount | Tab with `at_cost: true`; pay with discount_id; rejected with 409. |
+| 7 | Redemption counter incremented | Pay order with discount; `redemptions` on the discount increments by 1. |
+
+---
+
+## 11. Admin
+
+**Feature:** As an admin, I want to manage the security PIN, control register open/close, manage authorized users, configure discounts, and manage supplies so that operations are secure and stock is configured correctly.
 
 **Register sub-section:** The Register controls (open, cash out, close) live on the Admin page. All staff can open the register; cash out and close require PIN confirmation.
 
-**Authorized Users sub-section (admin only):** Only users with `role: admin` see this section. Admins can add an email + role, change an existing user's role, or remove a user. Changes take effect on the user's next sign-in.
+**Authorized Users sub-section (admin only):** Only users with `role: admin` see this section. Admins can add an email + role, change an existing user’s role, or remove a user. Changes take effect on the user’s next sign-in.
+
+**Discounts sub-section (admin only):** Configure auto and manual discounts. See section 10 for detail.
+
+**Supplies sub-section (admin only):** Create, edit, and delete supplies. See section 9 for detail.
 
 | # | Scenario | Description |
 |---|----------|-------------|
@@ -163,16 +220,12 @@ This document lists all **features** and **scenarios** covered by the BDD test s
 
 ## Running the BDD tests
 
-- **Run all scenarios:**
-  `pnpm test` (run from the relevant package directory)
-  Uses `NODE_ENV=test` and an in-memory SQLite database.
-
 - **Run backend tests only:**
-  `cd packages/backend && pnpm test` — 42 scenarios, 207 steps
+  `cd packages/backend && pnpm test` — 59 scenarios, 296 steps
 
 - **Run frontend tests only:**
-  `cd packages/frontend && pnpm test` — 38 scenarios, 204 steps
-  Requires both backend (`:3001`) and frontend (`:5173`) servers running.
+  `cd packages/frontend && pnpm test` — 56 scenarios, 310 steps
+  Requires Docker/Postgres running. The test script starts its own backend (`:3002`) and frontend (`:5174`) servers automatically.
 
 - **HTML report:**
   Both packages write a Cucumber HTML report to `report/cucumber-report.html` after each run.
@@ -181,14 +234,17 @@ This document lists all **features** and **scenarios** covered by the BDD test s
 
 ## Feature file locations
 
-| Feature | File |
-|---------|------|
-| Checkout | `features/checkout.feature` |
-| Tabs (long-lasting orders) | `features/tabs_long_lasting_orders.feature` |
-| Register | `features/register.feature` |
-| Ledger & accounts | `features/ledger.feature` |
-| Reports | `features/reports.feature` |
-| Restock | `features/restock.feature` |
-| Inventory adjustment | `features/inventory_adjustment.feature` |
-| Products | `features/products.feature` |
-| Admin (PIN, Register, Authorized Users) | `features/admin.feature`, `features/register.feature` |
+| Feature | Package | File |
+|---------|---------|------|
+| Checkout | backend + frontend | `features/checkout.feature` |
+| Tabs (long-lasting orders) | backend | `features/tabs_long_lasting_orders.feature` |
+| Tabs | frontend | `features/tabs.feature` |
+| Register | backend + frontend | `features/register.feature` |
+| Ledger & accounts | backend + frontend | `features/ledger.feature` |
+| Reports | backend + frontend | `features/reports.feature` |
+| Restock | backend + frontend | `features/restock.feature` |
+| Inventory adjustment | backend | `features/inventory_adjustment.feature` |
+| Inventory | frontend | `features/inventory.feature` |
+| Products | backend + frontend | `features/products.feature` |
+| Discounts | backend + frontend | `features/discounts.feature` |
+| Admin (PIN, Register, Users, Discounts, Supplies) | frontend | `features/admin.feature` |

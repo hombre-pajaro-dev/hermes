@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { getDb, pool } from '../db/database.js';
 import { requireOpenRegister } from '../middleware/requireOpenRegister.js';
+import { productUsesSupplies } from '../lib/supply-utils.js';
 
 const router = Router();
 
@@ -16,6 +17,8 @@ router.post('/adjust', requireOpenRegister, async (req, res) => {
     for (const adj of adjustments) {
       const { rows: [product] } = await client.query('SELECT * FROM products WHERE id = $1', [adj.product_id]);
       if (!product) throw new Error(`Product ${adj.product_id} not found`);
+      const usesSupplies = await productUsesSupplies(client, adj.product_id);
+      if (usesSupplies) throw new Error(`'${product.name}' is supply-based — adjust its supplies directly instead`);
       const delta = adj.physical_count - product.units;
       await client.query('UPDATE products SET units = $1 WHERE id = $2', [adj.physical_count, adj.product_id]);
       const { rows: [adjRow] } = await client.query(

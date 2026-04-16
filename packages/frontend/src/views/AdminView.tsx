@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { api } from '../api/client';
-import type { AuthorizedUser, Discount, Product, RegisterSession } from '../api/client';
+import type { AuthorizedUser, Discount, Product, RegisterSession, Supply } from '../api/client';
 import { authClient } from '../lib/auth-client';
 import PinModal from '../components/PinModal';
 
@@ -242,6 +242,57 @@ export default function AdminView() {
         ? f.product_ids.filter(id => id !== pid)
         : [...f.product_ids, pid],
     }));
+  }
+
+  // ── Supplies (admin only) ────────────────────────────────────────────────────
+  const [supplies, setSupplies] = useState<Supply[]>([]);
+  const [suppliesError, setSuppliesError] = useState('');
+  const [showSupplyForm, setShowSupplyForm] = useState(false);
+  const [editingSupplyId, setEditingSupplyId] = useState<number | null>(null);
+  const [supplyForm, setSupplyForm] = useState({ name: '', unit: 'units', quantity: '0' });
+
+  async function loadSupplies() {
+    if (!isAdmin) return;
+    try { setSupplies(await api.getSupplies()); }
+    catch (e: unknown) { setSuppliesError((e as Error).message); }
+  }
+
+  useEffect(() => { loadSupplies(); }, [isAdmin]);
+
+  function openNewSupplyForm() {
+    setEditingSupplyId(null);
+    setSupplyForm({ name: '', unit: 'units', quantity: '0' });
+    setSuppliesError('');
+    setShowSupplyForm(true);
+  }
+
+  function openEditSupplyForm(s: Supply) {
+    setEditingSupplyId(s.id);
+    setSupplyForm({ name: s.name, unit: s.unit, quantity: String(s.quantity) });
+    setSuppliesError('');
+    setShowSupplyForm(true);
+  }
+
+  async function handleSaveSupply() {
+    setSuppliesError('');
+    const qty = Number(supplyForm.quantity);
+    if (isNaN(qty) || qty < 0) { setSuppliesError('Quantity must be ≥ 0'); return; }
+    try {
+      if (editingSupplyId != null) {
+        await api.updateSupply(editingSupplyId, { name: supplyForm.name, unit: supplyForm.unit, quantity: qty });
+      } else {
+        await api.createSupply({ name: supplyForm.name, unit: supplyForm.unit, quantity: qty });
+      }
+      setShowSupplyForm(false);
+      setEditingSupplyId(null);
+      loadSupplies();
+    } catch (e: unknown) { setSuppliesError((e as Error).message); }
+  }
+
+  async function handleDeleteSupply(id: number) {
+    setSuppliesError('');
+    try { await api.deleteSupply(id); loadSupplies(); }
+    catch (e: unknown) { setSuppliesError((e as Error).message); }
   }
 
   return (
@@ -572,6 +623,82 @@ export default function AdminView() {
                     onClick={handleSaveDiscount}
                     disabled={!discountForm.name || (discountForm.type === 'bxgy' && discountForm.product_ids.length === 0)}>
                     {editingDiscountId != null ? 'Save Changes' : 'Create Discount'}
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        </>
+      )}
+
+      {/* Supplies — admin only */}
+      {isAdmin && (
+        <>
+          {suppliesError && <div className="error-banner">{suppliesError}</div>}
+
+          <div className="card">
+            <div className="card__title">Supplies</div>
+            <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', marginBottom: 12 }}>
+              Supplies are consumed when selling products linked to them. Products using supplies have computed stock.
+            </p>
+
+            {supplies.length === 0 ? (
+              <div className="empty" style={{ paddingBottom: 12 }}>No supplies yet</div>
+            ) : (
+              supplies.map(s => (
+                <div className="list-item" key={s.id}>
+                  <div className="list-item__main">
+                    <div className="list-item__name">{s.name}</div>
+                    <div className="list-item__sub">{s.quantity} {s.unit}</div>
+                  </div>
+                  <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
+                    <button className="btn btn--sm btn--ghost" onClick={() => openEditSupplyForm(s)}>Edit</button>
+                    <button className="btn btn--sm btn--danger" onClick={() => handleDeleteSupply(s.id)}>Delete</button>
+                  </div>
+                </div>
+              ))
+            )}
+
+            {!showSupplyForm && (
+              <button className="btn btn--primary" style={{ marginTop: 12 }} onClick={openNewSupplyForm}>
+                + Add Supply
+              </button>
+            )}
+
+            {showSupplyForm && (
+              <div style={{ marginTop: 16, borderTop: '1px solid var(--border)', paddingTop: 16 }}>
+                <div className="card__title">{editingSupplyId != null ? 'Edit Supply' : 'New Supply'}</div>
+
+                <div className="field">
+                  <label className="label">Name</label>
+                  <input className="input" placeholder="e.g. Coffee grounds"
+                    value={supplyForm.name}
+                    onChange={e => setSupplyForm(f => ({ ...f, name: e.target.value }))} />
+                </div>
+
+                <div className="field">
+                  <label className="label">Unit</label>
+                  <input className="input" placeholder="e.g. g, ml, units"
+                    value={supplyForm.unit}
+                    onChange={e => setSupplyForm(f => ({ ...f, unit: e.target.value }))} />
+                </div>
+
+                <div className="field">
+                  <label className="label">Initial quantity</label>
+                  <input className="input" type="number" min="0" step="0.01"
+                    value={supplyForm.quantity}
+                    onChange={e => setSupplyForm(f => ({ ...f, quantity: e.target.value }))} />
+                </div>
+
+                <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
+                  <button className="btn btn--ghost" style={{ flex: 1 }}
+                    onClick={() => { setShowSupplyForm(false); setEditingSupplyId(null); }}>
+                    Cancel
+                  </button>
+                  <button className="btn btn--primary" style={{ flex: 1 }}
+                    onClick={handleSaveSupply}
+                    disabled={!supplyForm.name || !supplyForm.unit}>
+                    {editingSupplyId != null ? 'Save Changes' : 'Create Supply'}
                   </button>
                 </div>
               </div>
