@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { api } from '../api/client';
-import type { Discount, Product } from '../api/client';
+import type { Discount, Product, Supply } from '../api/client';
+import { computeCartAwareProducts } from '../lib/cart-utils';
 import ReceiptModal, { type ReceiptLine, type ReceiptDiscount } from '../components/ReceiptModal';
 import ProductThumb from '../components/ProductThumb';
 import ProductPicker from '../components/ProductPicker';
@@ -24,6 +25,7 @@ interface Receipt {
 
 export default function CheckoutView() {
   const [products, setProducts] = useState<Product[]>([]);
+  const [supplies, setSupplies] = useState<Supply[]>([]);
   const [lines, setLines] = useState<LineItem[]>([]);
   const [step, setStep] = useState<Step>('order');
   const [cashReceived, setCashReceived] = useState('');
@@ -52,6 +54,7 @@ export default function CheckoutView() {
 
   useEffect(() => {
     api.getProducts().then(setProducts).catch(() => {});
+    api.getSupplies().then(setSupplies).catch(() => {});
     api.getTopProducts().then(rows => {
       setSoldCounts(Object.fromEntries(rows.map(r => [r.product_id, r.units_sold])));
     }).catch(() => {});
@@ -75,9 +78,18 @@ export default function CheckoutView() {
 
   const subtotal = lines.reduce((s, l) => s + l.product.price * l.quantity, 0);
 
+  // Cart-aware products: each product's `units` reflects remaining availability
+  // after accounting for what the current cart already consumes from shared supplies.
+  const cart = Object.fromEntries(lines.map(l => [l.product.id, l.quantity]));
+  const cartAwareProducts = computeCartAwareProducts(products, supplies, cart);
+  // Map for quick lookup (used to gate the + button in the order summary)
+  const cartAwareUnits: Record<number, number> = Object.fromEntries(
+    cartAwareProducts.map(p => [p.id, p.units])
+  );
+
   const filteredProducts = search.trim()
-    ? products.filter(p => p.name.toLowerCase().includes(search.toLowerCase()))
-    : products;
+    ? cartAwareProducts.filter(p => p.name.toLowerCase().includes(search.toLowerCase()))
+    : cartAwareProducts;
 
   // Compute cart items for discount engine
   const cartItems: CartItem[] = lines.map(l => ({
@@ -140,10 +152,11 @@ export default function CheckoutView() {
         changeDue: null,
       });
       resetOrder();
-      const [updated, top, refreshedDiscounts] = await Promise.all([
-        api.getProducts(), api.getTopProducts(), api.getDiscounts(),
+      const [updated, updatedSupplies, top, refreshedDiscounts] = await Promise.all([
+        api.getProducts(), api.getSupplies(), api.getTopProducts(), api.getDiscounts(),
       ]);
       setProducts(updated);
+      setSupplies(updatedSupplies);
       setSoldCounts(Object.fromEntries(top.map(r => [r.product_id, r.units_sold])));
       setDiscounts(refreshedDiscounts);
     } catch (e: unknown) { setError((e as Error).message); }
@@ -169,10 +182,11 @@ export default function CheckoutView() {
         changeDue: paid.change_due ?? null,
       });
       resetOrder();
-      const [updated, top, refreshedDiscounts] = await Promise.all([
-        api.getProducts(), api.getTopProducts(), api.getDiscounts(),
+      const [updated, updatedSupplies, top, refreshedDiscounts] = await Promise.all([
+        api.getProducts(), api.getSupplies(), api.getTopProducts(), api.getDiscounts(),
       ]);
       setProducts(updated);
+      setSupplies(updatedSupplies);
       setSoldCounts(Object.fromEntries(top.map(r => [r.product_id, r.units_sold])));
       setDiscounts(refreshedDiscounts);
     } catch (e: unknown) { setError((e as Error).message); }
@@ -334,7 +348,12 @@ export default function CheckoutView() {
                     <div className="qty">
                       <button className="btn btn--sm btn--ghost" onClick={() => changeQty(l.product.id, -1)}>−</button>
                       <span className="qty__val" data-testid={`qty-${l.product.name.toLowerCase()}`}>{l.quantity}</span>
-                      <button className="btn btn--sm btn--ghost" onClick={() => changeQty(l.product.id, +1)}>+</button>
+                      <button
+                        className="btn btn--sm btn--ghost"
+                        onClick={() => changeQty(l.product.id, +1)}
+                        disabled={(cartAwareUnits[l.product.id] ?? 0) <= 0}
+                        title={(cartAwareUnits[l.product.id] ?? 0) <= 0 ? 'No more stock available' : undefined}
+                      >+</button>
                     </div>
                     <div style={{ minWidth: 60, textAlign: 'right' }}>${(l.product.price * l.quantity).toFixed(2)}</div>
                   </div>

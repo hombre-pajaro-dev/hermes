@@ -11,6 +11,14 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+#### Cart-aware stock availability in Checkout
+- The **Add Items** picker in Checkout now reflects supply consumption from the current cart in real time — no network calls needed
+- For **supply-based products**: as soon as a product is added to the cart, all other products that share any of the same supplies immediately show reduced availability; the picker's stock label, disabled state, and ◈ In Stock filter all update instantly
+- For **unit-based products**: the picker shows `server units − cart quantity`, so it always indicates how many more of that product can still be added
+- The **+** button in the order summary is also gated on cart-aware availability, preventing the cashier from incrementing a line beyond what stock allows
+- After each payment, `products` and `supplies` are refreshed together so the next order starts from accurate server-side state
+- New pure utility function `src/lib/cart-utils.ts → computeCartAwareProducts(products, supplies, cart)` — computes the adjusted units array from already-loaded state with no side effects
+
 #### Supplies module
 - New **Supplies** entity: each supply has a name, a unit label (e.g. `g`, `ml`, `units`), and a current quantity
 - Products can now be **supply-based**: link a product to one or more supplies and specify how much of each supply is consumed per unit sold (e.g. "Espresso" uses 20 g of "Coffee grounds")

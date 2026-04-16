@@ -10,6 +10,8 @@ This document lists all **features** and **scenarios** covered by the BDD test s
 
 **UI — Add Items panel:** Shared `ProductPicker` component with search input, grid / list toggle (persisted under `checkout-view`), **● Active** filter (on by default, shared `product-active-filter`), **◈ In Stock** filter (on by default, shared `product-stock-filter`), and **↑ Most Sold** sort toggle (on by default, shared `product-sort`). Filter pipeline: active → in-stock → most-sold → render.
 
+**Cart-aware availability:** The picker computes effective stock in real time from the current cart without any network calls. For supply-based products, all products that share a supply reflect each other's cart consumption immediately. For unit-based products, the picker shows `server units − cart quantity`. The **+** button in the order summary is also disabled when effective units reach zero.
+
 | # | Scenario | Description |
 |---|----------|-------------|
 | 1 | Complete a sale with credit card | Order with items; pay with card; order completes; stock decreases. |
