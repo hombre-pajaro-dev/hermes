@@ -6,7 +6,8 @@
       "src": "package.json",
       "use": "@vercel/static-build",
       "config": {
-        "distDir": "dist"
+        "buildCommand": "npx --yes pnpm@9.15.9 --filter frontend build",
+        "outputDirectory": "dist"
       }
     },
     { "src": "api/index.ts", "use": "@vercel/node" }
