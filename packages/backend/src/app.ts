@@ -112,7 +112,7 @@ export function createApp() {
   app.use('/api/supplies', suppliesRouter);
 
   // Serve the built frontend in production (Vercel bundles public/ via includeFiles)
-  const publicDir = path.join(process.cwd(), 'public');
+  const publicDir = path.join(process.cwd(), 'dist');
   if (existsSync(path.join(publicDir, 'index.html'))) {
     app.use(express.static(publicDir));
     app.get('*', (_req, res) => res.sendFile(path.join(publicDir, 'index.html')));
