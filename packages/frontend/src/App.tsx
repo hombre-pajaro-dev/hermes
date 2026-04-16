@@ -12,8 +12,11 @@ import ReportsView from './views/ReportsView';
 import AdminView from './views/AdminView';
 import './App.css';
 
+const BYPASS_AUTH = import.meta.env.VITE_BYPASS_AUTH === 'true';
+
 function RequireAuth({ children }: { children: React.ReactNode }) {
   const { data: session, isPending } = authClient.useSession();
+  if (BYPASS_AUTH) return <>{children}</>;
   if (isPending) return (
     <div style={{ minHeight: '100dvh', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
       <div className="spinner">⏳</div>

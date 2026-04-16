@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { getDb, pool } from '../db/database.js';
 import { requireOpenRegister } from '../middleware/requireOpenRegister.js';
+import { isDiscountEligibleNow, computeDiscountAmount } from '../lib/discount-engine.js';
 
 const router = Router();
 
@@ -157,25 +158,61 @@ router.post('/:id/void', async (req, res) => {
 router.post('/:id/pay', async (req, res) => {
   const db = await getDb();
   const { rows } = await db.query('SELECT * FROM tabs WHERE id = $1', [req.params.id]);
-  const tab = rows[0] as { id: number; status: string; total: number } | undefined;
+  const tab = rows[0] as { id: number; status: string; total: number; at_cost: number } | undefined;
   if (!tab) return res.status(404).json({ error: 'Tab not found' });
   if (tab.status !== 'open') return res.status(409).json({ error: 'Tab is not open' });
-  const { payment_method, amount_received } = req.body as { payment_method: string; amount_received?: number };
+
+  const { payment_method, amount_received, discount_id } = req.body as {
+    payment_method: string; amount_received?: number; discount_id?: number;
+  };
   if (!payment_method) return res.status(400).json({ error: 'payment_method is required' });
+
+  // At-cost tabs are mutually exclusive with discounts
+  if (discount_id && tab.at_cost) {
+    return res.status(409).json({ error: 'Cannot apply a discount to a staff cost tab' });
+  }
+
+  // Resolve discount
+  let discountAmount = 0;
+  let discountRow: { id: number; name: string; type: string } | null = null;
+  if (discount_id && !tab.at_cost) {
+    const { rows: [d] } = await db.query('SELECT * FROM discounts WHERE id = $1', [discount_id]);
+    if (!d) return res.status(404).json({ error: 'Discount not found' });
+    if (!isDiscountEligibleNow(d)) return res.status(409).json({ error: 'Discount is not currently eligible' });
+    const { rows: dps } = await db.query('SELECT product_id FROM discount_products WHERE discount_id = $1', [discount_id]);
+    const productIds = dps.map((dp: { product_id: number }) => dp.product_id);
+    const { rows: items } = await db.query('SELECT * FROM tab_items WHERE tab_id = $1', [tab.id]);
+    discountAmount = computeDiscountAmount(d, productIds, items);
+    discountRow = d;
+  }
+
+  const effectiveTotal = Math.max(0, tab.total - discountAmount);
+
   if (payment_method === 'cash') {
     if (amount_received == null) return res.status(400).json({ error: 'amount_received is required for cash payments' });
-    if (amount_received < tab.total) return res.status(400).json({ error: `Insufficient payment: received ${amount_received}, total is ${tab.total}` });
+    if (amount_received < effectiveTotal) return res.status(400).json({ error: `Insufficient payment: received ${amount_received}, total is ${effectiveTotal}` });
   }
+
   const account = payment_method === 'card' ? 'credit_card' : 'cash';
-  const changeDue = payment_method === 'cash' ? (amount_received! - tab.total) : null;
+  const changeDue = payment_method === 'cash' ? (amount_received! - effectiveTotal) : null;
+
   const { rows: [updated] } = await db.query(
-    "UPDATE tabs SET status = 'paid', payment_method = $1, paid_at = NOW() WHERE id = $2 RETURNING *",
-    [payment_method === 'card' ? 'credit_card' : payment_method, tab.id]
+    "UPDATE tabs SET status = 'paid', payment_method = $1, discount_amount = $2, paid_at = NOW() WHERE id = $3 RETURNING *",
+    [payment_method === 'card' ? 'credit_card' : payment_method, discountAmount, tab.id],
   );
   await db.query(
     "INSERT INTO ledger_entries (entry_type, account, amount, description, ref_id, ref_type) VALUES ('tab_payment', $1, $2, $3, $4, 'tab')",
-    [account, tab.total, `Tab #${tab.id} paid with ${payment_method}`, tab.id]
+    [account, effectiveTotal, `Tab #${tab.id} paid with ${payment_method}`, tab.id],
   );
+
+  if (discountRow && discountAmount > 0) {
+    await db.query(
+      'INSERT INTO applied_discounts (discount_id, tab_id, snapshot_name, snapshot_type, amount) VALUES ($1,$2,$3,$4,$5)',
+      [discountRow.id, tab.id, discountRow.name, discountRow.type, discountAmount],
+    );
+    await db.query('UPDATE discounts SET redemptions = redemptions + 1 WHERE id = $1', [discountRow.id]);
+  }
+
   res.json({ ...updated, change_due: changeDue });
 });
 

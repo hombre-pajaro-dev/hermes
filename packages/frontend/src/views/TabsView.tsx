@@ -1,14 +1,18 @@
 import { useEffect, useRef, useState } from 'react';
 import { api } from '../api/client';
-import type { Tab, TabItem, Product } from '../api/client';
+import type { Discount, Tab, TabItem, Product } from '../api/client';
 import PinModal from '../components/PinModal';
-import ReceiptModal, { type ReceiptLine } from '../components/ReceiptModal';
+import ReceiptModal, { type ReceiptLine, type ReceiptDiscount } from '../components/ReceiptModal';
 import ProductThumb from '../components/ProductThumb';
 import ProductPicker from '../components/ProductPicker';
+import { computeSavings, getBestAutoDiscount } from '../lib/discounts';
+import type { CartItem } from '../lib/discounts';
 
 interface Receipt {
   timestamp: Date;
   lines: ReceiptLine[];
+  subtotal: number;
+  discountLine: ReceiptDiscount | null;
   total: number;
   changeDue: number | null;
 }
@@ -34,6 +38,15 @@ export default function TabsView() {
   const [addSearch, setAddSearch] = useState('');
   const PAGE_SIZE = 10;
 
+  // Discounts
+  const [discounts, setDiscounts] = useState<Discount[]>([]);
+  // undefined = use auto, null = cashier explicitly removed, object = cashier explicitly chose
+  const [manualDiscountOverride, setManualDiscountOverride] = useState<
+    { discount: Discount; savings: number } | null | undefined
+  >(undefined);
+  const [showCourtesyPin, setShowCourtesyPin] = useState(false);
+  const [showManualPicker, setShowManualPicker] = useState(false);
+
   function setAddView(mode: 'grid' | 'list') {
     setAddViewMode(mode);
     localStorage.setItem('tabs-add-view', mode);
@@ -56,11 +69,13 @@ export default function TabsView() {
     loadTabs();
     api.getProducts().then(setProducts).catch(() => {});
     refreshSoldCounts();
+    api.getDiscounts().then(setDiscounts).catch(() => {});
   }, []);
 
   async function openTab(t: Tab) {
     setSelectedTab(t as Tab & { items?: TabItem[] });
     setError(''); setCashReceived(''); setPayStep('form');
+    setManualDiscountOverride(undefined);
     setView('detail');
     api.getProducts().then(setProducts).catch(() => {});
     try {
@@ -134,28 +149,40 @@ export default function TabsView() {
   async function handlePayCard() {
     if (!selectedTab) return;
     setError('');
-    const snapshot = { items: selectedTab.items ?? [], total: selectedTab.total };
+    const snapshot = { items: selectedTab.items ?? [], subtotal: selectedTab.total, activeDiscount: tabActiveDiscount };
     try {
-      await api.payTab(selectedTab.id, 'card');
-      setReceipt({ timestamp: new Date(), lines: toReceiptLines(snapshot.items), total: snapshot.total, changeDue: null });
+      await api.payTab(selectedTab.id, 'card', undefined, snapshot.activeDiscount?.discount.id);
+      const discountLine = snapshot.activeDiscount && snapshot.activeDiscount.savings > 0
+        ? { name: snapshot.activeDiscount.discount.name, savings: snapshot.activeDiscount.savings }
+        : null;
+      const total = Math.max(0, snapshot.subtotal - (discountLine?.savings ?? 0));
+      setReceipt({ timestamp: new Date(), lines: toReceiptLines(snapshot.items), subtotal: snapshot.subtotal, discountLine, total, changeDue: null });
       setSelectedTab(null);
+      setManualDiscountOverride(undefined);
       await loadTabs(true);
       refreshSoldCounts();
+      api.getDiscounts().then(setDiscounts).catch(() => {});
     } catch (e: unknown) { setError((e as Error).message); }
   }
 
   async function handlePayCash() {
     if (!selectedTab) return;
     setError('');
-    const snapshot = { items: selectedTab.items ?? [], total: selectedTab.total };
+    const snapshot = { items: selectedTab.items ?? [], subtotal: selectedTab.total, activeDiscount: tabActiveDiscount };
     const cash = Number(cashReceived);
     try {
-      await api.payTab(selectedTab.id, 'cash', cash);
-      setReceipt({ timestamp: new Date(), lines: toReceiptLines(snapshot.items), total: snapshot.total, changeDue: Math.max(0, cash - snapshot.total) });
+      await api.payTab(selectedTab.id, 'cash', cash, snapshot.activeDiscount?.discount.id);
+      const discountLine = snapshot.activeDiscount && snapshot.activeDiscount.savings > 0
+        ? { name: snapshot.activeDiscount.discount.name, savings: snapshot.activeDiscount.savings }
+        : null;
+      const total = Math.max(0, snapshot.subtotal - (discountLine?.savings ?? 0));
+      setReceipt({ timestamp: new Date(), lines: toReceiptLines(snapshot.items), subtotal: snapshot.subtotal, discountLine, total, changeDue: Math.max(0, cash - total) });
       setSelectedTab(null);
       setCashReceived('');
+      setManualDiscountOverride(undefined);
       await loadTabs(true);
       refreshSoldCounts();
+      api.getDiscounts().then(setDiscounts).catch(() => {});
     } catch (e: unknown) { setError((e as Error).message); }
   }
 
@@ -185,8 +212,27 @@ export default function TabsView() {
   }, [selectedTab?.total]);
 
   const tabTotal = selectedTab?.total ?? 0;
+
+  // Discount logic for the selected tab (none when at_cost)
+  const tabCartItems: CartItem[] = (selectedTab?.items ?? []).map(i => ({
+    product_id: i.product_id,
+    price: i.unit_price,
+    quantity: i.quantity,
+  }));
+  const tabAutoDiscount = selectedTab && !selectedTab.at_cost && tabCartItems.length > 0
+    ? getBestAutoDiscount(discounts, tabCartItems)
+    : null;
+  const rawTabActive = manualDiscountOverride !== undefined ? manualDiscountOverride : tabAutoDiscount;
+  const tabActiveDiscount = rawTabActive
+    ? { discount: rawTabActive.discount, savings: computeSavings(rawTabActive.discount, tabCartItems) }
+    : null;
+  const tabEffectiveSavings = tabActiveDiscount && tabActiveDiscount.savings > 0 ? tabActiveDiscount.savings : 0;
+  const tabEffectiveTotal = Math.max(0, tabTotal - tabEffectiveSavings);
+
+  const manualDiscounts = discounts.filter(d => d.is_manual && d.active);
+
   const cashNum = Number(cashReceived) || 0;
-  const liveChange = cashReceived !== '' ? cashNum - tabTotal : null;
+  const liveChange = cashReceived !== '' ? cashNum - tabEffectiveTotal : null;
 
   const filteredAddProducts = addSearch.trim()
     ? products.filter(p => p.name.toLowerCase().includes(addSearch.toLowerCase()))
@@ -223,10 +269,56 @@ export default function TabsView() {
         />
       )}
 
+      {showCourtesyPin && (
+        <PinModal
+          title="Courtesy Discount — Enter PIN"
+          onConfirm={async (pin) => {
+            await api.verifyPin(pin);
+            setShowCourtesyPin(false);
+            setShowManualPicker(true);
+          }}
+          onCancel={() => setShowCourtesyPin(false)}
+        />
+      )}
+
+      {showManualPicker && (
+        <div style={{
+          position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.55)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          zIndex: 1000, padding: 16,
+        }}>
+          <div className="card" style={{ width: '100%', maxWidth: 360, margin: 0 }}>
+            <div className="card__title">Apply Courtesy Discount</div>
+            {manualDiscounts.map(d => (
+              <button
+                key={d.id}
+                className="btn btn--ghost"
+                style={{ marginBottom: 8, textAlign: 'left', justifyContent: 'flex-start' }}
+                onClick={() => {
+                  const savings = computeSavings(d, tabCartItems);
+                  setManualDiscountOverride({ discount: d, savings });
+                  setShowManualPicker(false);
+                }}
+              >
+                <div>
+                  <div style={{ fontWeight: 600 }}>{d.name}</div>
+                  {d.description && <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>{d.description}</div>}
+                </div>
+              </button>
+            ))}
+            <button className="btn btn--ghost" style={{ marginTop: 4 }} onClick={() => setShowManualPicker(false)}>
+              Cancel
+            </button>
+          </div>
+        </div>
+      )}
+
       {receipt && (
         <ReceiptModal
           timestamp={receipt.timestamp}
           lines={receipt.lines}
+          subtotal={receipt.subtotal}
+          discountLine={receipt.discountLine}
           total={receipt.total}
           changeDue={receipt.changeDue}
           onClose={handleCloseReceipt}
@@ -358,9 +450,16 @@ export default function TabsView() {
               );
             })}
 
+            {tabEffectiveSavings > 0 && tabActiveDiscount && (
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.9rem', color: 'var(--success)', fontWeight: 600, margin: '4px 0' }}>
+                <span>🏷 {tabActiveDiscount.discount.name}</span>
+                <span>−${tabEffectiveSavings.toFixed(2)}</span>
+              </div>
+            )}
+
             <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 700, fontSize: '1.1rem', margin: '12px 0 16px' }}>
               <span>Total Due</span>
-              <span>${tabTotal.toFixed(2)}</span>
+              <span>${tabEffectiveTotal.toFixed(2)}</span>
             </div>
 
             <div className="field">
@@ -407,7 +506,7 @@ export default function TabsView() {
                 className="btn btn--success"
                 style={{ flex: 1 }}
                 onClick={handlePayCash}
-                disabled={!cashReceived || Number(cashReceived) < tabTotal}
+                disabled={!cashReceived || Number(cashReceived) < tabEffectiveTotal}
               >
                 Confirm Payment
               </button>
@@ -487,24 +586,72 @@ export default function TabsView() {
                     Close Tab (no charge)
                   </button>
                 ) : (
-                  <div style={{ display: 'flex', gap: 8 }}>
-                    <button
-                      data-testid="pay-card-btn"
-                      className="btn btn--primary"
-                      style={{ flex: 1 }}
-                      onClick={handlePayCard}
-                    >
-                      💳 Pay with Card
-                    </button>
-                    <button
-                      data-testid="proceed-to-cash-btn"
-                      className="btn btn--success"
-                      style={{ flex: 1 }}
-                      onClick={() => setPayStep('cash')}
-                    >
-                      💵 Pay with Cash
-                    </button>
-                  </div>
+                  <>
+                    {/* Discount bar — hidden for at_cost tabs */}
+                    {selectedTab.at_cost ? (
+                      <div style={{ fontSize: '0.8rem', color: '#92400e', background: '#fef9c3', borderRadius: 6, padding: '6px 10px', marginBottom: 12 }}>
+                        Staff price active — discounts unavailable
+                      </div>
+                    ) : (
+                      <div style={{ marginBottom: 12 }}>
+                        {tabEffectiveSavings > 0 && tabActiveDiscount ? (
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', color: 'var(--success)', fontWeight: 600, fontSize: '0.9rem', marginBottom: 6 }}>
+                            <span>🏷 {tabActiveDiscount.discount.name}</span>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                              <span>−${tabEffectiveSavings.toFixed(2)}</span>
+                              <button
+                                className="btn btn--sm btn--ghost"
+                                style={{ padding: '2px 6px', fontSize: '0.75rem', color: 'var(--text-secondary)' }}
+                                onClick={() => setManualDiscountOverride(null)}
+                                title="Remove discount"
+                              >✕</button>
+                            </div>
+                          </div>
+                        ) : null}
+                        {manualDiscounts.length > 0 && (
+                          <button
+                            className="btn btn--sm btn--ghost"
+                            style={{ fontSize: '0.8rem', marginBottom: 4 }}
+                            onClick={() => {
+                              if (manualDiscounts.some(d => d.requires_pin)) {
+                                setShowCourtesyPin(true);
+                              } else {
+                                setShowManualPicker(true);
+                              }
+                            }}
+                          >
+                            🎁 Apply courtesy…
+                          </button>
+                        )}
+                      </div>
+                    )}
+
+                    {tabEffectiveSavings > 0 ? (
+                      <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 700, fontSize: '1.05rem', marginBottom: 10 }}>
+                        <span>Total</span>
+                        <span>${tabEffectiveTotal.toFixed(2)}</span>
+                      </div>
+                    ) : null}
+
+                    <div style={{ display: 'flex', gap: 8 }}>
+                      <button
+                        data-testid="pay-card-btn"
+                        className="btn btn--primary"
+                        style={{ flex: 1 }}
+                        onClick={handlePayCard}
+                      >
+                        💳 Pay with Card
+                      </button>
+                      <button
+                        data-testid="proceed-to-cash-btn"
+                        className="btn btn--success"
+                        style={{ flex: 1 }}
+                        onClick={() => setPayStep('cash')}
+                      >
+                        💵 Pay with Cash
+                      </button>
+                    </div>
+                  </>
                 )}
               </div>
 

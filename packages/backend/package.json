@@ -7,10 +7,10 @@
     "migrate": "tsx --env-file=.env src/scripts/migrate.ts",
     "seed": "tsx --env-file=.env src/scripts/seed.ts",
     "dev": "tsx watch --env-file=.env src/index.ts",
-    "test:server": "PORT=3002 NODE_ENV=test tsx src/index.ts",
+    "test:server": "cross-env PORT=3002 NODE_ENV=test DATABASE_URL=postgresql://hermes:hermes@localhost:5432/hermes tsx src/index.ts",
     "build": "tsc -p tsconfig.build.json",
     "start": "node dist/index.js",
-    "test": "NODE_ENV=test cucumber-js --config cucumber.js",
+    "test": "DATABASE_URL=postgresql://hermes:hermes@localhost:5432/hermes NODE_ENV=test cucumber-js --config cucumber.cjs",
     "test:doc": "NODE_ENV=test tsx src/scripts/generate-bdd-doc.ts"
   },
   "dependencies": {
@@ -29,6 +29,7 @@
     "@types/pg": "^8.11.14",
     "@types/supertest": "^7.2.0",
     "chai": "^6.2.2",
+    "cross-env": "^10.1.0",
     "supertest": "^7.2.2",
     "tsx": "^4.19.3",
     "typescript": "^5.8.2"

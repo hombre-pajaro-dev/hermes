@@ -146,6 +146,7 @@ body {
 .badge--closed { background: #fee2e2; color: #dc2626; }
 .badge--paid { background: #dbeafe; color: #2563eb; }
 .badge--pending { background: #fef9c3; color: #a16207; }
+.badge--void { background: #f3f4f6; color: #6b7280; }
 
 /* Lists */
 .list-item {

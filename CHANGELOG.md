@@ -9,6 +9,21 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+
+#### Discount engine
+- New discount module with two types: **Percentage** (X% off a set of products or the whole order) and **Buy X Get Y Free** (every N qualifying items = cheapest M are free, mixed products allowed)
+- Discounts are configured in **Admin → Discounts** (admin-only); each discount defines its reward, qualifying products, trigger conditions, and optional limits
+- **Auto-discounts** activate automatically when conditions match (day of week, date range, redemption cap); the discount with the highest savings is applied; cashier can remove it with ✕
+- **Manual / courtesy discounts** (`is_manual = true`) are never auto-applied; cashier triggers them via a "🎁 Apply courtesy…" button, optionally protected by PIN
+- **At-cost tabs** are mutually exclusive with discounts — the discount bar is replaced by a "Staff price active — discounts unavailable" notice
+- **One discount per order**: auto-discount is pre-selected; manual override replaces it; only one can be active at a time
+- Discount shows as a named line item between Subtotal and Total in both the order card and the receipt (`🏷 Martes Feliz −$3.70`)
+- Server re-validates discount eligibility at payment time (active, day, date, redemption count); rejects at-cost + discount combinations
+- Ledger entries record the post-discount effective amount paid; `orders.discount_amount` and `tabs.discount_amount` store the saving for reporting
+- Audit trail: every applied discount is recorded in `applied_discounts` with a name snapshot (survives discount edits/deletions) and the `redemptions` counter is incremented atomically
+- `GET/POST/PATCH/DELETE /api/discounts` endpoints; discount CRUD in Admin; product multi-select for qualifying items
+
 ### Fixed
 
 #### Mobile layout — ProductsView controls and ProductPicker filter bar

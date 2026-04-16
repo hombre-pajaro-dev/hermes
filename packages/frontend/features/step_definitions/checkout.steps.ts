@@ -16,11 +16,10 @@ Then('only products matching {string} are shown', async function (this: PosWorld
 });
 
 Then('products not matching are hidden', async function (this: PosWorld) {
-  const total = await this.page.locator('[data-testid^="add-"]').count();
-  const visible = await this.page.locator('[data-testid^="add-"]').evaluateAll(
-    els => els.filter(el => (el as HTMLElement).offsetParent !== null).length
-  );
-  expect(visible).to.be.lessThan(total);
+  // ProductPicker only renders matching products; non-matching ones are not in the DOM.
+  // With 3 seeded products and the search term "esp", only Espresso matches → count < 3.
+  const count = await this.page.locator('[data-testid^="add-"]').count();
+  expect(count).to.be.lessThan(3);
 });
 
 When('I switch checkout to grid view', async function (this: PosWorld) {
