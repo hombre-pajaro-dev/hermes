@@ -1,6 +1,6 @@
 import type { IncomingMessage, ServerResponse } from 'http';
-import { createApp } from '../packages/backend/src/app';
-import { schemaReady } from '../packages/backend/src/db/database';
+import { createApp } from '../packages/backend/src/app.js';
+import { schemaReady } from '../packages/backend/src/db/database.js';
 
 const app = createApp();
 
