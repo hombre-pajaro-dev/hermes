@@ -75,6 +75,10 @@ export default function CheckoutView() {
 
   const subtotal = lines.reduce((s, l) => s + l.product.price * l.quantity, 0);
 
+  const filteredProducts = search.trim()
+    ? products.filter(p => p.name.toLowerCase().includes(search.toLowerCase()))
+    : products;
+
   // Compute cart items for discount engine
   const cartItems: CartItem[] = lines.map(l => ({
     product_id: l.product.id,
@@ -346,11 +350,12 @@ export default function CheckoutView() {
                     <span>Subtotal</span>
                     <span key={totalBump} className="value-bump" data-testid="order-total">${subtotal.toFixed(2)}</span>
                   </div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', color: 'var(--success)', fontWeight: 600, fontSize: '0.9rem', marginBottom: 4 }}>
+                  <div data-testid="discount-banner" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', color: 'var(--success)', fontWeight: 600, fontSize: '0.9rem', marginBottom: 4 }}>
                     <span>🏷 {activeDiscount.discount.name}</span>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                       <span>−${effectiveSavings.toFixed(2)}</span>
                       <button
+                        data-testid="remove-discount-btn"
                         className="btn btn--sm btn--ghost"
                         style={{ padding: '2px 6px', fontSize: '0.75rem', color: 'var(--text-secondary)' }}
                         onClick={() => setManualDiscountOverride(null)}
@@ -415,7 +420,7 @@ export default function CheckoutView() {
           <div className="card">
             <ProductPicker
               title="Add Items"
-              products={products}
+              products={filteredProducts}
               onAdd={addProduct}
               viewMode={viewMode}
               onViewModeChange={setView}

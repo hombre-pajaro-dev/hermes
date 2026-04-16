@@ -9,7 +9,7 @@
     "vercel-build": "tsc -b && vite build",
     "lint": "eslint .",
     "preview": "vite preview",
-    "test": "concurrently --kill-others --success first -n be,fe,cu \"pnpm -C ../backend test:server\" \"VITE_API_PORT=3002 vite --port 5174 --strictPort\" \"wait-on http://localhost:3002/api/health http://localhost:5174 && TEST_API_URL=http://localhost:3002 TEST_BASE_URL=http://localhost:5174 NODE_ENV=test cucumber-js --config cucumber.cjs\"",
+    "test": "concurrently --kill-others --success first -n be,fe,cu \"pnpm -C ../backend test:server\" \"cross-env VITE_API_PORT=3002 VITE_BYPASS_AUTH=true vite --port 5174 --strictPort\" \"wait-on http://localhost:3002/api/health http://localhost:5174 && cross-env TEST_API_URL=http://localhost:3002 TEST_BASE_URL=http://localhost:5174 NODE_ENV=test cucumber-js --config cucumber.cjs\"",
     "test:doc": "echo 'Frontend BDD doc not implemented'"
   },
   "dependencies": {
@@ -29,6 +29,7 @@
     "@vitejs/plugin-react": "^5.1.1",
     "chai": "^6.2.2",
     "concurrently": "^9.2.1",
+    "cross-env": "^10.1.0",
     "eslint": "^9.39.1",
     "eslint-plugin-react-hooks": "^7.0.1",
     "eslint-plugin-react-refresh": "^0.4.24",

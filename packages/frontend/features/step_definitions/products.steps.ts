@@ -75,7 +75,14 @@ When('I set the new price to {float}', async function (this: PosWorld, price: nu
 When('I save the new price', async function (this: PosWorld) {
   const id = this.data.editProductId as number;
   await this.page.click(`[data-testid="save-price-${id}"]`);
-  await this.page.waitForLoadState('networkidle');
+  // Wait for either a successful PATCH (valid value) or an error banner (client-side validation)
+  await Promise.race([
+    this.page.waitForResponse(
+      r => r.url().includes(`/products/${id}/price`) && r.request().method() === 'PATCH',
+      { timeout: 5000 },
+    ).catch(() => null),
+    this.page.waitForSelector('[data-testid="error-banner"]', { timeout: 5000 }).catch(() => null),
+  ]);
 });
 
 Then('the product {string} shows price {float}', async function (this: PosWorld, name: string, price: number) {
@@ -158,7 +165,14 @@ When('I set the new cost to {float}', async function (this: PosWorld, cost: numb
 When('I save the new cost', async function (this: PosWorld) {
   const id = this.data.editProductId as number;
   await this.page.click(`[data-testid="save-cost-${id}"]`);
-  await this.page.waitForLoadState('networkidle');
+  // Wait for either a successful PATCH (valid value) or an error banner (client-side validation)
+  await Promise.race([
+    this.page.waitForResponse(
+      r => r.url().includes(`/products/${id}/cost`) && r.request().method() === 'PATCH',
+      { timeout: 5000 },
+    ).catch(() => null),
+    this.page.waitForSelector('[data-testid="error-banner"]', { timeout: 5000 }).catch(() => null),
+  ]);
 });
 
 Then('the product {string} shows cost {float}', async function (this: PosWorld, name: string, cost: number) {
@@ -232,7 +246,8 @@ Then('each product shows a thumbnail or placeholder', async function (this: PosW
   const count = await items.count();
   expect(count).to.be.greaterThan(0);
   for (let i = 0; i < count; i++) {
-    const thumb = items.nth(i).locator('[data-testid^="product-thumbnail-"]');
+    // ImagePicker renders multiple elements with this prefix; .first() avoids strict-mode error.
+    const thumb = items.nth(i).locator('[data-testid^="product-thumbnail-"]').first();
     expect(await thumb.isVisible()).to.be.true;
   }
 });
