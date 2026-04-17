@@ -9,6 +9,10 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+---
+
+## [1.0.0-beta.3] — 2026-04-17
+
 ### Added
 
 #### Cart-aware stock availability in Checkout
