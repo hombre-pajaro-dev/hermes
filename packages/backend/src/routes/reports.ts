@@ -5,7 +5,10 @@ const router = Router();
 
 router.get('/sales-by-item', async (req, res) => {
   const tz = (req.query.tz as string) || 'America/Monterrey';
-  const date = (req.query.date as string) || new Date().toLocaleDateString('en-CA', { timeZone: tz });
+  const todayLocal = new Date().toLocaleDateString('en-CA', { timeZone: tz });
+  const fallback = (req.query.date as string) || todayLocal;
+  const from = (req.query.from as string) || fallback;
+  const to = (req.query.to as string) || fallback;
   const db = await getDb();
   const { rows } = await db.query<{ product_id: number; name: string; units_sold: number; revenue: number; cost: number }>(`
     SELECT p.id as product_id, p.name,
@@ -15,7 +18,8 @@ router.get('/sales-by-item', async (req, res) => {
     FROM order_items oi
     JOIN orders o ON o.id = oi.order_id
     JOIN products p ON p.id = oi.product_id
-    WHERE o.status = 'paid' AND (o.paid_at AT TIME ZONE $2)::date = $1::date
+    WHERE o.status = 'paid'
+      AND (o.paid_at AT TIME ZONE $3)::date BETWEEN $1::date AND $2::date
     GROUP BY p.id, p.name
     UNION ALL
     SELECT p.id, p.name,
@@ -25,9 +29,10 @@ router.get('/sales-by-item', async (req, res) => {
     FROM tab_items ti
     JOIN tabs t ON t.id = ti.tab_id
     JOIN products p ON p.id = ti.product_id
-    WHERE t.status = 'paid' AND (t.paid_at AT TIME ZONE $2)::date = $1::date
+    WHERE t.status = 'paid'
+      AND (t.paid_at AT TIME ZONE $3)::date BETWEEN $1::date AND $2::date
     GROUP BY p.id, p.name
-  `, [date, tz]);
+  `, [from, to, tz]);
 
   const merged = new Map<number, { product_id: number; name: string; units_sold: number; revenue: number; cost: number }>();
   for (const row of rows) {
@@ -45,28 +50,42 @@ router.get('/sales-by-item', async (req, res) => {
 
 router.get('/daily-total', async (req, res) => {
   const tz = (req.query.tz as string) || 'America/Monterrey';
-  const date = (req.query.date as string) || new Date().toLocaleDateString('en-CA', { timeZone: tz });
+  const todayLocal = new Date().toLocaleDateString('en-CA', { timeZone: tz });
+  const fallback = (req.query.date as string) || todayLocal;
+  const from = (req.query.from as string) || fallback;
+  const to = (req.query.to as string) || fallback;
   const db = await getDb();
-  const { rows: [orders] } = await db.query(`
+  const { rows: [totals] } = await db.query(`
     SELECT
       COUNT(*)::int as order_count,
       COALESCE(SUM(total), 0) as total_sales,
       COALESCE(SUM(CASE WHEN payment_method = 'cash' THEN total ELSE 0 END), 0) as cash_sales,
       COALESCE(SUM(CASE WHEN payment_method = 'card' THEN total ELSE 0 END), 0) as card_sales
-    FROM orders WHERE status = 'paid' AND (paid_at AT TIME ZONE $2)::date = $1::date
-  `, [date, tz]);
+    FROM (
+      SELECT total, payment_method FROM orders
+        WHERE status = 'paid' AND (paid_at AT TIME ZONE $3)::date BETWEEN $1::date AND $2::date
+      UNION ALL
+      SELECT total, payment_method FROM tabs
+        WHERE status = 'paid' AND (paid_at AT TIME ZONE $3)::date BETWEEN $1::date AND $2::date
+    ) combined
+  `, [from, to, tz]);
   const { rows: [costRow] } = await db.query(`
-    SELECT COALESCE(SUM(oi.quantity * oi.unit_cost), 0) as total_cost
-    FROM order_items oi
-    JOIN orders o ON o.id = oi.order_id
-    WHERE o.status = 'paid' AND (o.paid_at AT TIME ZONE $2)::date = $1::date
-  `, [date, tz]);
+    SELECT COALESCE(SUM(cost), 0) as total_cost FROM (
+      SELECT SUM(oi.quantity * oi.unit_cost) as cost
+        FROM order_items oi JOIN orders o ON o.id = oi.order_id
+        WHERE o.status = 'paid' AND (o.paid_at AT TIME ZONE $3)::date BETWEEN $1::date AND $2::date
+      UNION ALL
+      SELECT SUM(ti.quantity * ti.unit_cost)
+        FROM tab_items ti JOIN tabs t ON t.id = ti.tab_id
+        WHERE t.status = 'paid' AND (t.paid_at AT TIME ZONE $3)::date BETWEEN $1::date AND $2::date
+    ) costs
+  `, [from, to, tz]);
   res.json({
-    date,
-    order_count: orders.order_count,
-    total_sales: Number(orders.total_sales),
-    cash_sales: Number(orders.cash_sales),
-    card_sales: Number(orders.card_sales),
+    date: from === to ? from : `${from}/${to}`,
+    order_count: totals.order_count,
+    total_sales: Number(totals.total_sales),
+    cash_sales: Number(totals.cash_sales),
+    card_sales: Number(totals.card_sales),
     total_cost: Number(costRow.total_cost),
   });
 });

@@ -7,18 +7,13 @@ Then('I see the sales by item section', async function (this: PosWorld) {
   expect(await this.page.locator('[data-testid="sales-by-item"]').isVisible()).to.be.true;
 });
 
-When('I switch to the Daily tab', async function (this: PosWorld) {
+When('I switch to the Range tab', async function (this: PosWorld) {
   await this.page.click('.tabs-nav__item:nth-child(2)');
   await this.page.waitForLoadState('networkidle');
 });
 
-When('I switch to the Range tab', async function (this: PosWorld) {
-  await this.page.click('.tabs-nav__item:nth-child(3)');
-  await this.page.waitForLoadState('networkidle');
-});
-
 When('I switch to the Brief tab', async function (this: PosWorld) {
-  await this.page.click('.tabs-nav__item:nth-child(4)');
+  await this.page.click('.tabs-nav__item:nth-child(3)');
   await this.page.waitForLoadState('networkidle');
 });
 

@@ -48,6 +48,11 @@ When('I fetch the sales by item report for today with tz {string}', async functi
   this.response = await this.agent.get(`/api/reports/sales-by-item?date=${today}&tz=${encodeURIComponent(tz)}`);
 });
 
+When('I fetch the daily total for range today to today', async function (this: PosWorld) {
+  const today = new Date().toISOString().slice(0, 10);
+  this.response = await this.agent.get(`/api/reports/daily-total?from=${today}&to=${today}&tz=UTC`);
+});
+
 Then('the report includes {string} with units_sold {int}', function (this: PosWorld, name: string, units: number) {
   const report = this.response.body as { name: string; units_sold: number }[];
   const item = report.find(r => r.name === name);

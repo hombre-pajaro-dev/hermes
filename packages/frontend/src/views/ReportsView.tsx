@@ -6,8 +6,9 @@ const localTz = Intl.DateTimeFormat().resolvedOptions().timeZone;
 const today = () => new Date().toLocaleDateString('en-CA', { timeZone: localTz });
 
 export default function ReportsView() {
-  const [tab, setTab] = useState<'sales' | 'daily' | 'range' | 'brief'>('sales');
-  const [date, setDate] = useState(today());
+  const [tab, setTab] = useState<'sales' | 'range' | 'brief'>('sales');
+  const [salesFrom, setSalesFrom] = useState(today());
+  const [salesTo, setSalesTo] = useState(today());
   const [salesByItem, setSalesByItem] = useState<SalesByItem[]>([]);
   const [dailyTotal, setDailyTotal] = useState<DailyTotal | null>(null);
   const [dailyRange, setDailyRange] = useState<DailyRange[]>([]);
@@ -19,15 +20,14 @@ export default function ReportsView() {
 
   async function fetchSales() {
     setLoading(true); setError('');
-    try { setSalesByItem(await api.getSalesByItem(date, localTz)); }
-    catch (e: unknown) { setError((e as Error).message); }
-    finally { setLoading(false); }
-  }
-
-  async function fetchDaily() {
-    setLoading(true); setError('');
-    try { setDailyTotal(await api.getDailyTotal(date, localTz)); }
-    catch (e: unknown) { setError((e as Error).message); }
+    try {
+      const [items, totals] = await Promise.all([
+        api.getSalesByItem(salesFrom, salesTo, localTz),
+        api.getDailyTotal(salesFrom, salesTo, localTz),
+      ]);
+      setSalesByItem(items);
+      setDailyTotal(totals);
+    } catch (e: unknown) { setError((e as Error).message); }
     finally { setLoading(false); }
   }
 
@@ -45,8 +45,7 @@ export default function ReportsView() {
     finally { setLoading(false); }
   }
 
-  useEffect(() => { if (tab === 'sales') fetchSales(); }, [tab]);
-  useEffect(() => { if (tab === 'daily') fetchDaily(); }, [tab]);
+  useEffect(() => { if (tab === 'sales') fetchSales(); }, [tab, salesFrom, salesTo]);
   useEffect(() => { if (tab === 'range') fetchRange(); }, [tab]);
   useEffect(() => { if (tab === 'brief') fetchBrief(); }, [tab]);
 
@@ -55,57 +54,45 @@ export default function ReportsView() {
       {error && <div className="error-banner" data-testid="error-banner">{error}</div>}
       <div className="tabs-nav">
         <button className={`tabs-nav__item${tab === 'sales' ? ' active' : ''}`} onClick={() => setTab('sales')}>By Item</button>
-        <button className={`tabs-nav__item${tab === 'daily' ? ' active' : ''}`} onClick={() => setTab('daily')}>Daily</button>
         <button className={`tabs-nav__item${tab === 'range' ? ' active' : ''}`} onClick={() => setTab('range')}>Range</button>
         <button className={`tabs-nav__item${tab === 'brief' ? ' active' : ''}`} onClick={() => setTab('brief')}>Brief</button>
       </div>
 
       {tab === 'sales' && (
         <div>
-          <div className="field" style={{ display: 'flex', gap: 8, alignItems: 'flex-end', marginBottom: 12 }}>
-            <div style={{ flex: 1 }}>
-              <label className="label">Date</label>
-              <input className="input" type="date" value={date} onChange={e => setDate(e.target.value)} />
-            </div>
-            <button className="btn btn--primary btn--sm" onClick={fetchSales} style={{ marginBottom: 0 }}>Go</button>
+          <div style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
+            <div style={{ flex: 1 }}><label className="label">From</label><input className="input" type="date" value={salesFrom} onChange={e => setSalesFrom(e.target.value)} /></div>
+            <div style={{ flex: 1 }}><label className="label">To</label><input className="input" type="date" value={salesTo} onChange={e => setSalesTo(e.target.value)} /></div>
           </div>
-          <div className="card" data-testid="sales-by-item">
-            {loading ? <div className="spinner">⏳</div> : salesByItem.length === 0 ? <div className="empty">No sales for this date</div> :
-              salesByItem.map(s => (
-                <div className="list-item" key={s.product_id} data-testid="sales-item">
-                  <div className="list-item__main">
-                    <div className="list-item__name" data-testid="sales-item-name">{s.name}</div>
-                    <div className="list-item__sub" data-testid="sales-item-units">{s.units_sold} units sold</div>
-                  </div>
-                  <div className="list-item__right">
-                    <div style={{ fontWeight: 700 }} data-testid="sales-item-revenue">${s.revenue.toFixed(2)}</div>
-                    <div className="list-item__sub">cost ${s.cost.toFixed(2)}</div>
-                  </div>
+          {loading ? <div className="spinner">⏳</div> : (
+            <>
+              {dailyTotal && (
+                <div className="stats" data-testid="daily-total">
+                  <div className="stat"><div className="stat__label">Orders</div><div className="stat__value" data-testid="order-count">{dailyTotal.order_count}</div></div>
+                  <div className="stat"><div className="stat__label">Sales</div><div className="stat__value" data-testid="total-sales">${dailyTotal.total_sales.toFixed(2)}</div></div>
+                  <div className="stat"><div className="stat__label">Cash</div><div className="stat__value" data-testid="cash-sales">${Number(dailyTotal.cash_sales ?? 0).toFixed(2)}</div></div>
+                  <div className="stat"><div className="stat__label">Card</div><div className="stat__value" data-testid="card-sales">${Number(dailyTotal.card_sales ?? 0).toFixed(2)}</div></div>
+                  <div className="stat"><div className="stat__label">Cost</div><div className="stat__value">${dailyTotal.total_cost.toFixed(2)}</div></div>
+                  <div className="stat"><div className="stat__label">Profit</div><div className="stat__value">${(dailyTotal.total_sales - dailyTotal.total_cost).toFixed(2)}</div></div>
                 </div>
-              ))
-            }
-          </div>
-        </div>
-      )}
-
-      {tab === 'daily' && (
-        <div>
-          <div style={{ display: 'flex', gap: 8, alignItems: 'flex-end', marginBottom: 12 }}>
-            <div style={{ flex: 1 }}>
-              <label className="label">Date</label>
-              <input className="input" type="date" value={date} onChange={e => setDate(e.target.value)} />
-            </div>
-            <button className="btn btn--primary btn--sm" onClick={fetchDaily}>Go</button>
-          </div>
-          {dailyTotal && (
-            <div className="stats" data-testid="daily-total">
-              <div className="stat"><div className="stat__label">Orders</div><div className="stat__value" data-testid="order-count">{dailyTotal.order_count}</div></div>
-              <div className="stat"><div className="stat__label">Sales</div><div className="stat__value" data-testid="total-sales">${dailyTotal.total_sales.toFixed(2)}</div></div>
-              <div className="stat"><div className="stat__label">Cash</div><div className="stat__value" data-testid="cash-sales">${Number(dailyTotal.cash_sales ?? 0).toFixed(2)}</div></div>
-              <div className="stat"><div className="stat__label">Card</div><div className="stat__value" data-testid="card-sales">${Number(dailyTotal.card_sales ?? 0).toFixed(2)}</div></div>
-              <div className="stat"><div className="stat__label">Cost</div><div className="stat__value">${dailyTotal.total_cost.toFixed(2)}</div></div>
-              <div className="stat"><div className="stat__label">Profit</div><div className="stat__value">${(dailyTotal.total_sales - dailyTotal.total_cost).toFixed(2)}</div></div>
-            </div>
+              )}
+              <div className="card" data-testid="sales-by-item">
+                {salesByItem.length === 0 ? <div className="empty">No sales for this period</div> :
+                  salesByItem.map(s => (
+                    <div className="list-item" key={s.product_id} data-testid="sales-item">
+                      <div className="list-item__main">
+                        <div className="list-item__name" data-testid="sales-item-name">{s.name}</div>
+                        <div className="list-item__sub" data-testid="sales-item-units">{s.units_sold} units sold</div>
+                      </div>
+                      <div className="list-item__right">
+                        <div style={{ fontWeight: 700 }} data-testid="sales-item-revenue">${s.revenue.toFixed(2)}</div>
+                        <div className="list-item__sub">cost ${s.cost.toFixed(2)}</div>
+                      </div>
+                    </div>
+                  ))
+                }
+              </div>
+            </>
           )}
         </div>
       )}

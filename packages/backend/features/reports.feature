@@ -45,3 +45,13 @@ Feature: Reports
   Scenario: Sales by item report respects explicit timezone parameter
     When I fetch the sales by item report for today with tz "America/Monterrey"
     Then the response is an array
+
+  Scenario: Daily total accepts from/to date range and includes tab payments
+    When I open a new tab named "Range Test Tab"
+    And I add items to the tab
+      | product_name | quantity |
+      | Latte        | 1        |
+    And I pay the tab with card
+    And I fetch the daily total for range today to today
+    Then the daily total has order_count at least 2
+    And the daily total has positive total_sales

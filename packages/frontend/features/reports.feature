@@ -8,16 +8,13 @@ Feature: Reports
     Given I am on the Reports page
     Then I see the sales by item section
 
-  Scenario: View daily total report
+  Scenario: By Item report shows daily summary alongside items
     Given I am on the Reports page
-    When I switch to the Daily tab
     Then I see the daily total section
 
-  Scenario: Daily total shows cash and card breakdown
+  Scenario: Daily summary shows cash and card breakdown
     Given I am on the Reports page
-    When I switch to the Daily tab
-    Then I see the daily total section
-    And I see the cash sales stat
+    Then I see the cash sales stat
     And I see the card sales stat
 
   Scenario: View daily range report

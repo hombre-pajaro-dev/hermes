@@ -84,17 +84,23 @@ This document lists all **features** and **scenarios** covered by the BDD test s
 
 **Feature:** As an admin employee, I want to see reports on sales and daily totals so that I can understand what was sold and revenue.
 
+**UI — tabs:** By Item · Range · Brief. The separate Daily tab has been removed; the daily summary (Orders, Sales, Cash, Card, Cost, Profit) now appears at the top of the By Item tab for the selected date range.
+
+**By Item tab:** From/To date pickers filter both the item breakdown and the summary stats. Changing either date re-fetches automatically. Both `GET /api/reports/sales-by-item` and `GET /api/reports/daily-total` are called in parallel with the same `from`/`to`/`tz` parameters.
+
+**Timezone support:** All date-filtered report endpoints (`sales-by-item`, `daily-total`, `daily-range`) accept an optional `tz` query parameter (IANA timezone name). The backend uses `AT TIME ZONE` to convert `paid_at` timestamps before date extraction. Default: `America/Monterrey`. The frontend passes the browser `Intl` timezone and computes "today" in local time.
+
 | # | Scenario | Description |
 |---|----------|-------------|
 | 1 | Sales by item report shows units and revenue | After a sale; report for today shows item, units sold, and revenue. |
-| 2 | Daily total report shows order count and totals | Report for today has order_count, total_sales, total_cost. |
+| 2 | Daily total accepts from/to date range and includes tab payments | After an order and a tab payment; daily total with today's range counts both; order_count ≥ 2 and total_sales > 0. |
 | 3 | Close brief includes revenue, cost, most sold and most profitable | Close brief has revenue, total_cost, most_sold, most_profitable, by_item. |
 | 4 | Daily range report for chart | Request daily range from today to today; response has at least one day with date, revenue, cost, order_count. |
 | 5 | Filter reports by date | Sales by item for a specific date; returns array without error. |
 | 6 | Top products by all-time units sold | `GET /api/reports/top-products` returns all products with `units_sold` aggregated from all paid orders and tabs, sorted descending; products with no sales appear with `units_sold: 0`. |
 | 7 | Sales by item report respects explicit timezone parameter | Pass `tz=America/Monterrey` with today's local date; report returns array without error. |
-
-**Timezone support:** All date-filtered report endpoints (`sales-by-item`, `daily-total`, `daily-range`) accept an optional `tz` query parameter (IANA timezone name). The backend converts `paid_at` timestamps to the requested timezone before extracting the date, so orders are grouped under the correct local calendar day. Default timezone: `America/Monterrey`. The frontend passes the browser's `Intl` timezone automatically and computes "today" in local time.
+| 8 | By Item report shows daily summary alongside items | On the Reports page (By Item tab); daily-total stats grid visible; sales-by-item list visible. |
+| 9 | Daily summary shows cash and card breakdown | On the Reports page; cash-sales and card-sales stats visible without switching tabs. |
 
 ---
 

@@ -49,6 +49,13 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 - Audit trail: every applied discount is recorded in `applied_discounts` with a name snapshot (survives discount edits/deletions) and the `redemptions` counter is incremented atomically
 - `GET/POST/PATCH/DELETE /api/discounts` endpoints; discount CRUD in Admin; product multi-select for qualifying items
 
+#### By Item report merged with Daily summary
+- The separate **Daily** tab has been removed; the daily summary (Orders, Sales, Cash, Card, Cost, Profit) now appears at the top of the **By Item** tab
+- Both the item breakdown and the summary stats share the same From / To date pickers and re-fetch together automatically when either date changes
+- `GET /api/reports/daily-total` now accepts `from` / `to` date range parameters (keeps `date` for backward compatibility); totals now include **tab payments** in addition to orders for `order_count`, `total_sales`, `cash_sales`, `card_sales`, and `total_cost`
+- Frontend calls `sales-by-item` and `daily-total` in parallel on the By Item tab
+- BDD: frontend scenarios updated (Daily tab scenarios replaced by By Item variants); new backend scenario "Daily total accepts from/to date range and includes tab payments"
+
 #### Timezone-aware daily reports
 - All date-filtered report endpoints (`sales-by-item`, `daily-total`, `daily-range`) now accept a `tz` query parameter (IANA timezone name, e.g. `America/Monterrey`)
 - Backend uses PostgreSQL `AT TIME ZONE` to convert `paid_at` timestamps before extracting the calendar date — orders are no longer misattributed to the wrong day when the server runs in UTC
