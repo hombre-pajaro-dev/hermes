@@ -66,6 +66,7 @@ export const api = {
   getDailyRange: (from: string, to: string, tz: string) => req<DailyRange[]>(`/reports/daily-range?from=${from}&to=${to}&tz=${encodeURIComponent(tz)}`),
   getCloseBriefReport: (session_id?: number) => req<CloseBrief>(`/reports/close-brief${session_id ? `?session_id=${session_id}` : ''}`),
   getTopProducts: () => req<TopProduct[]>('/reports/top-products'),
+  getInventoryAdjustmentReport: (from: string, to: string, tz: string) => req<InventoryAdjustmentItem[]>(`/reports/inventory-adjustments?from=${from}&to=${to}&tz=${encodeURIComponent(tz)}`),
 
   // Restock
   restock: (items: OrderItem[]) => req<RestockOrder>('/restock', { method: 'POST', body: JSON.stringify({ items }) }),
@@ -121,9 +122,10 @@ export interface LedgerEntryItem { product_id: number; name: string; quantity: n
 export interface Account { id: number; name: string; label: string; }
 export interface Balance { account: string; balance: number; }
 export interface SalesByItem { product_id: number; name: string; units_sold: number; revenue: number; cost: number; }
-export interface DailyTotal { date: string; order_count: number; total_sales: number; cash_sales?: number; card_sales?: number; total_cost: number; }
-export interface DailyRange { date: string; revenue: number; cost: number; order_count: number; }
+export interface DailyTotal { date: string; order_count: number; total_sales: number; cash_sales?: number; card_sales?: number; total_cost: number; inventory_adjustment_total?: number; }
+export interface DailyRange { date: string; revenue: number; cost: number; order_count: number; adjustment?: number; }
 export interface TopProduct { product_id: number; units_sold: number; }
+export interface InventoryAdjustmentItem { product_id: number; name: string; adjustment_count: number; total_delta: number; total_cost_impact: number; }
 export interface CloseBrief { session_id: number; revenue: number; total_cost: number; gross_profit: number; most_sold?: { name: string; units_sold: number } | null; most_profitable?: { name: string; profit: number } | null; by_item: SalesByItem[]; }
 export interface RestockOrder { id: number; session_id: number; items: { product_id: number; name: string; quantity: number; new_units: number }[]; }
 export interface AdjustResult { adjustments: { product_id: number; name: string; previous_units: number; physical_count: number; delta: number; new_units: number }[]; }

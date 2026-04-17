@@ -42,3 +42,19 @@ Then('the adjustment delta is positive', function (this: PosWorld) {
   const body = this.response.body as { adjustments: { delta: number }[] };
   expect(body.adjustments[0].delta).to.be.greaterThan(0);
 });
+
+Then('the adjustment ledger entry amount reflects cost price loss', async function (this: PosWorld) {
+  const res = await this.agent.get('/api/ledger');
+  const entries = res.body as { entry_type: string; account: string; amount: number }[];
+  const entry = entries.find(e => e.entry_type === 'adjustment' && e.account === 'inventory_adjustment');
+  expect(entry, 'Expected an adjustment entry on inventory_adjustment account').to.exist;
+  expect(entry!.amount).to.be.lessThan(0);
+});
+
+Then('the adjustment ledger entry amount reflects cost price gain', async function (this: PosWorld) {
+  const res = await this.agent.get('/api/ledger');
+  const entries = res.body as { entry_type: string; account: string; amount: number }[];
+  const entry = entries.find(e => e.entry_type === 'adjustment' && e.account === 'inventory_adjustment');
+  expect(entry, 'Expected an adjustment entry on inventory_adjustment account').to.exist;
+  expect(entry!.amount).to.be.greaterThan(0);
+});

@@ -46,6 +46,18 @@ Feature: Reports
     When I fetch the sales by item report for today with tz "America/Monterrey"
     Then the response is an array
 
+  Scenario: Inventory adjustment report shows per-product breakdown
+    When I submit an inventory adjustment via reports context
+      | product_name | physical_count |
+      | Espresso     | 95             |
+    And I fetch the inventory adjustment report for today
+    Then the inventory adjustment report includes "Espresso"
+    And the "Espresso" adjustment has a non-zero cost impact
+
+  Scenario: Daily total includes inventory_adjustment_total field
+    When I fetch the daily total for range today to today
+    Then the daily total response has inventory_adjustment_total field
+
   Scenario: Daily total accepts from/to date range and includes tab payments
     When I open a new tab named "Range Test Tab"
     And I add items to the tab

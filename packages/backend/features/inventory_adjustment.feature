@@ -20,6 +20,25 @@ Feature: Inventory adjustment
     Then the product "Croissant" units are now 55
     And the adjustment delta is positive
 
+  Scenario: Adjustment is posted to the inventory_adjustment account
+    When I submit an inventory adjustment
+      | product_name | physical_count |
+      | Espresso     | 95             |
+    And I fetch the ledger
+    Then there is a "adjustment" ledger entry with account "inventory_adjustment"
+
+  Scenario: Shortage adjustment posts negative amount at cost price
+    When I submit an inventory adjustment
+      | product_name | physical_count |
+      | Espresso     | 95             |
+    Then the adjustment ledger entry amount reflects cost price loss
+
+  Scenario: Surplus adjustment posts positive amount at cost price
+    When I submit an inventory adjustment
+      | product_name | physical_count |
+      | Croissant    | 55             |
+    Then the adjustment ledger entry amount reflects cost price gain
+
   Scenario: Cannot adjust when register is closed
     Given the register is closed
     When I try to submit an inventory adjustment

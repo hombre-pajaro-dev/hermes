@@ -49,6 +49,21 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 - Audit trail: every applied discount is recorded in `applied_discounts` with a name snapshot (survives discount edits/deletions) and the `redemptions` counter is incremented atomically
 - `GET/POST/PATCH/DELETE /api/discounts` endpoints; discount CRUD in Admin; product multi-select for qualifying items
 
+#### Inventory adjustment breakdown card in reports
+- New `GET /api/reports/inventory-adjustments?from=&to=&tz=` endpoint — returns per-product breakdown: `adjustment_count`, `total_delta` (net units), `total_cost_impact` (sum of ledger amounts at cost price at time of adjustment); sorted by absolute cost impact descending
+- **By Item tab**: when the selected period has any adjustments, an **Inventory Adjustments** card appears above the sales list showing each affected product (name, count, net units, cost impact in green/red) and a total impact row
+- `InventoryAdjustmentItem` type added to frontend API client
+- BDD: new scenario "Inventory adjustment report shows per-product breakdown"
+
+#### Inventory adjustment account and report visibility
+- Inventory adjustments now post ledger entries to a dedicated **`inventory_adjustment`** account (`Inventory Adjustment`) instead of `NULL`; the account is seeded on startup and visible in Ledger → Balances
+- Entry description improved: `Inventory adjustment: {name} (+3 units)` / `(-1 units)` for readability
+- Amount = `delta × product.cost`; surplus (positive delta) is a positive amount; shortage is negative
+- **Reports — By Item tab**: an `Inv. Adjustment` stat tile appears when the period has non-zero adjustments (green for surplus, red for loss)
+- **Reports — Range tab**: each day row shows `adj ±$X.XX` sub-line when that day has adjustments
+- `GET /api/reports/daily-total` now always returns `inventory_adjustment_total`; `GET /api/reports/daily-range` now includes `adjustment` per day entry
+- BDD: 3 new inventory adjustment scenarios (account, loss amount, gain amount); 1 new reports scenario (`inventory_adjustment_total` field present)
+
 #### Restock and inventory adjustment hide inactive and supply-based products
 - **Restock view**: inactive products no longer appear in the Products section; the existing supply-based filter now also excludes inactive products (`active !== false && !uses_supplies`)
 - **Inventory adjustment view**: supply-based products are now excluded on the frontend (previously only rejected by the backend); inactive products are also hidden — both filters applied at load time and after each adjustment refresh

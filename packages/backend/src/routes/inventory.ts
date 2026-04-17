@@ -26,8 +26,8 @@ router.post('/adjust', requireOpenRegister, async (req, res) => {
         [sessionId, adj.product_id, product.units, adj.physical_count, delta]
       );
       await client.query(
-        "INSERT INTO ledger_entries (entry_type, account, amount, description, ref_id, ref_type) VALUES ('adjustment', NULL, $1, $2, $3, 'adjustment')",
-        [delta * product.cost, `Inventory adjustment for ${product.name} (delta: ${delta})`, adjRow.id]
+        "INSERT INTO ledger_entries (entry_type, account, amount, description, ref_id, ref_type) VALUES ('adjustment', 'inventory_adjustment', $1, $2, $3, 'adjustment')",
+        [delta * product.cost, `Inventory adjustment: ${product.name} (${delta > 0 ? '+' : ''}${delta} units)`, adjRow.id]
       );
       results.push({ product_id: adj.product_id, name: product.name, previous_units: product.units, physical_count: adj.physical_count, delta, new_units: adj.physical_count });
     }

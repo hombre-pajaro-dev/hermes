@@ -80,6 +80,12 @@ router.get('/daily-total', async (req, res) => {
         WHERE t.status = 'paid' AND (t.paid_at AT TIME ZONE $3)::date BETWEEN $1::date AND $2::date
     ) costs
   `, [from, to, tz]);
+  const { rows: [adjRow] } = await db.query(`
+    SELECT COALESCE(SUM(amount), 0) as inventory_adjustment_total
+    FROM ledger_entries
+    WHERE account = 'inventory_adjustment'
+      AND (created_at AT TIME ZONE $3)::date BETWEEN $1::date AND $2::date
+  `, [from, to, tz]);
   res.json({
     date: from === to ? from : `${from}/${to}`,
     order_count: totals.order_count,
@@ -87,6 +93,7 @@ router.get('/daily-total', async (req, res) => {
     cash_sales: Number(totals.cash_sales),
     card_sales: Number(totals.card_sales),
     total_cost: Number(costRow.total_cost),
+    inventory_adjustment_total: Number(adjRow.inventory_adjustment_total),
   });
 });
 
@@ -184,10 +191,48 @@ router.get('/daily-range', async (req, res) => {
       FROM order_items oi JOIN orders o ON o.id = oi.order_id
       WHERE o.status = 'paid' AND (o.paid_at AT TIME ZONE $2)::date = $1::date
     `, [dateStr, tz]);
-    days.push({ date: dateStr, revenue: Number(row.revenue), cost: Number(costRow.cost), order_count: row.order_count });
+    const { rows: [adjRow] } = await db.query(`
+      SELECT COALESCE(SUM(amount), 0) as adjustment
+      FROM ledger_entries
+      WHERE account = 'inventory_adjustment'
+        AND (created_at AT TIME ZONE $2)::date = $1::date
+    `, [dateStr, tz]);
+    days.push({ date: dateStr, revenue: Number(row.revenue), cost: Number(costRow.cost), order_count: row.order_count, adjustment: Number(adjRow.adjustment) });
     current.setDate(current.getDate() + 1);
   }
   res.json(days);
+});
+
+router.get('/inventory-adjustments', async (req, res) => {
+  const tz = (req.query.tz as string) || 'America/Monterrey';
+  const todayLocal = new Date().toLocaleDateString('en-CA', { timeZone: tz });
+  const fallback = (req.query.date as string) || todayLocal;
+  const from = (req.query.from as string) || fallback;
+  const to = (req.query.to as string) || fallback;
+  const db = await getDb();
+  const { rows } = await db.query<{
+    product_id: number; name: string;
+    adjustment_count: number; total_delta: number; total_cost_impact: number;
+  }>(`
+    SELECT p.id as product_id, p.name,
+           COUNT(*)::int as adjustment_count,
+           SUM(ia.delta) as total_delta,
+           SUM(le.amount) as total_cost_impact
+    FROM ledger_entries le
+    JOIN inventory_adjustments ia ON ia.id = le.ref_id
+    JOIN products p ON p.id = ia.product_id
+    WHERE le.account = 'inventory_adjustment'
+      AND (le.created_at AT TIME ZONE $3)::date BETWEEN $1::date AND $2::date
+    GROUP BY p.id, p.name
+    ORDER BY ABS(SUM(le.amount)) DESC
+  `, [from, to, tz]);
+  res.json(rows.map(r => ({
+    product_id: r.product_id,
+    name: r.name,
+    adjustment_count: r.adjustment_count,
+    total_delta: Number(r.total_delta),
+    total_cost_impact: Number(r.total_cost_impact),
+  })));
 });
 
 export default router;

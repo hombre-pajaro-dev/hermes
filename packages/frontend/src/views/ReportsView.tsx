@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { api } from '../api/client';
-import type { SalesByItem, DailyTotal, DailyRange, CloseBrief } from '../api/client';
+import type { SalesByItem, DailyTotal, DailyRange, CloseBrief, InventoryAdjustmentItem } from '../api/client';
 
 const localTz = Intl.DateTimeFormat().resolvedOptions().timeZone;
 const today = () => new Date().toLocaleDateString('en-CA', { timeZone: localTz });
@@ -11,6 +11,7 @@ export default function ReportsView() {
   const [salesTo, setSalesTo] = useState(today());
   const [salesByItem, setSalesByItem] = useState<SalesByItem[]>([]);
   const [dailyTotal, setDailyTotal] = useState<DailyTotal | null>(null);
+  const [adjItems, setAdjItems] = useState<InventoryAdjustmentItem[]>([]);
   const [dailyRange, setDailyRange] = useState<DailyRange[]>([]);
   const [closeBrief, setCloseBrief] = useState<CloseBrief | null>(null);
   const [rangeFrom, setRangeFrom] = useState(today());
@@ -21,12 +22,14 @@ export default function ReportsView() {
   async function fetchSales() {
     setLoading(true); setError('');
     try {
-      const [items, totals] = await Promise.all([
+      const [items, totals, adjs] = await Promise.all([
         api.getSalesByItem(salesFrom, salesTo, localTz),
         api.getDailyTotal(salesFrom, salesTo, localTz),
+        api.getInventoryAdjustmentReport(salesFrom, salesTo, localTz),
       ]);
       setSalesByItem(items);
       setDailyTotal(totals);
+      setAdjItems(adjs);
     } catch (e: unknown) { setError((e as Error).message); }
     finally { setLoading(false); }
   }
@@ -74,6 +77,36 @@ export default function ReportsView() {
                   <div className="stat"><div className="stat__label">Card</div><div className="stat__value" data-testid="card-sales">${Number(dailyTotal.card_sales ?? 0).toFixed(2)}</div></div>
                   <div className="stat"><div className="stat__label">Cost</div><div className="stat__value">${dailyTotal.total_cost.toFixed(2)}</div></div>
                   <div className="stat"><div className="stat__label">Profit</div><div className="stat__value">${(dailyTotal.total_sales - dailyTotal.total_cost).toFixed(2)}</div></div>
+                  {dailyTotal.inventory_adjustment_total != null && dailyTotal.inventory_adjustment_total !== 0 && (
+                    <div className="stat">
+                      <div className="stat__label">Inv. Adjustment</div>
+                      <div className="stat__value" style={{ color: dailyTotal.inventory_adjustment_total >= 0 ? 'var(--success)' : 'var(--danger)' }}>
+                        {dailyTotal.inventory_adjustment_total >= 0 ? '+' : ''}${dailyTotal.inventory_adjustment_total.toFixed(2)}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+              {adjItems.length > 0 && (
+                <div className="card" data-testid="inventory-adjustment-report" style={{ marginBottom: 12 }}>
+                  <div className="card__title">Inventory Adjustments</div>
+                  {adjItems.map(a => (
+                    <div className="list-item" key={a.product_id} data-testid="adj-item-row">
+                      <div className="list-item__main">
+                        <div className="list-item__name" data-testid="adj-item-name">{a.name}</div>
+                        <div className="list-item__sub">{a.adjustment_count} adjustment{a.adjustment_count !== 1 ? 's' : ''} · net {a.total_delta > 0 ? '+' : ''}{a.total_delta} units</div>
+                      </div>
+                      <div className="list-item__right" style={{ color: a.total_cost_impact >= 0 ? 'var(--success)' : 'var(--danger)', fontWeight: 700 }} data-testid="adj-item-cost">
+                        {a.total_cost_impact >= 0 ? '+' : ''}${a.total_cost_impact.toFixed(2)}
+                      </div>
+                    </div>
+                  ))}
+                  <div className="list-item" style={{ borderTop: '1px solid var(--border)', marginTop: 4, paddingTop: 8 }}>
+                    <div className="list-item__name" style={{ fontWeight: 600 }}>Total impact</div>
+                    <div className="list-item__right" style={{ fontWeight: 700, color: adjItems.reduce((s, a) => s + a.total_cost_impact, 0) >= 0 ? 'var(--success)' : 'var(--danger)' }} data-testid="adj-total-cost">
+                      {adjItems.reduce((s, a) => s + a.total_cost_impact, 0) >= 0 ? '+' : ''}${adjItems.reduce((s, a) => s + a.total_cost_impact, 0).toFixed(2)}
+                    </div>
+                  </div>
                 </div>
               )}
               <div className="card" data-testid="sales-by-item">
@@ -110,6 +143,11 @@ export default function ReportsView() {
                 <div className="list-item__main">
                   <div className="list-item__name" data-testid="range-date">{d.date}</div>
                   <div className="list-item__sub">{d.order_count} orders</div>
+                  {d.adjustment != null && d.adjustment !== 0 && (
+                    <div className="list-item__sub" style={{ color: d.adjustment >= 0 ? 'var(--success)' : 'var(--danger)' }}>
+                      adj {d.adjustment >= 0 ? '+' : ''}${d.adjustment.toFixed(2)}
+                    </div>
+                  )}
                 </div>
                 <div className="list-item__right">
                   <div style={{ fontWeight: 700 }}>${d.revenue.toFixed(2)}</div>

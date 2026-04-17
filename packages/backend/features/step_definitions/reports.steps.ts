@@ -53,6 +53,38 @@ When('I fetch the daily total for range today to today', async function (this: P
   this.response = await this.agent.get(`/api/reports/daily-total?from=${today}&to=${today}&tz=UTC`);
 });
 
+Then('the daily total response has inventory_adjustment_total field', function (this: PosWorld) {
+  const body = this.response.body as { inventory_adjustment_total: number };
+  expect(body).to.have.property('inventory_adjustment_total');
+  expect(typeof body.inventory_adjustment_total).to.equal('number');
+});
+
+When('I submit an inventory adjustment via reports context', async function (this: PosWorld, table: DataTable) {
+  const rows = table.hashes() as { product_name: string; physical_count: string }[];
+  const adjustments = await Promise.all(rows.map(async r => {
+    const res = await this.agent.get(`/api/products?name=${encodeURIComponent(r.product_name)}`);
+    return { product_id: (res.body as { id: number }).id, physical_count: Number(r.physical_count) };
+  }));
+  await this.agent.post('/api/inventory/adjust').send({ adjustments });
+});
+
+When('I fetch the inventory adjustment report for today', async function (this: PosWorld) {
+  const today = new Date().toISOString().slice(0, 10);
+  this.response = await this.agent.get(`/api/reports/inventory-adjustments?from=${today}&to=${today}&tz=UTC`);
+});
+
+Then('the inventory adjustment report includes {string}', function (this: PosWorld, name: string) {
+  const rows = this.response.body as { name: string }[];
+  expect(rows.some(r => r.name === name), `Expected "${name}" in adjustment report`).to.be.true;
+});
+
+Then('the {string} adjustment has a non-zero cost impact', function (this: PosWorld, name: string) {
+  const rows = this.response.body as { name: string; total_cost_impact: number }[];
+  const row = rows.find(r => r.name === name);
+  expect(row, `Expected "${name}" in adjustment report`).to.exist;
+  expect(row!.total_cost_impact).to.not.equal(0);
+});
+
 Then('the report includes {string} with units_sold {int}', function (this: PosWorld, name: string, units: number) {
   const report = this.response.body as { name: string; units_sold: number }[];
   const item = report.find(r => r.name === name);

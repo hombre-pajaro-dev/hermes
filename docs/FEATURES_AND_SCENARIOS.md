@@ -101,6 +101,11 @@ This document lists all **features** and **scenarios** covered by the BDD test s
 | 7 | Sales by item report respects explicit timezone parameter | Pass `tz=America/Monterrey` with today's local date; report returns array without error. |
 | 8 | By Item report shows daily summary alongside items | On the Reports page (By Item tab); daily-total stats grid visible; sales-by-item list visible. |
 | 9 | Daily summary shows cash and card breakdown | On the Reports page; cash-sales and card-sales stats visible without switching tabs. |
+| 10 | Daily total includes inventory_adjustment_total field | `daily-total` response always includes `inventory_adjustment_total` (number); reflects net cost impact of adjustments for the period. |
+| 11 | Daily range includes adjustment per day | Each entry in `daily-range` includes an `adjustment` field; non-zero days show `adj ±$X.XX` in the Range view. |
+| 12 | Inventory adjustment report shows per-product breakdown | After a shortage adjustment; `GET /api/reports/inventory-adjustments` returns the product with its `adjustment_count`, `total_delta`, and non-zero `total_cost_impact`. |
+
+**Inventory Adjustments card (By Item tab):** When any adjustments exist in the selected period, a card appears above the sales list showing each affected product with adjustment count, net unit delta, and cost impact (green = surplus, red = loss), plus a total impact row.
 
 ---
 
@@ -124,11 +129,16 @@ This document lists all **features** and **scenarios** covered by the BDD test s
 
 > Inventory adjustments apply to **active, unit-based products only**. Supply-based products have computed stock derived from their supplies; adjust the supplies directly instead. **Inactive products** are hidden from the adjustment form — they do not appear in the physical count list.
 
+**Accounting:** Each adjustment posts a ledger entry to the `inventory_adjustment` account. Amount = `delta × product.cost`. Surplus (positive delta) = positive amount; shortage (negative delta) = negative amount. The account balance and daily totals reflect the cumulative cost impact of all adjustments.
+
 | # | Scenario | Description |
 |---|----------|-------------|
 | 1 | Adjust inventory to match physical count (loss) | Set physical count below current; adjustment applied; product units updated; ledger has adjustment with loss. |
 | 2 | Adjust inventory (increase – no loss) | Set physical count above current; adjustment applied; product units updated. |
 | 3 | Cannot adjust when register is closed | Register closed; adjustment is rejected. |
+| 4 | Adjustment is posted to the inventory_adjustment account | After a shortage adjustment; ledger has an `adjustment` entry with `account = inventory_adjustment`. |
+| 5 | Shortage adjustment posts negative amount at cost price | Physical count below system count; adjustment entry amount is negative. |
+| 6 | Surplus adjustment posts positive amount at cost price | Physical count above system count; adjustment entry amount is positive. |
 
 ---
 
