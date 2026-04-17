@@ -61,9 +61,9 @@ export const api = {
     req<LedgerEntry>('/ledger/payroll', { method: 'POST', body: JSON.stringify({ amount, account, description }) }),
 
   // Reports
-  getSalesByItem: (date: string) => req<SalesByItem[]>(`/reports/sales-by-item?date=${date}`),
-  getDailyTotal: (date: string) => req<DailyTotal>(`/reports/daily-total?date=${date}`),
-  getDailyRange: (from: string, to: string) => req<DailyRange[]>(`/reports/daily-range?from=${from}&to=${to}`),
+  getSalesByItem: (date: string, tz: string) => req<SalesByItem[]>(`/reports/sales-by-item?date=${date}&tz=${encodeURIComponent(tz)}`),
+  getDailyTotal: (date: string, tz: string) => req<DailyTotal>(`/reports/daily-total?date=${date}&tz=${encodeURIComponent(tz)}`),
+  getDailyRange: (from: string, to: string, tz: string) => req<DailyRange[]>(`/reports/daily-range?from=${from}&to=${to}&tz=${encodeURIComponent(tz)}`),
   getCloseBriefReport: (session_id?: number) => req<CloseBrief>(`/reports/close-brief${session_id ? `?session_id=${session_id}` : ''}`),
   getTopProducts: () => req<TopProduct[]>('/reports/top-products'),
 

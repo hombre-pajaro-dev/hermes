@@ -4,7 +4,8 @@ import { getDb } from '../db/database.js';
 const router = Router();
 
 router.get('/sales-by-item', async (req, res) => {
-  const date = (req.query.date as string) || new Date().toISOString().slice(0, 10);
+  const tz = (req.query.tz as string) || 'America/Monterrey';
+  const date = (req.query.date as string) || new Date().toLocaleDateString('en-CA', { timeZone: tz });
   const db = await getDb();
   const { rows } = await db.query<{ product_id: number; name: string; units_sold: number; revenue: number; cost: number }>(`
     SELECT p.id as product_id, p.name,
@@ -14,7 +15,7 @@ router.get('/sales-by-item', async (req, res) => {
     FROM order_items oi
     JOIN orders o ON o.id = oi.order_id
     JOIN products p ON p.id = oi.product_id
-    WHERE o.status = 'paid' AND o.paid_at::date = $1::date
+    WHERE o.status = 'paid' AND (o.paid_at AT TIME ZONE $2)::date = $1::date
     GROUP BY p.id, p.name
     UNION ALL
     SELECT p.id, p.name,
@@ -24,9 +25,9 @@ router.get('/sales-by-item', async (req, res) => {
     FROM tab_items ti
     JOIN tabs t ON t.id = ti.tab_id
     JOIN products p ON p.id = ti.product_id
-    WHERE t.status = 'paid' AND t.paid_at::date = $1::date
+    WHERE t.status = 'paid' AND (t.paid_at AT TIME ZONE $2)::date = $1::date
     GROUP BY p.id, p.name
-  `, [date]);
+  `, [date, tz]);
 
   const merged = new Map<number, { product_id: number; name: string; units_sold: number; revenue: number; cost: number }>();
   for (const row of rows) {
@@ -43,7 +44,8 @@ router.get('/sales-by-item', async (req, res) => {
 });
 
 router.get('/daily-total', async (req, res) => {
-  const date = (req.query.date as string) || new Date().toISOString().slice(0, 10);
+  const tz = (req.query.tz as string) || 'America/Monterrey';
+  const date = (req.query.date as string) || new Date().toLocaleDateString('en-CA', { timeZone: tz });
   const db = await getDb();
   const { rows: [orders] } = await db.query(`
     SELECT
@@ -51,14 +53,14 @@ router.get('/daily-total', async (req, res) => {
       COALESCE(SUM(total), 0) as total_sales,
       COALESCE(SUM(CASE WHEN payment_method = 'cash' THEN total ELSE 0 END), 0) as cash_sales,
       COALESCE(SUM(CASE WHEN payment_method = 'card' THEN total ELSE 0 END), 0) as card_sales
-    FROM orders WHERE status = 'paid' AND paid_at::date = $1::date
-  `, [date]);
+    FROM orders WHERE status = 'paid' AND (paid_at AT TIME ZONE $2)::date = $1::date
+  `, [date, tz]);
   const { rows: [costRow] } = await db.query(`
     SELECT COALESCE(SUM(oi.quantity * oi.unit_cost), 0) as total_cost
     FROM order_items oi
     JOIN orders o ON o.id = oi.order_id
-    WHERE o.status = 'paid' AND o.paid_at::date = $1::date
-  `, [date]);
+    WHERE o.status = 'paid' AND (o.paid_at AT TIME ZONE $2)::date = $1::date
+  `, [date, tz]);
   res.json({
     date,
     order_count: orders.order_count,
@@ -145,23 +147,24 @@ router.get('/top-products', async (_req, res) => {
 });
 
 router.get('/daily-range', async (req, res) => {
-  const from = (req.query.from as string) || new Date().toISOString().slice(0, 10);
-  const to = (req.query.to as string) || new Date().toISOString().slice(0, 10);
+  const tz = (req.query.tz as string) || 'America/Monterrey';
+  const from = (req.query.from as string) || new Date().toLocaleDateString('en-CA', { timeZone: tz });
+  const to = (req.query.to as string) || new Date().toLocaleDateString('en-CA', { timeZone: tz });
   const db = await getDb();
   const days: { date: string; revenue: number; cost: number; order_count: number }[] = [];
-  const current = new Date(from);
-  const end = new Date(to);
+  const current = new Date(`${from}T12:00:00`);
+  const end = new Date(`${to}T12:00:00`);
   while (current <= end) {
     const dateStr = current.toISOString().slice(0, 10);
     const { rows: [row] } = await db.query(
-      "SELECT COUNT(*)::int as order_count, COALESCE(SUM(total), 0) as revenue FROM orders WHERE status = 'paid' AND paid_at::date = $1::date",
-      [dateStr]
+      "SELECT COUNT(*)::int as order_count, COALESCE(SUM(total), 0) as revenue FROM orders WHERE status = 'paid' AND (paid_at AT TIME ZONE $2)::date = $1::date",
+      [dateStr, tz]
     );
     const { rows: [costRow] } = await db.query(`
       SELECT COALESCE(SUM(oi.quantity * oi.unit_cost), 0) as cost
       FROM order_items oi JOIN orders o ON o.id = oi.order_id
-      WHERE o.status = 'paid' AND o.paid_at::date = $1::date
-    `, [dateStr]);
+      WHERE o.status = 'paid' AND (o.paid_at AT TIME ZONE $2)::date = $1::date
+    `, [dateStr, tz]);
     days.push({ date: dateStr, revenue: Number(row.revenue), cost: Number(costRow.cost), order_count: row.order_count });
     current.setDate(current.getDate() + 1);
   }

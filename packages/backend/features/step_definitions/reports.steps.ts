@@ -22,16 +22,16 @@ Given('I have sold items', async function (this: PosWorld, table: DataTable) {
 
 When('I fetch the sales by item report for today', async function (this: PosWorld) {
   const today = new Date().toISOString().slice(0, 10);
-  this.response = await this.agent.get(`/api/reports/sales-by-item?date=${today}`);
+  this.response = await this.agent.get(`/api/reports/sales-by-item?date=${today}&tz=UTC`);
 });
 
 When('I fetch the sales by item report for {string}', async function (this: PosWorld, date: string) {
-  this.response = await this.agent.get(`/api/reports/sales-by-item?date=${date}`);
+  this.response = await this.agent.get(`/api/reports/sales-by-item?date=${date}&tz=UTC`);
 });
 
 When('I fetch the daily total report for today', async function (this: PosWorld) {
   const today = new Date().toISOString().slice(0, 10);
-  this.response = await this.agent.get(`/api/reports/daily-total?date=${today}`);
+  this.response = await this.agent.get(`/api/reports/daily-total?date=${today}&tz=UTC`);
 });
 
 When('I fetch the close brief', async function (this: PosWorld) {
@@ -40,7 +40,12 @@ When('I fetch the close brief', async function (this: PosWorld) {
 
 When('I fetch the daily range from today to today', async function (this: PosWorld) {
   const today = new Date().toISOString().slice(0, 10);
-  this.response = await this.agent.get(`/api/reports/daily-range?from=${today}&to=${today}`);
+  this.response = await this.agent.get(`/api/reports/daily-range?from=${today}&to=${today}&tz=UTC`);
+});
+
+When('I fetch the sales by item report for today with tz {string}', async function (this: PosWorld, tz: string) {
+  const today = new Date().toLocaleDateString('en-CA', { timeZone: tz });
+  this.response = await this.agent.get(`/api/reports/sales-by-item?date=${today}&tz=${encodeURIComponent(tz)}`);
 });
 
 Then('the report includes {string} with units_sold {int}', function (this: PosWorld, name: string, units: number) {

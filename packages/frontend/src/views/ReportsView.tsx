@@ -2,7 +2,8 @@ import { useEffect, useState } from 'react';
 import { api } from '../api/client';
 import type { SalesByItem, DailyTotal, DailyRange, CloseBrief } from '../api/client';
 
-const today = () => new Date().toISOString().slice(0, 10);
+const localTz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+const today = () => new Date().toLocaleDateString('en-CA', { timeZone: localTz });
 
 export default function ReportsView() {
   const [tab, setTab] = useState<'sales' | 'daily' | 'range' | 'brief'>('sales');
@@ -18,21 +19,21 @@ export default function ReportsView() {
 
   async function fetchSales() {
     setLoading(true); setError('');
-    try { setSalesByItem(await api.getSalesByItem(date)); }
+    try { setSalesByItem(await api.getSalesByItem(date, localTz)); }
     catch (e: unknown) { setError((e as Error).message); }
     finally { setLoading(false); }
   }
 
   async function fetchDaily() {
     setLoading(true); setError('');
-    try { setDailyTotal(await api.getDailyTotal(date)); }
+    try { setDailyTotal(await api.getDailyTotal(date, localTz)); }
     catch (e: unknown) { setError((e as Error).message); }
     finally { setLoading(false); }
   }
 
   async function fetchRange() {
     setLoading(true); setError('');
-    try { setDailyRange(await api.getDailyRange(rangeFrom, rangeTo)); }
+    try { setDailyRange(await api.getDailyRange(rangeFrom, rangeTo, localTz)); }
     catch (e: unknown) { setError((e as Error).message); }
     finally { setLoading(false); }
   }

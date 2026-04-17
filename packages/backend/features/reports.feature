@@ -41,3 +41,7 @@ Feature: Reports
   Scenario: Filter reports by date
     When I fetch the sales by item report for "2020-01-01"
     Then the response is an array
+
+  Scenario: Sales by item report respects explicit timezone parameter
+    When I fetch the sales by item report for today with tz "America/Monterrey"
+    Then the response is an array

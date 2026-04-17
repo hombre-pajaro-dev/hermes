@@ -92,6 +92,9 @@ This document lists all **features** and **scenarios** covered by the BDD test s
 | 4 | Daily range report for chart | Request daily range from today to today; response has at least one day with date, revenue, cost, order_count. |
 | 5 | Filter reports by date | Sales by item for a specific date; returns array without error. |
 | 6 | Top products by all-time units sold | `GET /api/reports/top-products` returns all products with `units_sold` aggregated from all paid orders and tabs, sorted descending; products with no sales appear with `units_sold: 0`. |
+| 7 | Sales by item report respects explicit timezone parameter | Pass `tz=America/Monterrey` with today's local date; report returns array without error. |
+
+**Timezone support:** All date-filtered report endpoints (`sales-by-item`, `daily-total`, `daily-range`) accept an optional `tz` query parameter (IANA timezone name). The backend converts `paid_at` timestamps to the requested timezone before extracting the date, so orders are grouped under the correct local calendar day. Default timezone: `America/Monterrey`. The frontend passes the browser's `Intl` timezone automatically and computes "today" in local time.
 
 ---
 

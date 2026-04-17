@@ -49,6 +49,15 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 - Audit trail: every applied discount is recorded in `applied_discounts` with a name snapshot (survives discount edits/deletions) and the `redemptions` counter is incremented atomically
 - `GET/POST/PATCH/DELETE /api/discounts` endpoints; discount CRUD in Admin; product multi-select for qualifying items
 
+#### Timezone-aware daily reports
+- All date-filtered report endpoints (`sales-by-item`, `daily-total`, `daily-range`) now accept a `tz` query parameter (IANA timezone name, e.g. `America/Monterrey`)
+- Backend uses PostgreSQL `AT TIME ZONE` to convert `paid_at` timestamps before extracting the calendar date — orders are no longer misattributed to the wrong day when the server runs in UTC
+- Default timezone: `America/Monterrey`; prior behaviour (UTC cast) is preserved when `tz=UTC` is passed
+- Frontend detects the browser timezone via `Intl.DateTimeFormat().resolvedOptions().timeZone` and passes it with every report request
+- `today()` helper in ReportsView now uses `toLocaleDateString('en-CA', { timeZone })` so the default date is always the local calendar date, not UTC midnight
+- `daily-range` loop seeds dates at `T12:00:00` to avoid DST boundary edge cases when iterating with `setDate()`
+- BDD: existing test steps updated to pass `tz=UTC` for deterministic results; new scenario "Sales by item report respects explicit timezone parameter"
+
 #### Discount applied shown in ledger entries
 - When an order or tab payment had a discount applied, the ledger entry now surfaces the discount name and amount saved
 - `GET /api/ledger` now LEFT JOINs `applied_discounts` and returns `discount_name` and `discount_amount` on each entry (null when no discount)
