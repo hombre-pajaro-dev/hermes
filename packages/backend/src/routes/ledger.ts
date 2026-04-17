@@ -5,7 +5,17 @@ const router = Router();
 
 router.get('/', async (_req, res) => {
   const db = await getDb();
-  const { rows } = await db.query('SELECT * FROM ledger_entries ORDER BY created_at DESC, id DESC');
+  const { rows } = await db.query(`
+    SELECT le.*,
+           ad.snapshot_name AS discount_name,
+           ad.amount        AS discount_amount
+    FROM ledger_entries le
+    LEFT JOIN applied_discounts ad ON (
+      (le.ref_type = 'order' AND ad.order_id = le.ref_id) OR
+      (le.ref_type = 'tab'   AND ad.tab_id   = le.ref_id)
+    )
+    ORDER BY le.created_at DESC, le.id DESC
+  `);
   res.json(rows);
 });
 

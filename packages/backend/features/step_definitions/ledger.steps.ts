@@ -111,3 +111,17 @@ Then('the tab payment items include {string} with quantity {int}', function (thi
   expect(item, `Expected item '${name}'`).to.exist;
   expect(item!.quantity).to.equal(qty);
 });
+
+Then('the sale ledger entry has discount_name {string}', function (this: PosWorld, name: string) {
+  const entries = this.response.body as { entry_type: string; discount_name?: string }[];
+  const sale = entries.find(e => e.entry_type === 'sale');
+  expect(sale, 'Expected a sale entry').to.exist;
+  expect(sale!.discount_name).to.equal(name);
+});
+
+Then('the sale ledger entry discount_amount is greater than 0', function (this: PosWorld) {
+  const entries = this.response.body as { entry_type: string; discount_amount?: number }[];
+  const sale = entries.find(e => e.entry_type === 'sale');
+  expect(sale, 'Expected a sale entry').to.exist;
+  expect(sale!.discount_amount).to.be.greaterThan(0);
+});

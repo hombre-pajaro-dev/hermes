@@ -102,6 +102,11 @@ export default function LedgerView() {
                       )}
                     </div>
                     <div className="list-item__sub">{e.description}</div>
+                    {e.discount_name && e.discount_amount != null && (
+                      <div className="list-item__sub" style={{ color: 'var(--warning, #d97706)' }}>
+                        🏷 {e.discount_name} −${e.discount_amount.toFixed(2)}
+                      </div>
+                    )}
                     <div className="list-item__sub">{e.created_at.slice(0, 16).replace('T', ' ')}</div>
                   </div>
                   <div className="list-item__right">
@@ -136,6 +141,16 @@ export default function LedgerView() {
                               <td style={{ padding: '2px 0', textAlign: 'right', fontWeight: 600 }}>${item.subtotal.toFixed(2)}</td>
                             </tr>
                           ))}
+                          {e.discount_name && e.discount_amount != null && (
+                            <tr>
+                              <td colSpan={3} style={{ padding: '4px 0 2px', color: 'var(--warning, #d97706)', borderTop: '1px solid var(--border)' }}>
+                                🏷 {e.discount_name}
+                              </td>
+                              <td style={{ padding: '4px 0 2px', textAlign: 'right', color: 'var(--warning, #d97706)', borderTop: '1px solid var(--border)', fontWeight: 600 }}>
+                                −${e.discount_amount.toFixed(2)}
+                              </td>
+                            </tr>
+                          )}
                         </tbody>
                       </table>
                     ) : (

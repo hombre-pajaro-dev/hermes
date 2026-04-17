@@ -49,6 +49,13 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 - Audit trail: every applied discount is recorded in `applied_discounts` with a name snapshot (survives discount edits/deletions) and the `redemptions` counter is incremented atomically
 - `GET/POST/PATCH/DELETE /api/discounts` endpoints; discount CRUD in Admin; product multi-select for qualifying items
 
+#### Discount applied shown in ledger entries
+- When an order or tab payment had a discount applied, the ledger entry now surfaces the discount name and amount saved
+- `GET /api/ledger` now LEFT JOINs `applied_discounts` and returns `discount_name` and `discount_amount` on each entry (null when no discount)
+- In the Entries tab: a `🏷 Name −$X.XX` line (amber) appears below the description on any entry where a discount was used
+- When expanding an entry, the same discount appears as a footer row in the items table, separated by a divider line
+- BDD: new backend scenario "Ledger entry includes discount info when a discount was applied" verifying `discount_name` and `discount_amount` fields on the sale entry
+
 ### Fixed
 
 #### Mobile layout — ProductsView controls and ProductPicker filter bar

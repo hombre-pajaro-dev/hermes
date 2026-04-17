@@ -65,3 +65,13 @@ Feature: General Ledger and Accounts
     And I fetch the ledger
     Then the tab_payment ledger entry has items
     And the tab payment items include "Latte" with quantity 1
+
+  Scenario: Ledger entry includes discount info when a discount was applied
+    Given a 20% discount named "Happy Hour" exists
+    When I create an order with items
+      | product_name | quantity |
+      | Espresso     | 2        |
+    And I pay the order with card and discount "Happy Hour"
+    And I fetch the ledger
+    Then the sale ledger entry has discount_name "Happy Hour"
+    And the sale ledger entry discount_amount is greater than 0

@@ -76,6 +76,7 @@ This document lists all **features** and **scenarios** covered by the BDD test s
 | 5 | List accounts | Fetch accounts; list includes cash and credit_card. |
 | 6 | View items for a sale ledger entry | After a card order; fetch ledger; `GET /ledger/:id/items` on the sale entry returns items with correct product name and quantity. |
 | 7 | View items for a tab payment ledger entry | After a paid tab; fetch ledger; `GET /ledger/:id/items` on the tab_payment entry returns items with correct product name and quantity. |
+| 8 | Ledger entry includes discount info when a discount was applied | After paying an order with a discount; fetch ledger; the sale entry includes `discount_name` matching the discount and a `discount_amount` greater than zero. |
 
 ---
 
