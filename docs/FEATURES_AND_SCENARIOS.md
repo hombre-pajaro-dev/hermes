@@ -108,7 +108,7 @@ This document lists all **features** and **scenarios** covered by the BDD test s
 
 **Feature:** As an employee, I want to insert a restock order to increase product units and restock supplies so that inventory reflects new stock.
 
-> **Unit-based products** (no supply ingredients) are restocked directly via the Products section. **Supply-based products** cannot be directly restocked — their available units are computed from supplies. Use the Supplies section to restock the underlying supplies instead.
+> **Unit-based products** (no supply ingredients) are restocked directly via the Products section. **Supply-based products** cannot be directly restocked — their available units are computed from supplies. Use the Supplies section to restock the underlying supplies instead. **Inactive products** are hidden from the restock form.
 
 | # | Scenario | Description |
 |---|----------|-------------|
@@ -122,7 +122,7 @@ This document lists all **features** and **scenarios** covered by the BDD test s
 
 **Feature:** As an admin employee, I want to set physical count per product to match actual inventory so that discrepancies are recorded and losses appear on the ledger.
 
-> Inventory adjustments apply to **unit-based products only**. Supply-based products have computed stock derived from their supplies; adjust the supplies directly instead.
+> Inventory adjustments apply to **active, unit-based products only**. Supply-based products have computed stock derived from their supplies; adjust the supplies directly instead. **Inactive products** are hidden from the adjustment form — they do not appear in the physical count list.
 
 | # | Scenario | Description |
 |---|----------|-------------|

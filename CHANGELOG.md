@@ -49,6 +49,11 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 - Audit trail: every applied discount is recorded in `applied_discounts` with a name snapshot (survives discount edits/deletions) and the `redemptions` counter is incremented atomically
 - `GET/POST/PATCH/DELETE /api/discounts` endpoints; discount CRUD in Admin; product multi-select for qualifying items
 
+#### Restock and inventory adjustment hide inactive and supply-based products
+- **Restock view**: inactive products no longer appear in the Products section; the existing supply-based filter now also excludes inactive products (`active !== false && !uses_supplies`)
+- **Inventory adjustment view**: supply-based products are now excluded on the frontend (previously only rejected by the backend); inactive products are also hidden — both filters applied at load time and after each adjustment refresh
+- No backend changes required — the backend already rejects supply-based products with a clear error; the frontend now prevents users from even attempting ineligible adjustments
+
 #### By Item report merged with Daily summary
 - The separate **Daily** tab has been removed; the daily summary (Orders, Sales, Cash, Card, Cost, Profit) now appears at the top of the **By Item** tab
 - Both the item breakdown and the summary stats share the same From / To date pickers and re-fetch together automatically when either date changes

@@ -18,7 +18,7 @@ export default function RestockView() {
 
   useEffect(() => { load().catch(() => {}); }, []);
 
-  const unitProducts = products.filter(p => !p.uses_supplies);
+  const unitProducts = products.filter(p => !p.uses_supplies && p.active !== false);
 
   async function handleRestock() {
     setError(''); setSuccess('');

@@ -11,8 +11,9 @@ export default function InventoryView() {
 
   useEffect(() => {
     api.getProducts().then(ps => {
-      setProducts(ps);
-      setCounts(Object.fromEntries(ps.map(p => [p.id, String(p.units)])));
+      const eligible = ps.filter(p => !p.uses_supplies && p.active !== false);
+      setProducts(eligible);
+      setCounts(Object.fromEntries(eligible.map(p => [p.id, String(p.units)])));
     }).catch(() => {});
   }, []);
 
@@ -26,7 +27,7 @@ export default function InventoryView() {
       const res = await api.adjustInventory(adjustments);
       setSuccess('Inventory adjusted');
       setResult(res.adjustments);
-      const updated = await api.getProducts();
+      const updated = (await api.getProducts()).filter(p => !p.uses_supplies && p.active !== false);
       setProducts(updated);
       setCounts(Object.fromEntries(updated.map(p => [p.id, String(p.units)])));
     } catch (e: unknown) { setError((e as Error).message); }
