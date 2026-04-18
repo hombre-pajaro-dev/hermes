@@ -205,7 +205,7 @@ router.post('/:id/pay', async (req, res) => {
 
   const { rows: [updated] } = await db.query(
     "UPDATE tabs SET status = 'paid', payment_method = $1, discount_amount = $2, paid_at = NOW() WHERE id = $3 RETURNING *",
-    [payment_method === 'card' ? 'credit_card' : payment_method, discountAmount, tab.id],
+    [payment_method, discountAmount, tab.id],
   );
   await db.query(
     "INSERT INTO ledger_entries (entry_type, account, amount, description, ref_id, ref_type) VALUES ('tab_payment', $1, $2, $3, $4, 'tab')",

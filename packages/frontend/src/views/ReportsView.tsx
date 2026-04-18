@@ -1,12 +1,13 @@
 import { useEffect, useState } from 'react';
 import { api } from '../api/client';
-import type { SalesByItem, DailyTotal, DailyRange, CloseBrief, InventoryAdjustmentItem } from '../api/client';
+import type { SalesByItem, DailyTotal, DailyRange, CloseBrief, InventoryAdjustmentItem, HistoricReport, WeekdayReport } from '../api/client';
+import ColumnChart from '../components/ColumnChart';
 
 const localTz = Intl.DateTimeFormat().resolvedOptions().timeZone;
 const today = () => new Date().toLocaleDateString('en-CA', { timeZone: localTz });
 
 export default function ReportsView() {
-  const [tab, setTab] = useState<'sales' | 'range' | 'brief'>('sales');
+  const [tab, setTab] = useState<'sales' | 'range' | 'brief' | 'historic' | 'weekday'>('sales');
   const [salesFrom, setSalesFrom] = useState(today());
   const [salesTo, setSalesTo] = useState(today());
   const [salesByItem, setSalesByItem] = useState<SalesByItem[]>([]);
@@ -18,6 +19,9 @@ export default function ReportsView() {
   const [rangeTo, setRangeTo] = useState(today());
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [historicGroupBy, setHistoricGroupBy] = useState<'week' | 'month' | 'day'>('week');
+  const [historicReport, setHistoricReport] = useState<HistoricReport | null>(null);
+  const [weekdayReport, setWeekdayReport] = useState<WeekdayReport | null>(null);
 
   async function fetchSales() {
     setLoading(true); setError('');
@@ -48,9 +52,25 @@ export default function ReportsView() {
     finally { setLoading(false); }
   }
 
+  async function fetchHistoric() {
+    setLoading(true); setError('');
+    try { setHistoricReport(await api.getHistoricReport(historicGroupBy, localTz)); }
+    catch (e: unknown) { setError((e as Error).message); }
+    finally { setLoading(false); }
+  }
+
+  async function fetchWeekday() {
+    setLoading(true); setError('');
+    try { setWeekdayReport(await api.getWeekdayReport(localTz)); }
+    catch (e: unknown) { setError((e as Error).message); }
+    finally { setLoading(false); }
+  }
+
   useEffect(() => { if (tab === 'sales') fetchSales(); }, [tab, salesFrom, salesTo]);
   useEffect(() => { if (tab === 'range') fetchRange(); }, [tab]);
   useEffect(() => { if (tab === 'brief') fetchBrief(); }, [tab]);
+  useEffect(() => { if (tab === 'historic') fetchHistoric(); }, [tab, historicGroupBy]);
+  useEffect(() => { if (tab === 'weekday') fetchWeekday(); }, [tab]);
 
   return (
     <div>
@@ -59,6 +79,8 @@ export default function ReportsView() {
         <button className={`tabs-nav__item${tab === 'sales' ? ' active' : ''}`} onClick={() => setTab('sales')}>By Item</button>
         <button className={`tabs-nav__item${tab === 'range' ? ' active' : ''}`} onClick={() => setTab('range')}>Range</button>
         <button className={`tabs-nav__item${tab === 'brief' ? ' active' : ''}`} onClick={() => setTab('brief')}>Brief</button>
+        <button className={`tabs-nav__item${tab === 'historic' ? ' active' : ''}`} onClick={() => setTab('historic')}>Historic</button>
+        <button className={`tabs-nav__item${tab === 'weekday' ? ' active' : ''}`} onClick={() => setTab('weekday')}>By Weekday</button>
       </div>
 
       {tab === 'sales' && (
@@ -178,6 +200,146 @@ export default function ReportsView() {
               </div>
             </div>
           )}
+        </div>
+      )}
+      {tab === 'historic' && (
+        <div>
+          <div style={{ display: 'flex', gap: 6, marginBottom: 12 }}>
+            {(['week', 'month', 'day'] as const).map(g => (
+              <button
+                key={g}
+                className={`btn btn--sm ${historicGroupBy === g ? 'btn--primary' : 'btn--ghost'}`}
+                onClick={() => setHistoricGroupBy(g)}
+                data-testid={`historic-group-${g}`}
+              >
+                {g === 'week' ? 'Weekly' : g === 'month' ? 'Monthly' : 'Daily'}
+              </button>
+            ))}
+          </div>
+
+          {loading && <div className="spinner">⏳</div>}
+
+          {!loading && historicReport && (() => {
+            const { periods, best_period_index, median_revenue, median_cost, median_profit } = historicReport;
+            const best = periods[best_period_index];
+            const hasData = periods.some(p => p.revenue > 0);
+
+            return (
+              <>
+                {hasData ? (
+                  <div className="card" style={{ padding: '12px 8px 8px' }} data-testid="historic-chart">
+                    <ColumnChart
+                      periods={periods}
+                      groupBy={historicGroupBy}
+                      bestIndex={best_period_index}
+                      medianRevenue={median_revenue}
+                    />
+                  </div>
+                ) : (
+                  <div className="card"><div className="empty">No sales data for this period</div></div>
+                )}
+
+                {hasData && best && (
+                  <div className="card" style={{ marginTop: 10 }} data-testid="historic-best">
+                    <div className="card__title">
+                      ★ Best {historicGroupBy === 'week' ? 'Week' : historicGroupBy === 'month' ? 'Month' : 'Day'} — {best.label}
+                    </div>
+                    <div className="stats" style={{ marginTop: 8 }}>
+                      <div className="stat"><div className="stat__label">Revenue</div><div className="stat__value" data-testid="historic-best-revenue">${best.revenue.toFixed(2)}</div></div>
+                      <div className="stat"><div className="stat__label">Cost</div><div className="stat__value">${best.cost.toFixed(2)}</div></div>
+                      <div className="stat"><div className="stat__label">Profit</div><div className="stat__value">${best.profit.toFixed(2)}</div></div>
+                      <div className="stat"><div className="stat__label">Orders</div><div className="stat__value">{best.order_count}</div></div>
+                    </div>
+                  </div>
+                )}
+
+                {historicGroupBy === 'day' && median_revenue != null && (
+                  <div className="card" style={{ marginTop: 10 }} data-testid="historic-medians">
+                    <div className="card__title">Median (days with sales)</div>
+                    <div className="stats" style={{ marginTop: 8 }}>
+                      <div className="stat"><div className="stat__label">Revenue</div><div className="stat__value" data-testid="historic-median-revenue">${median_revenue.toFixed(2)}</div></div>
+                      <div className="stat"><div className="stat__label">Cost</div><div className="stat__value">${(median_cost ?? 0).toFixed(2)}</div></div>
+                      <div className="stat"><div className="stat__label">Profit</div><div className="stat__value">${(median_profit ?? 0).toFixed(2)}</div></div>
+                    </div>
+                  </div>
+                )}
+              </>
+            );
+          })()}
+        </div>
+      )}
+      {tab === 'weekday' && (
+        <div>
+          {loading && <div className="spinner">⏳</div>}
+          {!loading && weekdayReport && (() => {
+            const { periods, best_index, year } = weekdayReport;
+            const best = periods[best_index];
+            const hasData = periods.some(p => p.median_revenue > 0);
+
+            // Map to HistoricPeriod shape so ColumnChart can render
+            const chartPeriods = periods.map(p => ({
+              label: p.label,
+              period_start: String(p.dow),
+              period_end: String(p.dow),
+              revenue: p.median_revenue,
+              cost: p.median_cost,
+              profit: p.median_profit,
+              order_count: p.sample_days,
+            }));
+
+            return (
+              <>
+                <div style={{ marginBottom: 10, color: 'var(--text-muted)', fontSize: 13 }}>
+                  Median sales by day of week — {year} · based on actual sales days only
+                </div>
+
+                {hasData ? (
+                  <div className="card" style={{ padding: '12px 8px 8px' }} data-testid="weekday-chart">
+                    <ColumnChart
+                      periods={chartPeriods}
+                      groupBy="month"
+                      bestIndex={best_index}
+                      medianRevenue={null}
+                    />
+                  </div>
+                ) : (
+                  <div className="card"><div className="empty">No sales data for {year}</div></div>
+                )}
+
+                {hasData && best && (
+                  <div className="card" style={{ marginTop: 10 }} data-testid="weekday-best">
+                    <div className="card__title">★ Best Day — {best.label}</div>
+                    <div className="stats" style={{ marginTop: 8 }}>
+                      <div className="stat"><div className="stat__label">Med. Revenue</div><div className="stat__value" data-testid="weekday-best-revenue">${best.median_revenue.toFixed(2)}</div></div>
+                      <div className="stat"><div className="stat__label">Med. Cost</div><div className="stat__value">${best.median_cost.toFixed(2)}</div></div>
+                      <div className="stat"><div className="stat__label">Med. Profit</div><div className="stat__value">${best.median_profit.toFixed(2)}</div></div>
+                      <div className="stat"><div className="stat__label">Sample days</div><div className="stat__value">{best.sample_days}</div></div>
+                    </div>
+                  </div>
+                )}
+
+                {hasData && (
+                  <div className="card" style={{ marginTop: 10 }} data-testid="weekday-table">
+                    <div className="card__title">All Days</div>
+                    {periods.map((p, i) => (
+                      <div className="list-item" key={p.dow} style={{ background: i === best_index ? 'var(--surface-hover, rgba(251,191,36,0.06))' : undefined }}>
+                        <div className="list-item__main">
+                          <div className="list-item__name" style={{ fontWeight: i === best_index ? 700 : undefined }}>
+                            {i === best_index ? '★ ' : ''}{p.label}
+                          </div>
+                          <div className="list-item__sub">{p.sample_days} {p.sample_days === 1 ? 'day' : 'days'} of data</div>
+                        </div>
+                        <div className="list-item__right">
+                          <div style={{ fontWeight: 700 }}>${p.median_revenue.toFixed(2)}</div>
+                          <div className="list-item__sub">profit ${p.median_profit.toFixed(2)}</div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </>
+            );
+          })()}
         </div>
       )}
     </div>

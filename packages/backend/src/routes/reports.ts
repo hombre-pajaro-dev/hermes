@@ -177,19 +177,28 @@ router.get('/daily-range', async (req, res) => {
   const from = (req.query.from as string) || new Date().toLocaleDateString('en-CA', { timeZone: tz });
   const to = (req.query.to as string) || new Date().toLocaleDateString('en-CA', { timeZone: tz });
   const db = await getDb();
-  const days: { date: string; revenue: number; cost: number; order_count: number }[] = [];
+  const days: { date: string; revenue: number; cost: number; order_count: number; adjustment?: number }[] = [];
   const current = new Date(`${from}T12:00:00`);
   const end = new Date(`${to}T12:00:00`);
   while (current <= end) {
     const dateStr = current.toISOString().slice(0, 10);
-    const { rows: [row] } = await db.query(
-      "SELECT COUNT(*)::int as order_count, COALESCE(SUM(total), 0) as revenue FROM orders WHERE status = 'paid' AND (paid_at AT TIME ZONE $2)::date = $1::date",
-      [dateStr, tz]
-    );
+    const { rows: [row] } = await db.query(`
+      SELECT COUNT(*)::int as order_count, COALESCE(SUM(total), 0) as revenue FROM (
+        SELECT total FROM orders WHERE status = 'paid' AND (paid_at AT TIME ZONE $2)::date = $1::date
+        UNION ALL
+        SELECT total FROM tabs   WHERE status = 'paid' AND (paid_at AT TIME ZONE $2)::date = $1::date
+      ) combined
+    `, [dateStr, tz]);
     const { rows: [costRow] } = await db.query(`
-      SELECT COALESCE(SUM(oi.quantity * oi.unit_cost), 0) as cost
-      FROM order_items oi JOIN orders o ON o.id = oi.order_id
-      WHERE o.status = 'paid' AND (o.paid_at AT TIME ZONE $2)::date = $1::date
+      SELECT COALESCE(SUM(cost), 0) AS cost FROM (
+        SELECT SUM(oi.quantity * oi.unit_cost) AS cost
+          FROM order_items oi JOIN orders o ON o.id = oi.order_id
+          WHERE o.status = 'paid' AND (o.paid_at AT TIME ZONE $2)::date = $1::date
+        UNION ALL
+        SELECT SUM(ti.quantity * ti.unit_cost)
+          FROM tab_items ti JOIN tabs t ON t.id = ti.tab_id
+          WHERE t.status = 'paid' AND (t.paid_at AT TIME ZONE $2)::date = $1::date
+      ) costs
     `, [dateStr, tz]);
     const { rows: [adjRow] } = await db.query(`
       SELECT COALESCE(SUM(amount), 0) as adjustment
@@ -233,6 +242,193 @@ router.get('/inventory-adjustments', async (req, res) => {
     total_delta: Number(r.total_delta),
     total_cost_impact: Number(r.total_cost_impact),
   })));
+});
+
+router.get('/by-weekday', async (req, res) => {
+  const tz = (req.query.tz as string) || 'America/Monterrey';
+  const db = await getDb();
+  const todayLocal = new Date().toLocaleDateString('en-CA', { timeZone: tz });
+  const year = parseInt((req.query.year as string) || todayLocal.slice(0, 4));
+  const from = `${year}-01-01`;
+  const to = todayLocal.startsWith(String(year)) ? todayLocal : `${year}-12-31`;
+
+  const { rows } = await db.query<{
+    dow: number; median_revenue: string; median_cost: string; median_profit: string; sample_days: number;
+  }>(`
+    WITH daily AS (
+      SELECT
+        EXTRACT(DOW FROM (paid_at AT TIME ZONE $3)::date)::int AS dow,
+        (paid_at AT TIME ZONE $3)::date AS day,
+        SUM(revenue)::numeric AS revenue,
+        SUM(cost)::numeric AS cost
+      FROM (
+        SELECT o.paid_at, o.total AS revenue,
+          COALESCE((SELECT SUM(quantity * unit_cost) FROM order_items WHERE order_id = o.id), 0) AS cost
+        FROM orders o
+        WHERE o.status = 'paid'
+          AND (o.paid_at AT TIME ZONE $3)::date BETWEEN $1::date AND $2::date
+        UNION ALL
+        SELECT t.paid_at, t.total AS revenue,
+          COALESCE((SELECT SUM(quantity * unit_cost) FROM tab_items WHERE tab_id = t.id), 0) AS cost
+        FROM tabs t
+        WHERE t.status = 'paid'
+          AND (t.paid_at AT TIME ZONE $3)::date BETWEEN $1::date AND $2::date
+      ) combined
+      GROUP BY dow, day
+    )
+    SELECT
+      dow,
+      PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY revenue)::numeric AS median_revenue,
+      PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY cost)::numeric AS median_cost,
+      PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY revenue - cost)::numeric AS median_profit,
+      COUNT(*)::int AS sample_days
+    FROM daily
+    GROUP BY dow
+    ORDER BY dow
+  `, [from, to, tz]);
+
+  const dataMap = new Map(rows.map(r => [r.dow, r]));
+
+  // ISO order: Mon(1) Tue(2) Wed(3) Thu(4) Fri(5) Sat(6) Sun(0)
+  const DOW_ORDER = [1, 2, 3, 4, 5, 6, 0];
+  const DOW_LABELS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+
+  const periods = DOW_ORDER.map((dow, i) => {
+    const r = dataMap.get(dow);
+    return {
+      label: DOW_LABELS[i],
+      dow,
+      median_revenue: r ? Number(r.median_revenue) : 0,
+      median_cost: r ? Number(r.median_cost) : 0,
+      median_profit: r ? Number(r.median_profit) : 0,
+      sample_days: r ? r.sample_days : 0,
+    };
+  });
+
+  const bestIndex = periods.reduce((best, p, i) => p.median_revenue > periods[best].median_revenue ? i : best, 0);
+
+  res.json({ year, periods, best_index: bestIndex });
+});
+
+function addDays(dateStr: string, n: number): string {
+  const d = new Date(`${dateStr}T12:00:00`);
+  d.setDate(d.getDate() + n);
+  return d.toISOString().slice(0, 10);
+}
+
+function computeMonday(dateStr: string): string {
+  const d = new Date(`${dateStr}T12:00:00`);
+  const day = d.getDay();
+  const diff = day === 0 ? -6 : 1 - day;
+  d.setDate(d.getDate() + diff);
+  return d.toISOString().slice(0, 10);
+}
+
+function medianOf(values: number[]): number {
+  if (values.length === 0) return 0;
+  const sorted = [...values].sort((a, b) => a - b);
+  const mid = Math.floor(sorted.length / 2);
+  return sorted.length % 2 !== 0 ? sorted[mid] : (sorted[mid - 1] + sorted[mid]) / 2;
+}
+
+router.get('/historic', async (req, res) => {
+  const tz = (req.query.tz as string) || 'America/Monterrey';
+  const groupBy = ((req.query.groupBy as string) || 'week') as 'week' | 'month' | 'day';
+  if (!['week', 'month', 'day'].includes(groupBy)) return res.status(400).json({ error: 'Invalid groupBy' });
+
+  const db = await getDb();
+  const todayLocal = new Date().toLocaleDateString('en-CA', { timeZone: tz });
+  const currentYear = parseInt(todayLocal.slice(0, 4));
+  const year = parseInt((req.query.year as string) || String(currentYear));
+
+  let fromDate: string;
+  let toDate: string;
+  const truncUnit = groupBy;
+
+  if (groupBy === 'week') {
+    const monday = computeMonday(todayLocal);
+    fromDate = addDays(monday, -11 * 7);
+    toDate = todayLocal;
+  } else {
+    fromDate = `${year}-01-01`;
+    toDate = groupBy === 'day' && year === currentYear ? todayLocal : `${year}-12-31`;
+  }
+
+  const { rows } = await db.query<{ period_start: string; revenue: string; cost: string; order_count: number }>(`
+    SELECT
+      DATE_TRUNC('${truncUnit}', paid_at AT TIME ZONE $3)::date::text AS period_start,
+      SUM(revenue)::numeric AS revenue,
+      SUM(cost)::numeric AS cost,
+      COUNT(*)::int AS order_count
+    FROM (
+      SELECT o.paid_at, o.total AS revenue,
+        COALESCE((SELECT SUM(quantity * unit_cost) FROM order_items WHERE order_id = o.id), 0) AS cost
+      FROM orders o
+      WHERE o.status = 'paid'
+        AND (o.paid_at AT TIME ZONE $3)::date BETWEEN $1::date AND $2::date
+      UNION ALL
+      SELECT t.paid_at, t.total AS revenue,
+        COALESCE((SELECT SUM(quantity * unit_cost) FROM tab_items WHERE tab_id = t.id), 0) AS cost
+      FROM tabs t
+      WHERE t.status = 'paid'
+        AND (t.paid_at AT TIME ZONE $3)::date BETWEEN $1::date AND $2::date
+    ) combined
+    GROUP BY DATE_TRUNC('${truncUnit}', paid_at AT TIME ZONE $3)::date
+    ORDER BY period_start
+  `, [fromDate, toDate, tz]);
+
+  const dataMap = new Map(rows.map(r => [
+    String(r.period_start).slice(0, 10),
+    { revenue: Number(r.revenue), cost: Number(r.cost), order_count: r.order_count },
+  ]));
+
+  const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+
+  const periods: { label: string; period_start: string; period_end: string; revenue: number; cost: number; profit: number; order_count: number }[] = [];
+
+  if (groupBy === 'week') {
+    for (let i = 0; i < 12; i++) {
+      const start = addDays(fromDate, i * 7);
+      const end = addDays(start, 6);
+      const d = new Date(`${start}T12:00:00`);
+      const label = `${MONTHS[d.getMonth()]} ${d.getDate()}`;
+      const data = dataMap.get(start) ?? { revenue: 0, cost: 0, order_count: 0 };
+      periods.push({ label, period_start: start, period_end: end, revenue: data.revenue, cost: data.cost, profit: data.revenue - data.cost, order_count: data.order_count });
+    }
+  } else if (groupBy === 'month') {
+    for (let m = 0; m < 12; m++) {
+      const start = `${year}-${String(m + 1).padStart(2, '0')}-01`;
+      const data = dataMap.get(start) ?? { revenue: 0, cost: 0, order_count: 0 };
+      periods.push({ label: MONTHS[m], period_start: start, period_end: '', revenue: data.revenue, cost: data.cost, profit: data.revenue - data.cost, order_count: data.order_count });
+    }
+  } else {
+    const cur = new Date(`${fromDate}T12:00:00`);
+    const end = new Date(`${toDate}T12:00:00`);
+    while (cur <= end) {
+      const dateStr = cur.toISOString().slice(0, 10);
+      const d = cur;
+      const label = d.getDate() === 1 ? MONTHS[d.getMonth()] : String(d.getDate());
+      const data = dataMap.get(dateStr) ?? { revenue: 0, cost: 0, order_count: 0 };
+      periods.push({ label, period_start: dateStr, period_end: dateStr, revenue: data.revenue, cost: data.cost, profit: data.revenue - data.cost, order_count: data.order_count });
+      cur.setDate(cur.getDate() + 1);
+    }
+  }
+
+  const bestPeriodIndex = periods.reduce((best, p, i) => p.revenue > periods[best].revenue ? i : best, 0);
+
+  let medianRevenue: number | null = null;
+  let medianCost: number | null = null;
+  let medianProfit: number | null = null;
+  if (groupBy === 'day') {
+    const withSales = periods.filter(p => p.revenue > 0);
+    if (withSales.length > 0) {
+      medianRevenue = medianOf(withSales.map(p => p.revenue));
+      medianCost = medianOf(withSales.map(p => p.cost));
+      medianProfit = medianOf(withSales.map(p => p.profit));
+    }
+  }
+
+  res.json({ groupBy, periods, best_period_index: bestPeriodIndex, median_revenue: medianRevenue, median_cost: medianCost, median_profit: medianProfit });
 });
 
 export default router;

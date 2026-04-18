@@ -84,11 +84,15 @@ This document lists all **features** and **scenarios** covered by the BDD test s
 
 **Feature:** As an admin employee, I want to see reports on sales and daily totals so that I can understand what was sold and revenue.
 
-**UI — tabs:** By Item · Range · Brief. The separate Daily tab has been removed; the daily summary (Orders, Sales, Cash, Card, Cost, Profit) now appears at the top of the By Item tab for the selected date range.
+**UI — tabs:** By Item · Range · Brief · Historic · By Weekday. The separate Daily tab has been removed; the daily summary (Orders, Sales, Cash, Card, Cost, Profit) now appears at the top of the By Item tab for the selected date range.
 
 **By Item tab:** From/To date pickers filter both the item breakdown and the summary stats. Changing either date re-fetches automatically. Both `GET /api/reports/sales-by-item` and `GET /api/reports/daily-total` are called in parallel with the same `from`/`to`/`tz` parameters.
 
-**Timezone support:** All date-filtered report endpoints (`sales-by-item`, `daily-total`, `daily-range`) accept an optional `tz` query parameter (IANA timezone name). The backend uses `AT TIME ZONE` to convert `paid_at` timestamps before date extraction. Default: `America/Monterrey`. The frontend passes the browser `Intl` timezone and computes "today" in local time.
+**Timezone support:** All date-filtered report endpoints accept an optional `tz` query parameter (IANA timezone name). The backend uses `AT TIME ZONE` to convert `paid_at` timestamps before date extraction. Default: `America/Monterrey`. The frontend passes the browser `Intl` timezone and computes "today" in local time.
+
+**Historic tab:** SVG column chart groupable by Week (last 12 weeks), Month (full year), or Day (Jan 1 → today). Three bars per period: Revenue (blue), Cost (orange), Profit (green). Best period marked with ★. Daily view adds a dashed median line and a Median stats card. `GET /api/reports/historic?groupBy=week|month|day&tz=&year=`.
+
+**By Weekday tab:** Median revenue / cost / profit per day of week (Mon–Sun) computed with `PERCENTILE_CONT(0.5)` over all days with sales in the current year. Chart + best-day card + ranked table. `GET /api/reports/by-weekday?tz=&year=`.
 
 | # | Scenario | Description |
 |---|----------|-------------|

@@ -3,6 +3,13 @@ import { api } from '../api/client';
 import type { LedgerEntry, LedgerEntryItem, Balance, Account } from '../api/client';
 
 const EXPANDABLE = new Set(['sale', 'tab_payment']);
+const localTz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+function fmtLocal(iso: string): string {
+  return new Date(iso).toLocaleString('en-CA', {
+    timeZone: localTz, year: 'numeric', month: '2-digit', day: '2-digit',
+    hour: '2-digit', minute: '2-digit', hour12: false,
+  }).replace(',', '');
+}
 
 export default function LedgerView() {
   const [entries, setEntries] = useState<LedgerEntry[]>([]);
@@ -107,7 +114,7 @@ export default function LedgerView() {
                         🏷 {e.discount_name} −${e.discount_amount.toFixed(2)}
                       </div>
                     )}
-                    <div className="list-item__sub">{e.created_at.slice(0, 16).replace('T', ' ')}</div>
+                    <div className="list-item__sub">{fmtLocal(e.created_at)}</div>
                   </div>
                   <div className="list-item__right">
                     <div style={{ fontWeight: 700, color: e.amount >= 0 ? 'var(--success)' : 'var(--danger)' }}>

@@ -9,3 +9,4 @@ packages/frontend/dist/
 .DS_Store
 hermes.db-wal
 cucumber-report.html
+.claude/

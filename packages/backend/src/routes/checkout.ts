@@ -90,7 +90,7 @@ router.post('/orders/:id/pay', async (req, res) => {
 
   const { rows: [updated] } = await db.query(
     "UPDATE orders SET status = 'paid', payment_method = $1, amount_received = $2, change_due = $3, discount_amount = $4, paid_at = NOW() WHERE id = $5 RETURNING *",
-    [payment_method === 'card' ? 'card' : payment_method, amount_received ?? null, changeDue, discountAmount, order.id],
+    [payment_method, amount_received ?? null, changeDue, discountAmount, order.id],
   );
   await db.query(
     "INSERT INTO ledger_entries (entry_type, account, amount, description, ref_id, ref_type) VALUES ('sale', $1, $2, $3, $4, 'order')",

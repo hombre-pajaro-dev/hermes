@@ -28,17 +28,25 @@ POSTGRES_URL=postgresql://user:password@host:5432/dbname
 
 **Local Docker (quick start):**
 
+First time — create the container:
+
 ```bash
-docker run -d --name hermes-pg \
-  -e POSTGRES_PASSWORD=postgres \
+docker run --name hermes-db \
+  -e POSTGRES_USER=hermes \
+  -e POSTGRES_PASSWORD=hermes \
   -e POSTGRES_DB=hermes \
-  -p 5432:5432 \
-  postgres:16-alpine
+  -p 5432:5432 -d postgres
+```
+
+Subsequent starts (container already exists):
+
+```bash
+docker start hermes-db
 ```
 
 Then set in `packages/backend/.env`:
 ```
-POSTGRES_URL=postgresql://postgres:postgres@localhost:5432/hermes
+DATABASE_URL=postgresql://hermes:hermes@localhost:5432/hermes
 ```
 
 **Vercel Postgres:** copy the `POSTGRES_URL` from your Vercel project → Storage tab.

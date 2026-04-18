@@ -67,6 +67,10 @@ export const api = {
   getCloseBriefReport: (session_id?: number) => req<CloseBrief>(`/reports/close-brief${session_id ? `?session_id=${session_id}` : ''}`),
   getTopProducts: () => req<TopProduct[]>('/reports/top-products'),
   getInventoryAdjustmentReport: (from: string, to: string, tz: string) => req<InventoryAdjustmentItem[]>(`/reports/inventory-adjustments?from=${from}&to=${to}&tz=${encodeURIComponent(tz)}`),
+  getHistoricReport: (groupBy: 'week' | 'month' | 'day', tz: string, year?: number) =>
+    req<HistoricReport>(`/reports/historic?groupBy=${groupBy}&tz=${encodeURIComponent(tz)}${year ? `&year=${year}` : ''}`),
+  getWeekdayReport: (tz: string, year?: number) =>
+    req<WeekdayReport>(`/reports/by-weekday?tz=${encodeURIComponent(tz)}${year ? `&year=${year}` : ''}`),
 
   // Restock
   restock: (items: OrderItem[]) => req<RestockOrder>('/restock', { method: 'POST', body: JSON.stringify({ items }) }),
@@ -130,6 +134,11 @@ export interface CloseBrief { session_id: number; revenue: number; total_cost: n
 export interface RestockOrder { id: number; session_id: number; items: { product_id: number; name: string; quantity: number; new_units: number }[]; }
 export interface AdjustResult { adjustments: { product_id: number; name: string; previous_units: number; physical_count: number; delta: number; new_units: number }[]; }
 export interface AuthorizedUser { id: number; email: string; role: 'staff' | 'admin'; created_at: string; }
+export interface HistoricPeriod { label: string; period_start: string; period_end: string; revenue: number; cost: number; profit: number; order_count: number; }
+export interface HistoricReport { groupBy: 'week' | 'month' | 'day'; periods: HistoricPeriod[]; best_period_index: number; median_revenue: number | null; median_cost: number | null; median_profit: number | null; }
+export interface WeekdayPeriod { label: string; dow: number; median_revenue: number; median_cost: number; median_profit: number; sample_days: number; }
+export interface WeekdayReport { year: number; periods: WeekdayPeriod[]; best_index: number; }
+
 export interface Discount {
   id: number;
   name: string;

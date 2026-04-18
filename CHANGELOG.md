@@ -9,6 +9,40 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+
+#### Historic report
+- New **Historic** tab in Reports with three groupings: **Weekly** (last 12 weeks, default), **Monthly** (full year), **Daily** (Jan 1 → today)
+- SVG column chart with three bars per period (Revenue / Cost / Profit); best period highlighted with ★ and golden glow
+- Daily view shows a single revenue bar per day with a dashed median line computed over days that had sales
+- Best-period summary card below the chart (revenue, cost, profit, order count)
+- Daily view adds a Median card showing median revenue / cost / profit across all sale days
+- `GET /api/reports/historic?groupBy=week|month|day&tz=&year=` — returns periods with revenue, cost, profit, order count, best period index, and median stats for day view
+
+#### By Weekday report
+- New **By Weekday** tab in Reports showing median revenue / cost / profit for each day of the week (Mon–Sun)
+- Uses `PERCENTILE_CONT(0.5)` computed over all days with sales in the current year
+- Chart (7 grouped bars) + best-day card + ranked table with sample count per weekday
+- `GET /api/reports/by-weekday?tz=&year=` endpoint
+
+### Fixed
+
+#### Card sales always showing $0.00 in reports
+- Tabs were storing `payment_method = 'credit_card'` while orders stored `'card'`; the `daily-total` report filtered on `'card'` so all tab card payments were invisible
+- Both routes now store the raw `payment_method` value (`'card'`) — consistent across orders and tabs
+
+#### Ledger timestamps showing UTC instead of local time
+- `created_at` was sliced as a raw UTC string (`2026-04-18T23:30` displayed as-is); now converted to browser local timezone via `toLocaleString` with `Intl` timezone
+
+#### Daily range report missing tab payments
+- `GET /api/reports/daily-range` only queried the `orders` table; tab payments were silently excluded from both revenue and cost
+- Both sub-queries now UNION ALL with `tabs` / `tab_items`
+
+### Infra
+
+- `packages/backend/src/scripts/seed-orders.ts` — dev utility to seed 14 weeks of realistic historical order data for chart testing
+- `README.md` updated: correct Docker container name (`hermes-db`), credentials (`hermes/hermes`), env var name (`DATABASE_URL`), and added `docker start hermes-db` for subsequent starts
+
 ---
 
 ## [1.0.0-beta.3] — 2026-04-17
