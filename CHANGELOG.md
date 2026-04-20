@@ -47,6 +47,11 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 
 ### Changed
 
+#### Tabs can be opened without an open register
+- `POST /tabs` no longer requires the register to be open — tabs are long-lasting and span multiple sessions
+- The new tab is linked to the most recent register session (open or closed); if no session has ever been created, a 409 is returned with a clear message
+- Removed `requireOpenRegister` middleware from the tab creation route
+
 #### Register close no longer blocked by open tabs
 - `POST /register/close` previously rejected with 409 when any tabs linked to the session were still open
 - Removed this restriction — tabs are long-running by design and often outlive a register session; closing the register is now always permitted

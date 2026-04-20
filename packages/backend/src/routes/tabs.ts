@@ -1,6 +1,5 @@
 import { Router } from 'express';
 import { getDb, pool } from '../db/database.js';
-import { requireOpenRegister } from '../middleware/requireOpenRegister.js';
 import { isDiscountEligibleNow, computeDiscountAmount } from '../lib/discount-engine.js';
 import { getProductAvailableUnits, deductProductStock, restoreProductStock } from '../lib/supply-utils.js';
 
@@ -30,9 +29,13 @@ router.get('/summary', async (_req, res) => {
   res.json(rows[0]);
 });
 
-router.post('/', requireOpenRegister, async (req, res) => {
+router.post('/', async (req, res) => {
   const db = await getDb();
-  const sessionId = (req as typeof req & { sessionId: number }).sessionId;
+  const { rows: sessionRows } = await db.query(
+    "SELECT id FROM register_sessions ORDER BY opened_at DESC LIMIT 1"
+  );
+  if (!sessionRows[0]) return res.status(409).json({ error: 'No register session exists — open the register first' });
+  const sessionId = sessionRows[0].id as number;
   const { name = '', at_cost = false } = req.body;
   const { rows } = await db.query(
     "INSERT INTO tabs (session_id, name, status, at_cost, total, created_at) VALUES ($1, $2, 'open', $3, 0, NOW()) RETURNING *",

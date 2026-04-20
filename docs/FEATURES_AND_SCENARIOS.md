@@ -35,6 +35,7 @@ This document lists all **features** and **scenarios** covered by the BDD test s
 | 3 | Pay a tab with cash | Add items to tab; pay tab with cash and amount received; tab closes; ledger records payment; `paid_at` timestamp recorded. |
 | 4 | Pay a tab with card | Add items to tab; pay tab with card; tab closes. |
 | 5 | Can close register with open tabs | With at least one open tab; closing register succeeds — tabs span multiple sessions and do not block. |
+| 16 | Can open a tab when register is closed | Register is closed but a prior session exists; `POST /tabs` succeeds and the tab is linked to the most recent session. |
 | 6 | Open multiple tabs simultaneously | Multiple tabs can be open at the same time; each is managed independently. |
 | 7 | Create an at-cost (staff) tab | Create tab with `at_cost: true`; items added are priced at `product.cost` instead of `product.price`; `at_cost` flag cannot be changed after creation. |
 | 8 | Closed tabs are paginated | Closed tabs list returns 10 per page; `paid_at` timestamp and payment method shown per entry. |
