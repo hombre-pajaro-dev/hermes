@@ -26,13 +26,28 @@ export async function resetDb(): Promise<void> {
     TRUNCATE products, register_sessions, orders, order_items, tabs, tab_items,
     cashouts, restock_orders, restock_items, inventory_adjustments, ledger_entries,
     accounts, settings, discounts, discount_products, applied_discounts,
-    supplies, product_supplies
+    supplies, product_supplies, payees
     RESTART IDENTITY CASCADE
   `);
   await db.query(`
     INSERT INTO accounts (name, label) VALUES
     ('cash', 'Cash Drawer'), ('credit_card', 'Credit Card'), ('payroll', 'Payroll'),
-    ('inventory_adjustment', 'Inventory Adjustment')
+    ('inventory_adjustment', 'Inventory Adjustment'), ('savings', 'Savings')
+    ON CONFLICT DO NOTHING
+  `);
+  await db.query(`
+    INSERT INTO payees (name, type, default_weight, source_account) VALUES
+    ('Pajaro',           'staff',   1, 'cash'),
+    ('MonGee',           'staff',   1, 'cash'),
+    ('Mon',              'staff',   1, 'cash'),
+    ('Paloma',           'staff',   1, 'cash'),
+    ('Lola',             'staff',   1, 'cash'),
+    ('Rent',             'expense', 1, 'cash'),
+    ('Utilities',        'expense', 1, 'cash'),
+    ('Capital Payments', 'expense', 1, 'cash'),
+    ('Maintenance',      'expense', 1, 'cash'),
+    ('Sound Equipment',  'expense', 1, 'cash'),
+    ('Savings',          'savings', 1, 'cash')
     ON CONFLICT DO NOTHING
   `);
   await db.query(`INSERT INTO settings (key, value) VALUES ('pin', '1234') ON CONFLICT DO NOTHING`);

@@ -127,7 +127,7 @@ export async function applySchema(db: Pool): Promise<void> {
   await db.query(`
     INSERT INTO accounts (name, label) VALUES
     ('cash', 'Cash Drawer'), ('credit_card', 'Credit Card'), ('payroll', 'Payroll'),
-    ('inventory_adjustment', 'Inventory Adjustment')
+    ('inventory_adjustment', 'Inventory Adjustment'), ('savings', 'Savings')
     ON CONFLICT DO NOTHING
   `);
   await db.query(`ALTER TABLE register_sessions ADD COLUMN IF NOT EXISTS inventory_snapshot_open JSONB`);
@@ -195,6 +195,35 @@ export async function applySchema(db: Pool): Promise<void> {
       quantity_per_unit DOUBLE PRECISION NOT NULL,
       PRIMARY KEY (product_id, supply_id)
     )
+  `);
+
+  // Payees
+  await db.query(`
+    CREATE TABLE IF NOT EXISTS payees (
+      id             SERIAL PRIMARY KEY,
+      name           TEXT NOT NULL,
+      type           TEXT NOT NULL,
+      default_weight DOUBLE PRECISION NOT NULL DEFAULT 1,
+      source_account TEXT NOT NULL DEFAULT 'cash',
+      active         BOOLEAN NOT NULL DEFAULT TRUE,
+      created_at     TIMESTAMPTZ DEFAULT NOW()
+    )
+  `);
+  await db.query(`CREATE UNIQUE INDEX IF NOT EXISTS payees_name_idx ON payees(name)`);
+  await db.query(`
+    INSERT INTO payees (name, type, default_weight, source_account) VALUES
+    ('Pajaro',           'staff',   1, 'cash'),
+    ('MonGee',           'staff',   1, 'cash'),
+    ('Mon',              'staff',   1, 'cash'),
+    ('Paloma',           'staff',   1, 'cash'),
+    ('Lola',             'staff',   1, 'cash'),
+    ('Rent',             'expense', 1, 'cash'),
+    ('Utilities',        'expense', 1, 'cash'),
+    ('Capital Payments', 'expense', 1, 'cash'),
+    ('Maintenance',      'expense', 1, 'cash'),
+    ('Sound Equipment',  'expense', 1, 'cash'),
+    ('Savings',          'savings', 1, 'cash')
+    ON CONFLICT DO NOTHING
   `);
 
   // Auth — authorized users allowlist (source of truth for who may sign in)

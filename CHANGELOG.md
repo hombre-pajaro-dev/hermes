@@ -11,6 +11,19 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+#### Payments
+- Admin section to prepare and record weekly payments for staff and expenses
+- Default payees seeded on startup: Pajaro, MonGee, Mon, Paloma, Lola (staff); Rent, Utilities, Capital Payments, Maintenance, Sound Equipment (expense); Savings (savings account)
+- Three distribution modes: **Equal** (total ÷ active payees), **Weighted** (proportional to each payee's `default_weight`), **Manual** (cashier enters each amount)
+- Live total preview updates as amounts are entered
+- Manage Payees panel (collapsible): activate / deactivate payees, add new payees with type (staff / expense / savings) and source account (cash / card)
+- Payment recording creates ledger entries per payee: `payroll` for staff, `expense` for expenses, `savings_transfer` for savings — each with negative amount to reflect outflow from the source account
+- New `savings` account in the ledger accounts table for tracking savings transfers
+- API endpoints: `GET /api/payees`, `POST /api/payees`, `PATCH /api/payees/:id`, `DELETE /api/payees/:id`, `POST /api/payments/run`
+- BDD: 6 new backend scenarios in `payments.feature`; 3 new frontend e2e scenarios in `payments.feature` (verifying ledger entries after payment runs)
+
+### Added
+
 #### Tab item summary in tabs list
 - Each tab row in the open and closed tabs list now shows a one-line item summary (e.g. `Latte ×2 · Espresso ×1`) without opening the tab
 - Up to 4 items shown inline; additional items shown as `+N more`; empty tabs show `Empty`

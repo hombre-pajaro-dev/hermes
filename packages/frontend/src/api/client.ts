@@ -103,6 +103,15 @@ export const api = {
   setProductSupplies: (productId: number, supply_ingredients: { supply_id: number; quantity_per_unit: number }[]) =>
     req<Product>(`/products/${productId}/supplies`, { method: 'PATCH', body: JSON.stringify({ supply_ingredients }) }),
 
+  // Payees & Payments
+  getPayees: () => req<Payee[]>('/payees'),
+  createPayee: (body: Omit<Payee, 'id' | 'active' | 'created_at'>) =>
+    req<Payee>('/payees', { method: 'POST', body: JSON.stringify(body) }),
+  updatePayee: (id: number, body: Partial<Omit<Payee, 'id' | 'created_at'>>) =>
+    req<Payee>(`/payees/${id}`, { method: 'PATCH', body: JSON.stringify(body) }),
+  runPayments: (entries: PaymentEntry[], note?: string) =>
+    req<PaymentRunResult>('/payments/run', { method: 'POST', body: JSON.stringify({ entries, note }) }),
+
   // Discounts
   getDiscounts: () => req<Discount[]>('/discounts'),
   createDiscount: (body: Omit<Discount, 'id' | 'redemptions' | 'created_at'>) =>
@@ -152,6 +161,18 @@ export interface HistoricPeriod { label: string; period_start: string; period_en
 export interface HistoricReport { groupBy: 'week' | 'month' | 'day'; periods: HistoricPeriod[]; best_period_index: number; median_revenue: number | null; median_cost: number | null; median_profit: number | null; }
 export interface WeekdayPeriod { label: string; dow: number; median_revenue: number; median_cost: number; median_profit: number; sample_days: number; }
 export interface WeekdayReport { year: number; periods: WeekdayPeriod[]; best_index: number; }
+
+export interface Payee {
+  id: number;
+  name: string;
+  type: 'staff' | 'expense' | 'savings';
+  default_weight: number;
+  source_account: string;
+  active: boolean;
+  created_at?: string;
+}
+export interface PaymentEntry { payee_id: number; amount: number; source_account: string; }
+export interface PaymentRunResult { entries: LedgerEntry[]; }
 
 export interface Discount {
   id: number;

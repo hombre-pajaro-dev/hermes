@@ -255,13 +255,35 @@ This document lists all **features** and **scenarios** covered by the BDD test s
 
 ---
 
+## 12. Payments
+
+**Feature:** As an admin, I want to prepare and record weekly payments for staff and expenses so that all outflows are tracked in the ledger.
+
+**UI location / notes:** Admin page → Payments section (admin only). Supports three distribution modes: equal split, weighted by configurable `default_weight` per payee, and manual per-payee amounts. Manage Payees subsection allows activating/deactivating payees and adding new ones.
+
+**Default payees:** Pajaro, MonGee, Mon, Paloma, Lola (staff); Rent, Utilities, Capital Payments, Maintenance, Sound Equipment (expense); Savings (savings). Seeded on first run and on test reset.
+
+| # | Scenario | Description |
+|---|----------|-------------|
+| 1 | List payees returns default payees | `GET /api/payees` returns the 11 default payees including Pajaro (staff), Rent (expense), Savings (savings). |
+| 2 | Create a new payee | `POST /api/payees` adds the payee to the list. |
+| 3 | Deactivate a payee | `PATCH /api/payees/:id` with `active: false` marks the payee inactive; it is excluded from payment runs. |
+| 4 | Run a payment creates payroll ledger entry | `POST /api/payments/run` for a staff payee creates a `payroll` ledger entry with negative amount. |
+| 5 | Run a payment creates expense ledger entry | `POST /api/payments/run` for an expense payee creates an `expense` ledger entry with negative amount. |
+| 6 | Run a payment creates savings transfer ledger entry | `POST /api/payments/run` for a savings payee creates a `savings_transfer` ledger entry with negative amount. |
+| 7 | Payment creates a payroll ledger entry (E2E) | Record a payment via API; Ledger page shows a `payroll` entry. |
+| 8 | Payment creates an expense ledger entry (E2E) | Record a payment via API; Ledger page shows an `expense` entry. |
+| 9 | Payment creates a savings transfer ledger entry (E2E) | Record a payment via API; Ledger page shows a `savings transfer` entry. |
+
+---
+
 ## Running the BDD tests
 
 - **Run backend tests only:**
-  `cd packages/backend && pnpm test` — 66 scenarios
+  `cd packages/backend && pnpm test` — 72 scenarios
 
 - **Run frontend tests only:**
-  `cd packages/frontend && pnpm test` — 59 scenarios
+  `cd packages/frontend && pnpm test` — 62 scenarios
   Requires Docker/Postgres running. The test script starts its own backend (`:3002`) and frontend (`:5174`) servers automatically.
 
 - **HTML report:**
@@ -284,4 +306,5 @@ This document lists all **features** and **scenarios** covered by the BDD test s
 | Inventory | frontend | `features/inventory.feature` |
 | Products | backend + frontend | `features/products.feature` |
 | Discounts | backend + frontend | `features/discounts.feature` |
+| Payments | backend + frontend | `features/payments.feature` |
 | Admin (PIN, Register, Users, Discounts, Supplies) | frontend | `features/admin.feature` |
