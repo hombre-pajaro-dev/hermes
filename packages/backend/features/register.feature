@@ -33,3 +33,36 @@ Feature: Register (Open / Close / Cashout)
     When I try to close the register without closing cash
     Then the response status is 400
     And the response error mentions "closing_cash"
+
+  Scenario: List all register sessions
+    Given the register is open with opening cash 200
+    When I fetch the register sessions list
+    Then the sessions list is an array
+    And the sessions list has at least 1 entry
+
+  Scenario: Session report contains orders-only sales
+    Given the register is open with opening cash 200
+    And I have sold items
+      | product_name | quantity | payment |
+      | Espresso     | 2        | cash    |
+    When I fetch the session report for the current session
+    Then the session report has order_count at least 1
+    And the session report has positive revenue
+    And the session report has a by_item array
+
+  Scenario: Session report excludes tab sales
+    Given the register is open with opening cash 200
+    And I open a new tab and pay it
+    When I fetch the session report for the current session
+    Then the session report has order_count of 0
+
+  Scenario: Opening register captures inventory snapshot
+    Given the register is open with opening cash 200
+    When I fetch the session report for the current session
+    Then the session has an inventory_snapshot_open with products
+
+  Scenario: Closing register captures inventory snapshot
+    Given the register is open with opening cash 200
+    When I close the register with closing cash 150.00
+    And I fetch the session report for the last session
+    Then the session has an inventory_snapshot_close with products

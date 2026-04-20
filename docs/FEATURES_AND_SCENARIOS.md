@@ -34,7 +34,7 @@ This document lists all **features** and **scenarios** covered by the BDD test s
 | 2 | View open tabs summary | Create tab and add items; summary shows open count and total amount. |
 | 3 | Pay a tab with cash | Add items to tab; pay tab with cash and amount received; tab closes; ledger records payment; `paid_at` timestamp recorded. |
 | 4 | Pay a tab with card | Add items to tab; pay tab with card; tab closes. |
-| 5 | Cannot close register while tabs are open | With at least one open tab; closing register is rejected. |
+| 5 | Can close register with open tabs | With at least one open tab; closing register succeeds — tabs span multiple sessions and do not block. |
 | 6 | Open multiple tabs simultaneously | Multiple tabs can be open at the same time; each is managed independently. |
 | 7 | Create an at-cost (staff) tab | Create tab with `at_cost: true`; items added are priced at `product.cost` instead of `product.price`; `at_cost` flag cannot be changed after creation. |
 | 8 | Closed tabs are paginated | Closed tabs list returns 10 per page; `paid_at` timestamp and payment method shown per entry. |
@@ -44,6 +44,8 @@ This document lists all **features** and **scenarios** covered by the BDD test s
 | 12 | Adding a product to a tab decrements its stock | Add items to tab; product units decrease by the quantity added. |
 | 12 | Removing units from a tab item restores the stock | Add items then reduce quantity; net stock change matches net quantity on the tab. |
 | 13 | Cannot add more items to a tab than available stock | Request quantity exceeding available units; rejected with 409. |
+| 14 | Tab list includes items for each tab | `GET /api/tabs` returns each tab with an `items` array; items include product name and quantity. |
+| 15 | Tab list shows item summary without opening the tab | In the Tabs list view, each open tab row displays a one-line summary of its items (e.g. `Espresso ×2 · Latte ×1`) without navigating into the tab. |
 
 ---
 
@@ -58,8 +60,13 @@ This document lists all **features** and **scenarios** covered by the BDD test s
 | 1 | Open the register with starting cash | Register is closed; open with opening cash; session exists with that opening cash; ledger has register_open entry. |
 | 2 | Cannot open register when already open | Register already open; opening again is rejected. |
 | 3 | Cash out from the register | Register open; cash out amount with reason; cashout recorded; ledger has cashout entry. |
-| 4 | Close the register and get day brief | Register open, no open tabs; close with closing cash; register closes; ledger has register_close; close brief includes revenue and cost. |
+| 4 | Close the register and get day brief | Register open; close with closing cash; register closes; ledger has register_close; close brief includes revenue and cost. |
 | 5 | Cannot close without closing_cash | Attempt to close without providing closing cash; close is rejected. |
+| 6 | List all register sessions | `GET /api/register/sessions` returns an array with at least one entry after opening the register. |
+| 7 | Session report contains orders-only sales | After paid orders in a session; `GET /api/register/sessions/:id/report` has `order_count ≥ 1`, positive `revenue`, and a `by_item` array. |
+| 8 | Session report excludes tab sales | Paid tab in session; session report `order_count` is 0 (tab revenue not counted). |
+| 9 | Opening register captures inventory snapshot | After opening; session report `session.inventory_snapshot_open` is non-null with a `products` array. |
+| 10 | Closing register captures inventory snapshot | After closing; session report `session.inventory_snapshot_close` is non-null with a `products` array. |
 
 ---
 
@@ -84,7 +91,7 @@ This document lists all **features** and **scenarios** covered by the BDD test s
 
 **Feature:** As an admin employee, I want to see reports on sales and daily totals so that I can understand what was sold and revenue.
 
-**UI — tabs:** By Item · Range · Brief · Historic · By Weekday. The separate Daily tab has been removed; the daily summary (Orders, Sales, Cash, Card, Cost, Profit) now appears at the top of the By Item tab for the selected date range.
+**UI — tabs:** By Item · Range · Brief · Historic · By Weekday · Sessions. The separate Daily tab has been removed; the daily summary (Orders, Sales, Cash, Card, Cost, Profit) now appears at the top of the By Item tab for the selected date range.
 
 **By Item tab:** From/To date pickers filter both the item breakdown and the summary stats. Changing either date re-fetches automatically. Both `GET /api/reports/sales-by-item` and `GET /api/reports/daily-total` are called in parallel with the same `from`/`to`/`tz` parameters.
 
@@ -108,6 +115,10 @@ This document lists all **features** and **scenarios** covered by the BDD test s
 | 10 | Daily total includes inventory_adjustment_total field | `daily-total` response always includes `inventory_adjustment_total` (number); reflects net cost impact of adjustments for the period. |
 | 11 | Daily range includes adjustment per day | Each entry in `daily-range` includes an `adjustment` field; non-zero days show `adj ±$X.XX` in the Range view. |
 | 12 | Inventory adjustment report shows per-product breakdown | After a shortage adjustment; `GET /api/reports/inventory-adjustments` returns the product with its `adjustment_count`, `total_delta`, and non-zero `total_cost_impact`. |
+| 13 | Sessions tab shows session selector | On the Reports page; clicking the Sessions tab reveals a session dropdown (`session-selector`). |
+| 14 | Sessions tab shows tab exclusion notice | Sessions tab displays a notice that tab sales are excluded because tabs span multiple sessions. |
+
+**Sessions tab:** Dropdown to select any register session. Shows session metadata (opened/closed timestamps, opening/closing cash), a tab-exclusion notice, sales stats (orders/revenue/cash/card/cost/profit from counter orders only), inventory activity table (opening → closing → sold → restocked → adjusted per product, only shown when snapshots exist), a sales-by-product breakdown, and a cash removals list. `GET /api/register/sessions` and `GET /api/register/sessions/:id/report`.
 
 **Inventory Adjustments card (By Item tab):** When any adjustments exist in the selected period, a card appears above the sales list showing each affected product with adjustment count, net unit delta, and cost impact (green = surplus, red = loss), plus a total impact row.
 
@@ -247,10 +258,10 @@ This document lists all **features** and **scenarios** covered by the BDD test s
 ## Running the BDD tests
 
 - **Run backend tests only:**
-  `cd packages/backend && pnpm test` — 59 scenarios, 296 steps
+  `cd packages/backend && pnpm test` — 66 scenarios
 
 - **Run frontend tests only:**
-  `cd packages/frontend && pnpm test` — 56 scenarios, 310 steps
+  `cd packages/frontend && pnpm test` — 59 scenarios
   Requires Docker/Postgres running. The test script starts its own backend (`:3002`) and frontend (`:5174`) servers automatically.
 
 - **HTML report:**

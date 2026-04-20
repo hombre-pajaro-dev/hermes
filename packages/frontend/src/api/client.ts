@@ -34,6 +34,8 @@ export const api = {
   cashout: (amount: number, reason: string) => req<Cashout>('/register/cashout', { method: 'POST', body: JSON.stringify({ amount, reason }) }),
   closeRegister: (closing_cash: number) => req<RegisterSession>('/register/close', { method: 'POST', body: JSON.stringify({ closing_cash }) }),
   getCloseBrief: () => req<CloseBrief>('/register/close-brief'),
+  getRegisterSessions: () => req<RegisterSessionSummary[]>('/register/sessions'),
+  getSessionReport: (id: number) => req<SessionReport>(`/register/sessions/${id}/report`),
 
   // Checkout
   createOrder: (items: OrderItem[]) => req<Order>('/checkout/orders', { method: 'POST', body: JSON.stringify({ items }) }),
@@ -115,11 +117,23 @@ export interface SupplyIngredient { supply_id: number; quantity_per_unit: number
 export interface Product { id: number; name: string; description: string; cost: number; price: number; units: number; image?: string | null; active: boolean; uses_supplies: boolean; supply_ingredients: SupplyIngredient[]; }
 export interface Supply { id: number; name: string; unit: string; quantity: number; created_at: string; }
 export interface RegisterSession { id: number; status: string; opening_cash: number; closing_cash?: number; opened_at: string; closed_at?: string; }
+export interface RegisterSessionSummary { id: number; status: string; opening_cash: number; closing_cash: number | null; opened_at: string; closed_at: string | null; }
+export interface InventorySnapshotEntry { id: number; name: string; units: number; }
+export interface SupplySnapshotEntry { id: number; name: string; unit: string; quantity: number; }
+export interface SessionInventorySnapshot { products: InventorySnapshotEntry[]; supplies: SupplySnapshotEntry[]; }
+export interface SessionReport {
+  session: RegisterSessionSummary & { inventory_snapshot_open: SessionInventorySnapshot | null; inventory_snapshot_close: SessionInventorySnapshot | null; };
+  order_count: number; revenue: number; total_cost: number; gross_profit: number; cash_sales: number; card_sales: number;
+  by_item: { product_id: number; name: string; units_sold: number; revenue: number; cost: number; profit: number }[];
+  cashouts: { id: number; amount: number; reason: string; created_at: string }[];
+  restocked: { product_id: number; name: string; units_restocked: number }[];
+  adjustments: { product_id: number; name: string; delta: number }[];
+}
 export interface Cashout { id: number; session_id: number; amount: number; reason: string; created_at: string; }
 export interface OrderItem { product_id: number; quantity: number; }
 export interface Order { id: number; status: string; total: number; discount_amount?: number; payment_method?: string; amount_received?: number; change_due?: number; items?: unknown[]; }
-export interface Tab { id: number; name: string; status: string; at_cost: number; total: number; discount_amount?: number; payment_method?: string; created_at: string; paid_at?: string; }
-export interface TabItem { id: number; product_id: number; quantity: number; unit_price: number; subtotal: number; }
+export interface Tab { id: number; name: string; status: string; at_cost: number; total: number; discount_amount?: number; payment_method?: string; created_at: string; paid_at?: string; items?: TabItem[]; }
+export interface TabItem { id: number; product_id: number; name?: string; quantity: number; unit_price: number; unit_cost: number; subtotal: number; }
 export interface TabsSummary { open_count: number; total_amount: number; }
 export interface LedgerEntry { id: number; entry_type: string; account?: string; amount: number; description: string; ref_id?: number; ref_type?: string; created_at: string; discount_name?: string; discount_amount?: number; }
 export interface LedgerEntryItem { product_id: number; name: string; quantity: number; unit_price: number; subtotal: number; }

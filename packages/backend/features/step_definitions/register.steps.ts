@@ -57,3 +57,67 @@ Then('the close brief has a total_cost field', async function (this: PosWorld) {
   const res = await this.agent.get('/api/reports/close-brief');
   expect(res.body).to.have.property('total_cost');
 });
+
+When('I fetch the register sessions list', async function (this: PosWorld) {
+  this.response = await this.agent.get('/api/register/sessions');
+});
+
+When('I fetch the session report for the current session', async function (this: PosWorld) {
+  const sessionId = this.context.sessionId as number;
+  this.response = await this.agent.get(`/api/register/sessions/${sessionId}/report`);
+});
+
+When('I fetch the session report for the last session', async function (this: PosWorld) {
+  const listRes = await this.agent.get('/api/register/sessions');
+  const sessions = listRes.body as { id: number }[];
+  const lastId = sessions[0]?.id;
+  this.response = await this.agent.get(`/api/register/sessions/${lastId}/report`);
+});
+
+When('I open a new tab and pay it', async function (this: PosWorld) {
+  const tabRes = await this.agent.post('/api/tabs').send({ name: 'Tab Session Test' });
+  const tabId = tabRes.body.id as number;
+  const prodRes = await this.agent.get('/api/products?name=Espresso');
+  await this.agent.post(`/api/tabs/${tabId}/items`).send({ items: [{ product_id: prodRes.body.id, quantity: 1 }] });
+  await this.agent.post(`/api/tabs/${tabId}/pay`).send({ payment_method: 'cash', amount_received: 9999 });
+});
+
+Then('the sessions list is an array', function (this: PosWorld) {
+  expect(this.response.body).to.be.an('array');
+});
+
+Then('the sessions list has at least {int} entry', function (this: PosWorld, min: number) {
+  expect(this.response.body).to.have.length.at.least(min);
+});
+
+Then('the session report has order_count at least {int}', function (this: PosWorld, min: number) {
+  const body = this.response.body as { order_count: number };
+  expect(body.order_count).to.be.at.least(min);
+});
+
+Then('the session report has order_count of {int}', function (this: PosWorld, expected: number) {
+  const body = this.response.body as { order_count: number };
+  expect(body.order_count).to.equal(expected);
+});
+
+Then('the session report has positive revenue', function (this: PosWorld) {
+  const body = this.response.body as { revenue: number };
+  expect(body.revenue).to.be.greaterThan(0);
+});
+
+Then('the session report has a by_item array', function (this: PosWorld) {
+  const body = this.response.body as { by_item: unknown[] };
+  expect(body.by_item).to.be.an('array');
+});
+
+Then('the session has an inventory_snapshot_open with products', function (this: PosWorld) {
+  const body = this.response.body as { session: { inventory_snapshot_open: { products: unknown[] } | null } };
+  expect(body.session.inventory_snapshot_open).to.not.be.null;
+  expect(body.session.inventory_snapshot_open!.products).to.be.an('array').with.length.greaterThan(0);
+});
+
+Then('the session has an inventory_snapshot_close with products', function (this: PosWorld) {
+  const body = this.response.body as { session: { inventory_snapshot_close: { products: unknown[] } | null } };
+  expect(body.session.inventory_snapshot_close).to.not.be.null;
+  expect(body.session.inventory_snapshot_close!.products).to.be.an('array').with.length.greaterThan(0);
+});

@@ -98,11 +98,20 @@ Feature: Tabs (Long-lasting orders)
     Then the response status is 409
     And the response error mentions "has items"
 
-  Scenario: Cannot close register while tabs are open
+  Scenario: Can close register with open tabs
     When I open a new tab named "Table 9"
     And I add items to the tab
       | product_name | quantity |
       | Croissant    | 1        |
-    And I try to close the register with closing cash 200
-    Then the response status is 409
-    And the response error mentions "open tabs"
+    And I close the register with closing cash 200
+    Then the register status is "closed"
+
+  Scenario: Tab list includes items for each tab
+    When I open a new tab named "Item List Tab"
+    And I add items to the tab
+      | product_name | quantity |
+      | Espresso     | 2        |
+      | Latte        | 1        |
+    And I fetch the tabs list
+    Then each tab in the list has an items array
+    And the tab named "Item List Tab" has items with product names

@@ -1,13 +1,13 @@
 import { useEffect, useState } from 'react';
 import { api } from '../api/client';
-import type { SalesByItem, DailyTotal, DailyRange, CloseBrief, InventoryAdjustmentItem, HistoricReport, WeekdayReport } from '../api/client';
+import type { SalesByItem, DailyTotal, DailyRange, CloseBrief, InventoryAdjustmentItem, HistoricReport, WeekdayReport, RegisterSessionSummary, SessionReport } from '../api/client';
 import ColumnChart from '../components/ColumnChart';
 
 const localTz = Intl.DateTimeFormat().resolvedOptions().timeZone;
 const today = () => new Date().toLocaleDateString('en-CA', { timeZone: localTz });
 
 export default function ReportsView() {
-  const [tab, setTab] = useState<'sales' | 'range' | 'brief' | 'historic' | 'weekday'>('sales');
+  const [tab, setTab] = useState<'sales' | 'range' | 'brief' | 'historic' | 'weekday' | 'session'>('sales');
   const [salesFrom, setSalesFrom] = useState(today());
   const [salesTo, setSalesTo] = useState(today());
   const [salesByItem, setSalesByItem] = useState<SalesByItem[]>([]);
@@ -22,6 +22,9 @@ export default function ReportsView() {
   const [historicGroupBy, setHistoricGroupBy] = useState<'week' | 'month' | 'day'>('week');
   const [historicReport, setHistoricReport] = useState<HistoricReport | null>(null);
   const [weekdayReport, setWeekdayReport] = useState<WeekdayReport | null>(null);
+  const [sessions, setSessions] = useState<RegisterSessionSummary[]>([]);
+  const [selectedSessionId, setSelectedSessionId] = useState<number | null>(null);
+  const [sessionReport, setSessionReport] = useState<SessionReport | null>(null);
 
   async function fetchSales() {
     setLoading(true); setError('');
@@ -66,11 +69,32 @@ export default function ReportsView() {
     finally { setLoading(false); }
   }
 
+  async function fetchSessions() {
+    setLoading(true); setError('');
+    try {
+      const list = await api.getRegisterSessions();
+      setSessions(list);
+      if (list.length > 0 && selectedSessionId === null) {
+        setSelectedSessionId(list[0].id);
+      }
+    } catch (e: unknown) { setError((e as Error).message); }
+    finally { setLoading(false); }
+  }
+
+  async function fetchSessionReport(id: number) {
+    setLoading(true); setError('');
+    try { setSessionReport(await api.getSessionReport(id)); }
+    catch (e: unknown) { setError((e as Error).message); }
+    finally { setLoading(false); }
+  }
+
   useEffect(() => { if (tab === 'sales') fetchSales(); }, [tab, salesFrom, salesTo]);
   useEffect(() => { if (tab === 'range') fetchRange(); }, [tab]);
   useEffect(() => { if (tab === 'brief') fetchBrief(); }, [tab]);
   useEffect(() => { if (tab === 'historic') fetchHistoric(); }, [tab, historicGroupBy]);
   useEffect(() => { if (tab === 'weekday') fetchWeekday(); }, [tab]);
+  useEffect(() => { if (tab === 'session') fetchSessions(); }, [tab]);
+  useEffect(() => { if (selectedSessionId !== null) fetchSessionReport(selectedSessionId); }, [selectedSessionId]);
 
   return (
     <div>
@@ -81,6 +105,7 @@ export default function ReportsView() {
         <button className={`tabs-nav__item${tab === 'brief' ? ' active' : ''}`} onClick={() => setTab('brief')}>Brief</button>
         <button className={`tabs-nav__item${tab === 'historic' ? ' active' : ''}`} onClick={() => setTab('historic')}>Historic</button>
         <button className={`tabs-nav__item${tab === 'weekday' ? ' active' : ''}`} onClick={() => setTab('weekday')}>By Weekday</button>
+        <button className={`tabs-nav__item${tab === 'session' ? ' active' : ''}`} onClick={() => setTab('session')}>Sessions</button>
       </div>
 
       {tab === 'sales' && (
@@ -268,6 +293,157 @@ export default function ReportsView() {
           })()}
         </div>
       )}
+      {tab === 'session' && (
+        <div>
+          {loading && sessions.length === 0 ? <div className="spinner">⏳</div> : (
+            <>
+              {sessions.length === 0 ? (
+                <div className="card"><div className="empty">No register sessions found</div></div>
+              ) : (
+                <>
+                  <div className="field" style={{ marginBottom: 12 }}>
+                    <label className="label">Session</label>
+                    <select
+                      data-testid="session-selector"
+                      className="input"
+                      value={selectedSessionId ?? ''}
+                      onChange={e => { setSelectedSessionId(Number(e.target.value)); setSessionReport(null); }}
+                    >
+                      {sessions.map(s => (
+                        <option key={s.id} value={s.id}>
+                          #{s.id} — {new Date(s.opened_at).toLocaleDateString()} {new Date(s.opened_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                          {s.status === 'open' ? ' (open)' : s.closed_at ? ` → ${new Date(s.closed_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}` : ''}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  {loading && <div className="spinner">⏳</div>}
+
+                  {!loading && sessionReport && (() => {
+                    const { session: s, order_count, revenue, total_cost, gross_profit, cash_sales, card_sales, by_item, cashouts, restocked, adjustments } = sessionReport;
+
+                    // Build inventory comparison table from snapshots
+                    const openSnap = s.inventory_snapshot_open;
+                    const closeSnap = s.inventory_snapshot_close;
+                    const snapProducts = openSnap?.products ?? closeSnap?.products ?? [];
+                    const inventoryRows = snapProducts.map(p => {
+                      const openUnits = openSnap?.products.find(x => x.id === p.id)?.units ?? null;
+                      const closeUnits = closeSnap?.products.find(x => x.id === p.id)?.units ?? null;
+                      const sold = by_item.find(i => i.product_id === p.id)?.units_sold ?? 0;
+                      const stocked = restocked.find(r => r.product_id === p.id)?.units_restocked ?? 0;
+                      const adj = adjustments.find(a => a.product_id === p.id)?.delta ?? 0;
+                      return { id: p.id, name: p.name, openUnits, closeUnits, sold, stocked, adj };
+                    }).filter(r => r.sold > 0 || r.stocked > 0 || r.adj !== 0 || r.openUnits !== r.closeUnits);
+
+                    return (
+                      <>
+                        {/* Session info */}
+                        <div className="card">
+                          <div className="card__title">Session #{s.id} — {s.status === 'open' ? <span className="badge badge--open">OPEN</span> : <span className="badge badge--paid">CLOSED</span>}</div>
+                          <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap', fontSize: '0.9rem', marginTop: 8, color: 'var(--text-secondary)' }}>
+                            <span>Opened: {new Date(s.opened_at).toLocaleString()}</span>
+                            {s.closed_at && <span>Closed: {new Date(s.closed_at).toLocaleString()}</span>}
+                          </div>
+                          <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap', fontSize: '0.9rem', marginTop: 4 }}>
+                            <span>Opening cash: <strong>${s.opening_cash.toFixed(2)}</strong></span>
+                            {s.closing_cash != null && <span>Closing cash: <strong>${s.closing_cash.toFixed(2)}</strong></span>}
+                          </div>
+                        </div>
+
+                        {/* Tab exclusion notice */}
+                        <div data-testid="session-tab-notice" style={{ background: 'var(--surface-secondary, #f3f4f6)', border: '1px solid var(--border)', borderRadius: 8, padding: '8px 12px', fontSize: '0.82rem', color: 'var(--text-secondary)', marginBottom: 8 }}>
+                          Tab sales are not included — tabs may span multiple sessions and are tracked separately.
+                        </div>
+
+                        {/* Sales stats */}
+                        <div className="stats" data-testid="session-report-stats">
+                          <div className="stat"><div className="stat__label">Orders</div><div className="stat__value">{order_count}</div></div>
+                          <div className="stat"><div className="stat__label">Revenue</div><div className="stat__value">${revenue.toFixed(2)}</div></div>
+                          <div className="stat"><div className="stat__label">Cash</div><div className="stat__value">${cash_sales.toFixed(2)}</div></div>
+                          <div className="stat"><div className="stat__label">Card</div><div className="stat__value">${card_sales.toFixed(2)}</div></div>
+                          <div className="stat"><div className="stat__label">Cost</div><div className="stat__value">${total_cost.toFixed(2)}</div></div>
+                          <div className="stat"><div className="stat__label">Profit</div><div className="stat__value">${gross_profit.toFixed(2)}</div></div>
+                        </div>
+
+                        {/* Inventory comparison */}
+                        {(openSnap || closeSnap) && inventoryRows.length > 0 && (
+                          <div className="card">
+                            <div className="card__title">Inventory Activity</div>
+                            {!openSnap && <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: 8 }}>Opening snapshot not available for this session.</div>}
+                            {!closeSnap && s.status === 'closed' && <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: 8 }}>Closing snapshot not available for this session.</div>}
+                            <div style={{ overflowX: 'auto' }}>
+                              <table style={{ width: '100%', fontSize: '0.85rem', borderCollapse: 'collapse' }}>
+                                <thead>
+                                  <tr style={{ borderBottom: '1px solid var(--border)', color: 'var(--text-secondary)' }}>
+                                    <th style={{ textAlign: 'left', padding: '4px 8px 4px 0', fontWeight: 600 }}>Product</th>
+                                    {openSnap && <th style={{ textAlign: 'right', padding: '4px 6px', fontWeight: 600 }}>Opening</th>}
+                                    {closeSnap && <th style={{ textAlign: 'right', padding: '4px 6px', fontWeight: 600 }}>Closing</th>}
+                                    <th style={{ textAlign: 'right', padding: '4px 6px', fontWeight: 600 }}>Sold</th>
+                                    {restocked.length > 0 && <th style={{ textAlign: 'right', padding: '4px 6px', fontWeight: 600 }}>Restocked</th>}
+                                    {adjustments.length > 0 && <th style={{ textAlign: 'right', padding: '4px 6px', fontWeight: 600 }}>Adjusted</th>}
+                                  </tr>
+                                </thead>
+                                <tbody>
+                                  {inventoryRows.map(r => (
+                                    <tr key={r.id} style={{ borderBottom: '1px solid var(--border)' }}>
+                                      <td style={{ padding: '5px 8px 5px 0' }}>{r.name}</td>
+                                      {openSnap && <td style={{ textAlign: 'right', padding: '5px 6px' }}>{r.openUnits ?? '—'}</td>}
+                                      {closeSnap && <td style={{ textAlign: 'right', padding: '5px 6px' }}>{r.closeUnits ?? '—'}</td>}
+                                      <td style={{ textAlign: 'right', padding: '5px 6px', color: r.sold > 0 ? 'var(--text)' : 'var(--text-secondary)' }}>{r.sold > 0 ? r.sold : '—'}</td>
+                                      {restocked.length > 0 && <td style={{ textAlign: 'right', padding: '5px 6px', color: r.stocked > 0 ? 'var(--success)' : 'var(--text-secondary)' }}>{r.stocked > 0 ? `+${r.stocked}` : '—'}</td>}
+                                      {adjustments.length > 0 && <td style={{ textAlign: 'right', padding: '5px 6px', color: r.adj > 0 ? 'var(--success)' : r.adj < 0 ? 'var(--danger)' : 'var(--text-secondary)' }}>{r.adj !== 0 ? (r.adj > 0 ? `+${r.adj}` : r.adj) : '—'}</td>}
+                                    </tr>
+                                  ))}
+                                </tbody>
+                              </table>
+                            </div>
+                          </div>
+                        )}
+
+                        {/* By item */}
+                        {by_item.length > 0 && (
+                          <div className="card">
+                            <div className="card__title">Sales by Product</div>
+                            {by_item.map(i => (
+                              <div className="list-item" key={i.product_id}>
+                                <div className="list-item__main">
+                                  <div className="list-item__name">{i.name}</div>
+                                  <div className="list-item__sub">{i.units_sold} units · cost ${i.cost.toFixed(2)} · profit ${i.profit.toFixed(2)}</div>
+                                </div>
+                                <div className="list-item__right" style={{ fontWeight: 700 }}>${i.revenue.toFixed(2)}</div>
+                              </div>
+                            ))}
+                            {by_item.length === 0 && <div className="empty">No orders in this session</div>}
+                          </div>
+                        )}
+                        {by_item.length === 0 && <div className="card"><div className="empty">No orders in this session</div></div>}
+
+                        {/* Cashouts */}
+                        {cashouts.length > 0 && (
+                          <div className="card">
+                            <div className="card__title">Cash Removals</div>
+                            {cashouts.map(c => (
+                              <div className="list-item" key={c.id}>
+                                <div className="list-item__main">
+                                  <div className="list-item__name">{c.reason || 'No reason given'}</div>
+                                  <div className="list-item__sub">{new Date(c.created_at).toLocaleString()}</div>
+                                </div>
+                                <div className="list-item__right" style={{ fontWeight: 700, color: 'var(--danger)' }}>−${c.amount.toFixed(2)}</div>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </>
+                    );
+                  })()}
+                </>
+              )}
+            </>
+          )}
+        </div>
+      )}
+
       {tab === 'weekday' && (
         <div>
           {loading && <div className="spinner">⏳</div>}

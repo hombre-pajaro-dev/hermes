@@ -90,3 +90,23 @@ Then('the tab payment method is {string}', function (this: PosWorld, method: str
   const body = this.response.body as { payment_method: string };
   expect(body.payment_method).to.equal(method);
 });
+
+When('I fetch the tabs list', async function (this: PosWorld) {
+  this.response = await this.agent.get('/api/tabs');
+});
+
+Then('each tab in the list has an items array', function (this: PosWorld) {
+  const tabs = this.response.body as { items: unknown[] }[];
+  expect(tabs).to.be.an('array').with.length.greaterThan(0);
+  for (const tab of tabs) {
+    expect(tab).to.have.property('items').that.is.an('array');
+  }
+});
+
+Then('the tab named {string} has items with product names', function (this: PosWorld, name: string) {
+  const tabs = this.response.body as { name: string; items: { name: string; quantity: number }[] }[];
+  const tab = tabs.find(t => t.name === name);
+  expect(tab, `Expected tab named "${name}" in tabs list`).to.exist;
+  expect(tab!.items.length).to.be.greaterThan(0);
+  expect(tab!.items[0]).to.have.property('name').that.is.a('string');
+});

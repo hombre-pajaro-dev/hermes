@@ -75,3 +75,8 @@ Feature: Tabs (Long-lasting orders)
     When I view the tab "Table 6"
     And I decrease the quantity of "Espresso" on the tab to zero
     Then the tab items section is empty
+
+  Scenario: Tab list shows item summary without opening the tab
+    Given there is an open tab via the API named "Summary Tab"
+    And I am on the Tabs page
+    Then the tab items summary for "Summary Tab" is visible

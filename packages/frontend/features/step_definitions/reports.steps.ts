@@ -46,3 +46,18 @@ Then('I see the card sales stat', async function (this: PosWorld) {
   await this.page.waitForSelector('[data-testid="card-sales"]', { timeout: 5000 });
   expect(await this.page.locator('[data-testid="card-sales"]').isVisible()).to.be.true;
 });
+
+When('I switch to the Sessions tab', async function (this: PosWorld) {
+  await this.page.click('button:has-text("Sessions")');
+  await this.page.waitForLoadState('networkidle');
+});
+
+Then('I see the session selector', async function (this: PosWorld) {
+  await this.page.waitForSelector('[data-testid="session-selector"]', { timeout: 8000 });
+  expect(await this.page.locator('[data-testid="session-selector"]').isVisible()).to.be.true;
+});
+
+Then('I see the session tab notice', async function (this: PosWorld) {
+  await this.page.waitForSelector('[data-testid="session-tab-notice"]', { timeout: 8000 });
+  expect(await this.page.locator('[data-testid="session-tab-notice"]').isVisible()).to.be.true;
+});

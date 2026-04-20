@@ -8,6 +8,19 @@ import ProductPicker from '../components/ProductPicker';
 import { computeSavings, getBestAutoDiscount } from '../lib/discounts';
 import type { CartItem } from '../lib/discounts';
 
+function TabItemsSummary({ items, testId }: { items?: TabItem[]; testId?: string }) {
+  if (!items || items.length === 0) return <div className="list-item__sub" style={{ fontStyle: 'italic' }} data-testid={testId}>Empty</div>;
+  const MAX = 4;
+  const visible = items.slice(0, MAX);
+  const extra = items.length - MAX;
+  const text = visible.map(i => `${i.name ?? `#${i.product_id}`} ×${i.quantity}`).join(' · ');
+  return (
+    <div className="list-item__sub" style={{ marginTop: 2 }} data-testid={testId}>
+      {text}{extra > 0 ? ` · +${extra} more` : ''}
+    </div>
+  );
+}
+
 interface Receipt {
   timestamp: Date;
   lines: ReceiptLine[];
@@ -343,12 +356,12 @@ export default function TabsView() {
           <div className="card">
             {openTabs.length === 0 ? <div className="empty">No open tabs</div> : openTabs.map(t => (
               <div className="list-item list-item--tappable" key={t.id} data-testid="tab-item"
-                onClick={() => openTab(t)} style={{ cursor: 'pointer' }}>
-                <div className="list-item__main">
+                onClick={() => openTab(t)} style={{ cursor: 'pointer', alignItems: 'flex-start' }}>
+                <div className="list-item__main" style={{ minWidth: 0 }}>
                   <div className="list-item__name" data-testid="tab-name">{t.name || `Tab #${t.id}`}</div>
-                  <div className="list-item__sub">{t.created_at.slice(0, 10)}</div>
+                  <TabItemsSummary items={t.items} testId={`tab-items-summary-${t.id}`} />
                 </div>
-                <div className="list-item__right" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <div className="list-item__right" style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
                   <div style={{ fontWeight: 700 }}>${t.total.toFixed(2)}</div>
                   <button data-testid={`view-tab-${t.id}`} className="btn btn--sm btn--ghost"
                     onClick={e => { e.stopPropagation(); openTab(t); }}>View →</button>
@@ -362,16 +375,17 @@ export default function TabsView() {
               <p className="section-title">Closed Tabs ({closedTabs.length})</p>
               <div className="card">
                 {closedPagedTabs.map(t => (
-                  <div className="list-item" key={t.id}>
-                    <div className="list-item__main">
+                  <div className="list-item" key={t.id} style={{ alignItems: 'flex-start' }}>
+                    <div className="list-item__main" style={{ minWidth: 0 }}>
                       <div className="list-item__name">{t.name || `Tab #${t.id}`}</div>
+                      <TabItemsSummary items={t.items} />
                       {t.paid_at && (
                         <div className="list-item__sub">
-                          Paid {t.paid_at.slice(0, 10)} at {t.paid_at.slice(11, 16)}
+                          Paid {new Date(t.paid_at).toLocaleString(undefined, { dateStyle: 'short', timeStyle: 'short' })}
                         </div>
                       )}
                     </div>
-                    <div className="list-item__right" style={{ textAlign: 'right' }}>
+                    <div className="list-item__right" style={{ textAlign: 'right', flexShrink: 0 }}>
                       <span className="badge badge--paid">PAID</span>
                       <div style={{ fontWeight: 700, marginTop: 2 }}>${t.total.toFixed(2)}</div>
                       {t.payment_method && (

@@ -114,3 +114,11 @@ Then('I see the tabs list', async function (this: PosWorld) {
   await this.page.locator('[data-testid="open-tab-count"]').waitFor({ timeout: 5000 });
   expect(await this.page.locator('[data-testid="open-tab-count"]').isVisible()).to.be.true;
 });
+
+Then('the tab items summary for {string} is visible', async function (this: PosWorld, _name: string) {
+  const self = this as PosWorld & { tabId?: number };
+  const tabId = self.tabId;
+  const testId = `tab-items-summary-${tabId}`;
+  await this.page.waitForSelector(`[data-testid="${testId}"]`, { timeout: 8000 });
+  expect(await this.page.locator(`[data-testid="${testId}"]`).isVisible()).to.be.true;
+});

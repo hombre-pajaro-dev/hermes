@@ -8,7 +8,19 @@ const router = Router();
 
 router.get('/', async (_req, res) => {
   const db = await getDb();
-  const { rows } = await db.query("SELECT * FROM tabs ORDER BY created_at DESC");
+  const { rows } = await db.query(`
+    SELECT t.*,
+      COALESCE(json_agg(
+        json_build_object('id', ti.id, 'product_id', ti.product_id, 'name', p.name,
+          'quantity', ti.quantity, 'unit_price', ti.unit_price, 'unit_cost', ti.unit_cost, 'subtotal', ti.subtotal)
+        ORDER BY ti.id
+      ) FILTER (WHERE ti.id IS NOT NULL), '[]') AS items
+    FROM tabs t
+    LEFT JOIN tab_items ti ON ti.tab_id = t.id
+    LEFT JOIN products p ON p.id = ti.product_id
+    GROUP BY t.id
+    ORDER BY t.created_at DESC
+  `);
   res.json(rows);
 });
 

@@ -11,6 +11,36 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+#### Tab item summary in tabs list
+- Each tab row in the open and closed tabs list now shows a one-line item summary (e.g. `Latte ×2 · Espresso ×1`) without opening the tab
+- Up to 4 items shown inline; additional items shown as `+N more`; empty tabs show `Empty`
+- `GET /api/tabs` now JOINs `tab_items` and `products` and returns an `items` array on every tab — no extra API calls needed
+- `Tab` type gains optional `items?: TabItem[]`; `TabItem` gains optional `name?: string`
+- BDD: new backend scenario "Tab list includes items for each tab"; new frontend scenario "Tab list shows item summary without opening the tab"
+
+#### Register sessions report
+- New **Sessions** tab in Reports: select any register session from a dropdown and view an orders-only breakdown (tabs excluded by design — they span multiple sessions)
+- Session detail shows: opened/closed timestamps, opening/closing cash, orders count, revenue, cash sales, card sales, cost, profit
+- **Inventory activity table**: when snapshots exist, shows opening units vs closing units per product alongside units sold, restocked, and adjusted in the session
+- Sales by product breakdown with units, revenue, cost, and profit per item
+- Cash removals (cashouts) list for the session
+- A notice on the UI states: *"Tab sales are not included — tabs may span multiple sessions and are tracked separately."*
+- `POST /register/open` now captures a snapshot of all active product units and supply quantities (`inventory_snapshot_open` JSONB on `register_sessions`)
+- `POST /register/close` captures the same closing snapshot (`inventory_snapshot_close`)
+- `GET /api/register/sessions` — lists all sessions ordered by opened date descending
+- `GET /api/register/sessions/:id/report` — returns session metadata, orders-only sales summary, by-item breakdown, cashouts, restocked quantities, and inventory adjustments for that session
+- Schema: `ALTER TABLE register_sessions ADD COLUMN IF NOT EXISTS inventory_snapshot_open JSONB` and `inventory_snapshot_close JSONB`
+- BDD: 5 new backend scenarios (sessions list, orders-only report, tab exclusion, opening snapshot, closing snapshot); 2 new frontend scenarios (session selector visible, tab exclusion notice visible)
+
+### Changed
+
+#### Register close no longer blocked by open tabs
+- `POST /register/close` previously rejected with 409 when any tabs linked to the session were still open
+- Removed this restriction — tabs are long-running by design and often outlive a register session; closing the register is now always permitted
+- BDD: updated backend scenario "Cannot close register while tabs are open" → "Can close register with open tabs"
+
+### Added
+
 #### Historic report
 - New **Historic** tab in Reports with three groupings: **Weekly** (last 12 weeks, default), **Monthly** (full year), **Daily** (Jan 1 → today)
 - SVG column chart with three bars per period (Revenue / Cost / Profit); best period highlighted with ★ and golden glow

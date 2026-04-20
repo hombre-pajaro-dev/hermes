@@ -27,3 +27,13 @@ Feature: Reports
     Given I am on the Reports page
     When I switch to the Brief tab
     Then I see the close brief section
+
+  Scenario: Sessions tab shows session selector
+    Given I am on the Reports page
+    When I switch to the Sessions tab
+    Then I see the session selector
+
+  Scenario: Sessions tab shows tab exclusion notice
+    Given I am on the Reports page
+    When I switch to the Sessions tab
+    Then I see the session tab notice

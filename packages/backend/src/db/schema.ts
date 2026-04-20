@@ -130,6 +130,8 @@ export async function applySchema(db: Pool): Promise<void> {
     ('inventory_adjustment', 'Inventory Adjustment')
     ON CONFLICT DO NOTHING
   `);
+  await db.query(`ALTER TABLE register_sessions ADD COLUMN IF NOT EXISTS inventory_snapshot_open JSONB`);
+  await db.query(`ALTER TABLE register_sessions ADD COLUMN IF NOT EXISTS inventory_snapshot_close JSONB`);
   await db.query(`ALTER TABLE products ADD COLUMN IF NOT EXISTS image TEXT`);
   await db.query(`ALTER TABLE products ADD COLUMN IF NOT EXISTS active BOOLEAN NOT NULL DEFAULT TRUE`);
 
