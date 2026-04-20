@@ -45,12 +45,23 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 - Schema: `ALTER TABLE register_sessions ADD COLUMN IF NOT EXISTS inventory_snapshot_open JSONB` and `inventory_snapshot_close JSONB`
 - BDD: 5 new backend scenarios (sessions list, orders-only report, tab exclusion, opening snapshot, closing snapshot); 2 new frontend scenarios (session selector visible, tab exclusion notice visible)
 
+#### Product inventory tracking toggle
+- Products can be marked as **untracked** (`track_inventory: false`) — for items where stock counting has no operational value (e.g. beverages managed by a separate provider module in future)
+- Untracked products are always sellable: ◈ In Stock filter never hides them; the + button is never disabled regardless of `units` value
+- Selling an untracked product does not decrement `products.units` or deduct from linked supplies
+- Untracked products are excluded from Restock and Inventory Adjustment views; API rejects them with a clear error if submitted
+- Sold quantities are still recorded in `order_items` / `tab_items` — revenue and sales reports are unaffected
+- Products view shows `NO TRACK` badge and "∞ units" display; toggle button **Disable / Enable tracking** per product (non-supply products only)
+- API: `PATCH /api/products/:id/track-inventory` with `{ track_inventory: boolean }`
+- Schema: `ALTER TABLE products ADD COLUMN IF NOT EXISTS track_inventory BOOLEAN NOT NULL DEFAULT TRUE`
+
 ### Changed
 
 #### Tabs can be opened without an open register
 - `POST /tabs` no longer requires the register to be open — tabs are long-lasting and span multiple sessions
 - The new tab is linked to the most recent register session (open or closed); if no session has ever been created, a 409 is returned with a clear message
 - Removed `requireOpenRegister` middleware from the tab creation route
+- BDD: new scenario "Can open a tab when register is closed" (scenario 16 in Tabs)
 
 #### Register close no longer blocked by open tabs
 - `POST /register/close` previously rejected with 409 when any tabs linked to the session were still open

@@ -120,6 +120,14 @@ export default function ProductsView() {
     } catch (e: unknown) { setError((e as Error).message); }
   }
 
+  async function handleToggleTrackInventory(p: Product) {
+    setError('');
+    try {
+      const updated = await api.setProductTrackInventory(p.id, !p.track_inventory);
+      setProducts(prev => prev.map(x => x.id === updated.id ? updated : x));
+    } catch (e: unknown) { setError((e as Error).message); }
+  }
+
   async function saveField(p: Product, field: EditField) {
     setError('');
     const raw = field === 'price' ? editingPrice[p.id] : editingCost[p.id];
@@ -440,6 +448,7 @@ export default function ProductsView() {
                   <div className="product-card__name" data-testid="product-name" style={{ flex: 1 }}>{p.name}</div>
                   {!p.active && <span className="badge badge--void" style={{ fontSize: '0.65rem' }}>INACTIVE</span>}
                   {p.uses_supplies && <span className="badge badge--pending" style={{ fontSize: '0.65rem' }}>SUPPLY</span>}
+                  {p.track_inventory === false && <span className="badge badge--void" style={{ fontSize: '0.65rem' }}>NO TRACK</span>}
                 </div>
                 <div className="product-card__meta">Price</div>
                 <div className="product-card__field">
@@ -449,7 +458,7 @@ export default function ProductsView() {
                 <div className="product-card__field">
                   {renderEditableField(p, 'cost', p.cost, locked)}
                 </div>
-                <div className="product-card__meta" data-testid="product-units">{p.units} units</div>
+                <div className="product-card__meta" data-testid="product-units">{p.track_inventory === false ? '∞' : p.units} units</div>
                 {renderSupplySection(p)}
                 <button
                   data-testid={`toggle-active-${p.id}`}
@@ -459,6 +468,16 @@ export default function ProductsView() {
                 >
                   {p.active ? 'Deactivate' : 'Activate'}
                 </button>
+                {!p.uses_supplies && (
+                  <button
+                    data-testid={`toggle-track-inventory-${p.id}`}
+                    className={`btn btn--sm ${p.track_inventory === false ? 'btn--primary' : 'btn--ghost'}`}
+                    style={{ marginTop: 4, width: '100%', fontSize: '0.75rem' }}
+                    onClick={() => handleToggleTrackInventory(p)}
+                  >
+                    {p.track_inventory === false ? 'Enable tracking' : 'Disable tracking'}
+                  </button>
+                )}
               </div>
             );
           })}
@@ -481,6 +500,7 @@ export default function ProductsView() {
                       <div className="list-item__name" data-testid="product-name">{p.name}</div>
                       {!p.active && <span className="badge badge--void" style={{ fontSize: '0.65rem' }}>INACTIVE</span>}
                       {p.uses_supplies && <span className="badge badge--pending" style={{ fontSize: '0.65rem' }}>SUPPLY</span>}
+                      {p.track_inventory === false && <span className="badge badge--void" style={{ fontSize: '0.65rem' }}>NO TRACK</span>}
                     </div>
                     <div className="list-item__sub" style={{ marginTop: 4 }}>
                       <span style={{ marginRight: 8 }}>Cost:</span>
@@ -490,7 +510,7 @@ export default function ProductsView() {
                   <div className="list-item__right" style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 4 }}>
                     <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginBottom: 2 }}>Price</div>
                     {renderEditableField(p, 'price', p.price, locked)}
-                    <div className="list-item__sub" data-testid="product-units">{p.units} units</div>
+                    <div className="list-item__sub" data-testid="product-units">{p.track_inventory === false ? '∞' : p.units} units</div>
                     <button
                       data-testid={`toggle-active-${p.id}`}
                       className={`btn btn--sm ${p.active ? 'btn--ghost' : 'btn--success'}`}
@@ -499,6 +519,16 @@ export default function ProductsView() {
                     >
                       {p.active ? 'Deactivate' : 'Activate'}
                     </button>
+                    {!p.uses_supplies && (
+                      <button
+                        data-testid={`toggle-track-inventory-${p.id}`}
+                        className={`btn btn--sm ${p.track_inventory === false ? 'btn--primary' : 'btn--ghost'}`}
+                        style={{ fontSize: '0.72rem', marginTop: 2 }}
+                        onClick={() => handleToggleTrackInventory(p)}
+                      >
+                        {p.track_inventory === false ? 'Enable tracking' : 'Disable tracking'}
+                      </button>
+                    )}
                   </div>
                 </div>
                 {renderSupplySection(p)}

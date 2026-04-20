@@ -11,7 +11,7 @@ export default function InventoryView() {
 
   useEffect(() => {
     api.getProducts().then(ps => {
-      const eligible = ps.filter(p => !p.uses_supplies && p.active !== false);
+      const eligible = ps.filter(p => !p.uses_supplies && p.active !== false && p.track_inventory !== false);
       setProducts(eligible);
       setCounts(Object.fromEntries(eligible.map(p => [p.id, String(p.units)])));
     }).catch(() => {});

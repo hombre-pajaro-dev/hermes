@@ -27,6 +27,7 @@ export const api = {
   updateCost: (id: number, cost: number) => req<Product>(`/products/${id}/cost`, { method: 'PATCH', body: JSON.stringify({ cost }) }),
   updateImage: (id: number, image: string | null) => req<Product>(`/products/${id}/image`, { method: 'PATCH', body: JSON.stringify({ image }) }),
   setProductActive: (id: number, active: boolean) => req<Product>(`/products/${id}/active`, { method: 'PATCH', body: JSON.stringify({ active }) }),
+  setProductTrackInventory: (id: number, track_inventory: boolean) => req<Product>(`/products/${id}/track-inventory`, { method: 'PATCH', body: JSON.stringify({ track_inventory }) }),
 
   // Register
   getSession: () => req<RegisterSession | null>('/register/session'),
@@ -123,7 +124,7 @@ export const api = {
 
 // Types
 export interface SupplyIngredient { supply_id: number; quantity_per_unit: number; supply_name: string; unit: string; }
-export interface Product { id: number; name: string; description: string; cost: number; price: number; units: number; image?: string | null; active: boolean; uses_supplies: boolean; supply_ingredients: SupplyIngredient[]; }
+export interface Product { id: number; name: string; description: string; cost: number; price: number; units: number; image?: string | null; active: boolean; track_inventory: boolean; uses_supplies: boolean; supply_ingredients: SupplyIngredient[]; }
 export interface Supply { id: number; name: string; unit: string; quantity: number; created_at: string; }
 export interface RegisterSession { id: number; status: string; opening_cash: number; closing_cash?: number; opened_at: string; closed_at?: string; }
 export interface RegisterSessionSummary { id: number; status: string; opening_cash: number; closing_cash: number | null; opened_at: string; closed_at: string | null; }

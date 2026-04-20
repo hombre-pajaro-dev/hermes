@@ -35,7 +35,6 @@ This document lists all **features** and **scenarios** covered by the BDD test s
 | 3 | Pay a tab with cash | Add items to tab; pay tab with cash and amount received; tab closes; ledger records payment; `paid_at` timestamp recorded. |
 | 4 | Pay a tab with card | Add items to tab; pay tab with card; tab closes. |
 | 5 | Can close register with open tabs | With at least one open tab; closing register succeeds — tabs span multiple sessions and do not block. |
-| 16 | Can open a tab when register is closed | Register is closed but a prior session exists; `POST /tabs` succeeds and the tab is linked to the most recent session. |
 | 6 | Open multiple tabs simultaneously | Multiple tabs can be open at the same time; each is managed independently. |
 | 7 | Create an at-cost (staff) tab | Create tab with `at_cost: true`; items added are priced at `product.cost` instead of `product.price`; `at_cost` flag cannot be changed after creation. |
 | 8 | Closed tabs are paginated | Closed tabs list returns 10 per page; `paid_at` timestamp and payment method shown per entry. |
@@ -47,6 +46,7 @@ This document lists all **features** and **scenarios** covered by the BDD test s
 | 13 | Cannot add more items to a tab than available stock | Request quantity exceeding available units; rejected with 409. |
 | 14 | Tab list includes items for each tab | `GET /api/tabs` returns each tab with an `items` array; items include product name and quantity. |
 | 15 | Tab list shows item summary without opening the tab | In the Tabs list view, each open tab row displays a one-line summary of its items (e.g. `Espresso ×2 · Latte ×1`) without navigating into the tab. |
+| 16 | Can open a tab when register is closed | Register is closed but a prior session exists; `POST /tabs` succeeds and the tab is linked to the most recent session. |
 
 ---
 
@@ -168,6 +168,8 @@ This document lists all **features** and **scenarios** covered by the BDD test s
 
 **Supply-based products:** Products linked to supplies show a `SUPPLY` badge and display their ingredient list (e.g. `20g Coffee grounds`). Their `units` value is computed server-side; they cannot be directly restocked or inventory-adjusted — manage their stock via their supplies.
 
+**Inventory tracking toggle:** Unit-based products can be marked as `track_inventory: false`. Untracked products are always sellable (the ◈ In Stock filter never hides them; the + button is never disabled); selling does not decrement their `units`; they are hidden from Restock and Inventory Adjustment views. Sold quantities are still recorded in `order_items` / `tab_items` for revenue reporting. Products view shows a `NO TRACK` badge and "∞ units"; toggled via `PATCH /api/products/:id/track-inventory`.
+
 | # | Scenario | Description |
 |---|----------|-------------|
 | 1 | List products | Fetch products; response is array; each product has id, name, description, cost, price, units. |
@@ -183,6 +185,9 @@ This document lists all **features** and **scenarios** covered by the BDD test s
 | 11 | Reactivate a product | `PATCH /api/products/:id/active` with `{ active: true }`; product returns with `active: true`. |
 | 12 | Active filter hides inactive products in Add Items | Products with `active: false` are hidden in Checkout and Tabs when the ● Active filter is on (default). |
 | 13 | In-stock filter hides out-of-stock products in Add Items | Products with `units ≤ 0` are hidden in Checkout and Tabs when the ◈ In Stock filter is on (default). |
+| 14 | Disable inventory tracking on a product | `PATCH /api/products/:id/track-inventory` with `{ track_inventory: false }`; product returns with `track_inventory: false`; available units reported as 999999. |
+| 15 | Untracked product is always available and never deducted | Sell an untracked product; `products.units` unchanged; `getProductAvailableUnits` always returns 999999. |
+| 16 | Restock and adjustment reject untracked products | Attempt to restock or inventory-adjust an untracked product; rejected with error "inventory tracking disabled". |
 
 ---
 

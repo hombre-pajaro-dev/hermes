@@ -6,7 +6,7 @@ const router = Router();
 // Shared SELECT that computes units from supplies when applicable and includes supply_ingredients.
 const PRODUCT_SELECT = `
   SELECT
-    p.id, p.name, p.description, p.cost, p.price, p.image, p.active,
+    p.id, p.name, p.description, p.cost, p.price, p.image, p.active, p.track_inventory,
     CASE
       WHEN EXISTS(SELECT 1 FROM product_supplies ps WHERE ps.product_id = p.id)
       THEN COALESCE((
@@ -175,6 +175,16 @@ router.patch('/:id/active', async (req, res) => {
   if (typeof active !== 'boolean') return res.status(400).json({ error: 'active must be a boolean' });
   const db = await getDb();
   await db.query('UPDATE products SET active = $1 WHERE id = $2', [active, req.params.id]);
+  const { rows: [updated] } = await db.query(`${PRODUCT_SELECT} WHERE p.id = $1`, [req.params.id]);
+  if (!updated) return res.status(404).json({ error: 'Product not found' });
+  res.json(updated);
+});
+
+router.patch('/:id/track-inventory', async (req, res) => {
+  const { track_inventory } = req.body;
+  if (typeof track_inventory !== 'boolean') return res.status(400).json({ error: 'track_inventory must be a boolean' });
+  const db = await getDb();
+  await db.query('UPDATE products SET track_inventory = $1 WHERE id = $2', [track_inventory, req.params.id]);
   const { rows: [updated] } = await db.query(`${PRODUCT_SELECT} WHERE p.id = $1`, [req.params.id]);
   if (!updated) return res.status(404).json({ error: 'Product not found' });
   res.json(updated);

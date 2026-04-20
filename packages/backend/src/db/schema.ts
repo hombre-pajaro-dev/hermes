@@ -134,6 +134,7 @@ export async function applySchema(db: Pool): Promise<void> {
   await db.query(`ALTER TABLE register_sessions ADD COLUMN IF NOT EXISTS inventory_snapshot_close JSONB`);
   await db.query(`ALTER TABLE products ADD COLUMN IF NOT EXISTS image TEXT`);
   await db.query(`ALTER TABLE products ADD COLUMN IF NOT EXISTS active BOOLEAN NOT NULL DEFAULT TRUE`);
+  await db.query(`ALTER TABLE products ADD COLUMN IF NOT EXISTS track_inventory BOOLEAN NOT NULL DEFAULT TRUE`);
 
   // Discounts
   await db.query(`

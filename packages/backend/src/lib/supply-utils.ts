@@ -14,6 +14,7 @@ export async function productUsesSupplies(db: Queryable, product_id: number): Pr
 
 /**
  * Returns available units for a product.
+ * Non-tracked products return 999999 (always available).
  * For supply-based products: floor(min(supply.quantity / qty_per_unit)).
  * For unit-based products: product.units.
  */
@@ -21,6 +22,7 @@ export async function getProductAvailableUnits(db: Queryable, product_id: number
   const { rows } = await db.query(
     `SELECT
        CASE
+         WHEN p.track_inventory = FALSE THEN 999999
          WHEN EXISTS(SELECT 1 FROM product_supplies ps WHERE ps.product_id = $1)
          THEN COALESCE((
            SELECT FLOOR(MIN(s.quantity / ps.quantity_per_unit))
@@ -38,9 +40,11 @@ export async function getProductAvailableUnits(db: Queryable, product_id: number
 
 /**
  * Deducts `quantity` product units from supplies (if supply-based) or product.units.
- * Must be called inside a transaction client.
+ * No-op for non-tracked products. Must be called inside a transaction client.
  */
 export async function deductProductStock(db: Queryable, product_id: number, quantity: number): Promise<void> {
+  const { rows: [p] } = await db.query('SELECT track_inventory FROM products WHERE id = $1', [product_id]);
+  if (p?.track_inventory === false) return;
   const usesSupplies = await productUsesSupplies(db, product_id);
   if (usesSupplies) {
     await db.query(
@@ -57,9 +61,11 @@ export async function deductProductStock(db: Queryable, product_id: number, quan
 
 /**
  * Restores `quantity` product units to supplies (if supply-based) or product.units.
- * Must be called inside a transaction client.
+ * No-op for non-tracked products. Must be called inside a transaction client.
  */
 export async function restoreProductStock(db: Queryable, product_id: number, quantity: number): Promise<void> {
+  const { rows: [p] } = await db.query('SELECT track_inventory FROM products WHERE id = $1', [product_id]);
+  if (p?.track_inventory === false) return;
   const usesSupplies = await productUsesSupplies(db, product_id);
   if (usesSupplies) {
     await db.query(

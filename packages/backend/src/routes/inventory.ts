@@ -19,6 +19,7 @@ router.post('/adjust', requireOpenRegister, async (req, res) => {
       if (!product) throw new Error(`Product ${adj.product_id} not found`);
       const usesSupplies = await productUsesSupplies(client, adj.product_id);
       if (usesSupplies) throw new Error(`'${product.name}' is supply-based — adjust its supplies directly instead`);
+      if (product.track_inventory === false) throw new Error(`'${product.name}' has inventory tracking disabled`);
       const delta = adj.physical_count - product.units;
       await client.query('UPDATE products SET units = $1 WHERE id = $2', [adj.physical_count, adj.product_id]);
       const { rows: [adjRow] } = await client.query(

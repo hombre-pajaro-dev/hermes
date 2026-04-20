@@ -118,7 +118,7 @@ export default function ProductPicker({
     : products;
 
   const stockFiltered = showStockFilter && inStockOnly
-    ? activeFiltered.filter(p => p.units > 0)
+    ? activeFiltered.filter(p => p.track_inventory === false || p.units > 0)
     : activeFiltered;
 
   const displayProducts = soldCounts && sortByMostSold
@@ -222,7 +222,7 @@ export default function ProductPicker({
                   className="product-card"
                   style={{ border: qty ? '2px solid var(--primary)' : undefined, cursor: 'pointer', textAlign: 'left', width: '100%', padding: 0, overflow: 'hidden' }}
                   onClick={() => onAdd(p)}
-                  disabled={p.units <= 0}
+                  disabled={p.track_inventory !== false && p.units <= 0}
                 >
                   <div style={{ width: '100%', height: 72, background: '#f3f4f6', borderBottom: '1px solid var(--border)', flexShrink: 0, overflow: 'hidden' }}>
                     {p.image
@@ -233,7 +233,7 @@ export default function ProductPicker({
                   <div style={{ padding: '8px 10px', display: 'flex', flexDirection: 'column', gap: 3 }}>
                     <div className="product-card__name">{p.name}</div>
                     <div className="product-card__price">${effectivePrice(p).toFixed(2)}</div>
-                    <div className="product-card__meta">{p.units > 0 ? `${p.units} in stock` : 'Out of stock'}</div>
+                    <div className="product-card__meta">{p.track_inventory === false ? '∞ no tracking' : p.units > 0 ? `${p.units} in stock` : 'Out of stock'}</div>
                     {qty && <div style={{ fontSize: '0.75rem', color: 'var(--primary)', fontWeight: 600 }}>× {qty} in order</div>}
                   </div>
                 </button>
@@ -253,11 +253,11 @@ export default function ProductPicker({
                     {stockTestIdPrefix
                       ? (
                         <span data-testid={`${stockTestIdPrefix}-${toSlug(p.name)}`} style={{ marginLeft: 8 }}>
-                          {p.units > 0 ? `· ${p.units} in stock` : <span style={{ color: 'var(--danger)' }}>· out of stock</span>}
+                          {p.track_inventory === false ? '· ∞' : p.units > 0 ? `· ${p.units} in stock` : <span style={{ color: 'var(--danger)' }}>· out of stock</span>}
                         </span>
                       ) : (
                         <span style={{ marginLeft: 8 }}>
-                          {p.units > 0 ? `· ${p.units} in stock` : <span style={{ color: 'var(--danger)' }}>· out of stock</span>}
+                          {p.track_inventory === false ? '· ∞' : p.units > 0 ? `· ${p.units} in stock` : <span style={{ color: 'var(--danger)' }}>· out of stock</span>}
                         </span>
                       )
                     }
@@ -267,7 +267,7 @@ export default function ProductPicker({
                   data-testid={`${addTestIdPrefix}-${toSlug(p.name)}`}
                   className="btn btn--sm btn--primary"
                   onClick={() => onAdd(p)}
-                  disabled={p.units <= 0}
+                  disabled={p.track_inventory !== false && p.units <= 0}
                 >+</button>
               </div>
             ))}
