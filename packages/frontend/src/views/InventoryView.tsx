@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { api } from '../api/client';
-import type { Product } from '../api/client';
+import type { Product, Tab } from '../api/client';
 
 export default function InventoryView() {
   const [products, setProducts] = useState<Product[]>([]);
@@ -8,13 +8,26 @@ export default function InventoryView() {
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [result, setResult] = useState<{ name: string; delta: number; new_units: number }[]>([]);
+  const [tabReserved, setTabReserved] = useState<Record<number, number>>({});
 
   useEffect(() => {
-    api.getProducts().then(ps => {
+    async function load() {
+      const [ps, tabs] = await Promise.all([api.getProducts(), api.getTabs()]);
       const eligible = ps.filter(p => !p.uses_supplies && p.active !== false && p.track_inventory !== false);
       setProducts(eligible);
       setCounts(Object.fromEntries(eligible.map(p => [p.id, String(p.units)])));
-    }).catch(() => {});
+      const reserved: Record<number, number> = {};
+      const openTabs = (tabs as Tab[]).filter(t => t.status === 'open');
+      await Promise.all(openTabs.map(async t => {
+        const detail = await api.getTab(t.id);
+        for (const item of detail.items ?? []) {
+          const { product_id, quantity } = item;
+          reserved[product_id] = (reserved[product_id] ?? 0) + quantity;
+        }
+      }));
+      setTabReserved(reserved);
+    }
+    load().catch(() => {});
   }, []);
 
   async function handleAdjust() {
@@ -59,6 +72,11 @@ export default function InventoryView() {
             <div className="list-item__main">
               <div className="list-item__name">{p.name}</div>
               <div className="list-item__sub">System: {p.units} units</div>
+              {tabReserved[p.id] > 0 && (
+                <div style={{ fontSize: '0.72rem', color: 'var(--warning, #d97706)' }}>
+                  {tabReserved[p.id]} in open tabs
+                </div>
+              )}
             </div>
             <input data-testid={`physical-count-${p.name.toLowerCase().replace(/\s+/g,'-')}`}
               className="input" type="number" min="0"

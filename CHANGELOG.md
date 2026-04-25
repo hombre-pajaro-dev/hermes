@@ -9,7 +9,17 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+---
+
+## [1.0.0-beta.4] — 2026-04-25
+
 ### Added
+
+#### Products view — tab-reserved stock indicator
+- Each product card and list row now shows an amber "X in open tabs" label when units are reserved across active tabs
+- Count is the sum of that product's quantity across all currently open tabs
+- Visible to all roles; shown only when quantity > 0; uses `data-testid="tab-reserved-{id}"`
+- No backend changes — aggregated client-side from the existing tab detail fetches already performed on load
 
 #### Products view — admin-only editing
 - All product mutation controls are now hidden from staff: Add Product button, price/cost Edit buttons, Activate/Deactivate, Enable/Disable tracking, Edit/Link Supplies, and image picker

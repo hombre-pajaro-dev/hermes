@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { api } from '../api/client';
-import type { Product, Provider, Supply } from '../api/client';
+import type { Product, Provider, Supply, Tab } from '../api/client';
 import { authClient } from '../lib/auth-client';
 
 export default function RestockView() {
@@ -13,6 +13,7 @@ export default function RestockView() {
   const [productQtys, setProductQtys] = useState<Record<number, string>>({});
   const [productTotals, setProductTotals] = useState<Record<number, string>>({});
   const [supplyQtys, setSupplyQtys] = useState<Record<number, string>>({});
+  const [tabReserved, setTabReserved] = useState<Record<number, number>>({});
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
 
@@ -26,10 +27,20 @@ export default function RestockView() {
   const [paymentAccount, setPaymentAccount] = useState('cash');
 
   async function load() {
-    const [ps, ss, pvs] = await Promise.all([api.getProducts(), api.getSupplies(), api.getProviders()]);
+    const [ps, ss, pvs, tabs] = await Promise.all([api.getProducts(), api.getSupplies(), api.getProviders(), api.getTabs()]);
     setProducts(ps);
     setSupplies(ss);
     setProviders(pvs);
+    const reserved: Record<number, number> = {};
+    const openTabs = (tabs as Tab[]).filter(t => t.status === 'open');
+    await Promise.all(openTabs.map(async t => {
+      const detail = await api.getTab(t.id);
+      for (const item of detail.items ?? []) {
+        const { product_id, quantity } = item;
+        reserved[product_id] = (reserved[product_id] ?? 0) + quantity;
+      }
+    }));
+    setTabReserved(reserved);
   }
 
   useEffect(() => { load().catch(() => {}); }, []);
@@ -222,6 +233,11 @@ export default function RestockView() {
                   <div style={{ flex: 1, minWidth: 120 }}>
                     <div className="list-item__name">{p.name}</div>
                     <div className="list-item__sub">Stock: {p.units} units · Cost: ${p.cost.toFixed(2)}</div>
+                    {tabReserved[p.id] > 0 && (
+                      <div style={{ fontSize: '0.72rem', color: 'var(--warning, #d97706)' }}>
+                        {tabReserved[p.id]} in open tabs
+                      </div>
+                    )}
                   </div>
                   <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexShrink: 0 }}>
                     <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 2 }}>

@@ -19,6 +19,7 @@ export default function ProductsView() {
   const [products, setProducts] = useState<Product[]>([]);
   const [supplies, setSupplies] = useState<Supply[]>([]);
   const [lockedIds, setLockedIds] = useState<Set<number>>(new Set());
+  const [tabReserved, setTabReserved] = useState<Record<number, number>>({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [showForm, setShowForm] = useState(false);
@@ -57,13 +58,17 @@ export default function ProductsView() {
       setSupplies(ss);
       const openTabs = (tabs as Tab[]).filter(t => t.status === 'open');
       const locked = new Set<number>();
+      const reserved: Record<number, number> = {};
       await Promise.all(openTabs.map(async t => {
         const detail = await api.getTab(t.id);
         for (const item of detail.items ?? []) {
-          locked.add((item as { product_id: number }).product_id);
+          const { product_id, quantity } = item;
+          locked.add(product_id);
+          reserved[product_id] = (reserved[product_id] ?? 0) + quantity;
         }
       }));
       setLockedIds(locked);
+      setTabReserved(reserved);
     } catch (e: unknown) { setError((e as Error).message); }
     finally { setLoading(false); }
   }
@@ -489,6 +494,12 @@ export default function ProductsView() {
                   {renderEditableField(p, 'cost', p.cost, locked)}
                 </div>
                 <div className="product-card__meta" data-testid="product-units">{p.track_inventory === false ? '∞' : p.units} units</div>
+                {tabReserved[p.id] > 0 && (
+                  <div data-testid={`tab-reserved-${p.id}`}
+                    style={{ fontSize: '0.72rem', color: 'var(--warning, #d97706)', marginTop: 2 }}>
+                    {tabReserved[p.id]} in open tabs
+                  </div>
+                )}
                 {renderSupplySection(p)}
                 {isAdmin && (
                   <>
@@ -549,6 +560,12 @@ export default function ProductsView() {
                     <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginBottom: 2 }}>Price</div>
                     {renderEditableField(p, 'price', p.price, locked)}
                     <div className="list-item__sub" data-testid="product-units">{p.track_inventory === false ? '∞' : p.units} units</div>
+                    {tabReserved[p.id] > 0 && (
+                      <div data-testid={`tab-reserved-${p.id}`}
+                        style={{ fontSize: '0.72rem', color: 'var(--warning, #d97706)' }}>
+                        {tabReserved[p.id]} in open tabs
+                      </div>
+                    )}
                     {isAdmin && (
                       <>
                         <button
