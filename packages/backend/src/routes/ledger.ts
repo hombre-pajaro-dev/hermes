@@ -9,12 +9,15 @@ router.get('/', async (_req, res) => {
   const { rows } = await db.query(`
     SELECT le.*,
            ad.snapshot_name AS discount_name,
-           ad.amount        AS discount_amount
+           ad.amount        AS discount_amount,
+           t.at_cost        AS tab_at_cost,
+           t.created_by     AS tab_opened_by
     FROM ledger_entries le
     LEFT JOIN applied_discounts ad ON (
       (le.ref_type = 'order' AND ad.order_id = le.ref_id) OR
       (le.ref_type = 'tab'   AND ad.tab_id   = le.ref_id)
     )
+    LEFT JOIN tabs t ON (le.ref_type = 'tab' AND t.id = le.ref_id)
     ORDER BY le.created_at DESC, le.id DESC
   `);
   res.json(rows);

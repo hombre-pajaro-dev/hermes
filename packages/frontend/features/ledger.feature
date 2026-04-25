@@ -20,6 +20,11 @@ Feature: General Ledger and Accounts
     When I expand the first sale entry
     Then I see item rows for that entry
 
+  Scenario: At-cost tab payment shows COST badge in ledger
+    Given there is a paid at-cost tab via the API
+    And I am on the Ledger page
+    Then I see a COST badge on the tab payment entry
+
   Scenario: Admin sees account adjustment form in Balances tab
     Given I am on the Ledger page
     When I switch to the Balances tab

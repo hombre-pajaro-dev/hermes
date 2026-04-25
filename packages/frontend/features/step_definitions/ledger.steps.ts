@@ -4,6 +4,21 @@ import { PosWorld } from '../support/world';
 
 const API = process.env.TEST_API_URL ?? 'http://localhost:3001';
 
+Given('there is a paid at-cost tab via the API', async function (this: PosWorld) {
+  const base = `${API}/api`;
+  const sessionRes = await fetch(`${base}/register/session`);
+  const session = await sessionRes.json() as { id?: number } | null;
+  if (!session?.id) {
+    await fetch(`${base}/register/open`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ opening_cash: 200 }) });
+  }
+  const productRes = await fetch(`${base}/products`);
+  const products = await productRes.json() as { id: number }[];
+  const tabRes = await fetch(`${base}/tabs`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: 'Staff Tab', at_cost: true }) });
+  const tab = await tabRes.json() as { id: number };
+  await fetch(`${base}/tabs/${tab.id}/items`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ items: [{ product_id: products[0].id, quantity: 1 }] }) });
+  await fetch(`${base}/tabs/${tab.id}/pay`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ payment_method: 'cash', amount_received: 999 }) });
+});
+
 Given('there is a paid order via the API with {string}', async function (this: PosWorld, productName: string) {
   const base = `${API}/api`;
   const sessionRes = await fetch(`${base}/register/session`);
@@ -57,6 +72,12 @@ Then('I see item rows for that entry', async function (this: PosWorld) {
   await this.page.waitForSelector('[data-testid="ledger-item-row"]', { timeout: 5000 });
   const rows = await this.page.locator('[data-testid="ledger-item-row"]').count();
   expect(rows).to.be.greaterThan(0);
+});
+
+Then('I see a COST badge on the tab payment entry', async function (this: PosWorld) {
+  await this.page.waitForSelector('[data-testid="at-cost-badge"]', { timeout: 5000 });
+  const badge = this.page.locator('[data-testid="at-cost-badge"]').first();
+  expect(await badge.isVisible()).to.be.true;
 });
 
 Then('I see the account adjustment form', async function (this: PosWorld) {

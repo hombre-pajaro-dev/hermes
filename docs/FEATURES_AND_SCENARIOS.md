@@ -85,6 +85,8 @@ This document lists all **features** and **scenarios** covered by the BDD test s
 
 **Account Adjustment (admin only, Balances tab):** Below the accounts list, admins see an "Account Adjustment" card to manually add or remove money from any account. Fields: account selector, Add/Remove toggle, amount, description (required). Posts to `POST /api/ledger/adjustment`; creates an `account_adjustment` ledger entry. Positive amount = credit; negative = debit. Balances and ledger entries refresh after submit.
 
+**Ledger entry enrichment for tab payments:** `GET /api/ledger` now joins the `tabs` table for `tab_payment` entries and includes two extra fields: `tab_at_cost` (1 if the tab was a staff/cost tab, null otherwise) and `tab_opened_by` (email of who opened the tab, null in test/anonymous mode). Display: **COST badge** — purple inline badge on any at-cost tab payment, visible to all users. **Opened by** (admin only) — shown below the description on tab payment rows. **Contextual actor label** (admin only) — `tab_payment` shows "paid by", `payroll`/`expense`/`savings_transfer` show "recorded by", all others show "by".
+
 | # | Scenario | Description |
 |---|----------|-------------|
 | 1 | Ledger records a sale with timestamp and account | Create and pay order; fetch ledger; latest sale entry has amount and account. |
@@ -98,6 +100,9 @@ This document lists all **features** and **scenarios** covered by the BDD test s
 | 9 | Admin can add money to an account via adjustment | `POST /api/ledger/adjustment` with positive amount; `account_adjustment` ledger entry created with correct account and amount. |
 | 10 | Admin can remove money from an account via adjustment | `POST /api/ledger/adjustment` with negative amount; `account_adjustment` ledger entry created with negative amount. |
 | 11 | Admin sees account adjustment form in Balances tab (E2E) | On Ledger Balances tab; account selector, type toggle, amount/description inputs, and submit button are visible. |
+| 12 | Tab payment entry for at-cost tab includes tab_at_cost flag | Pay an at-cost tab; `GET /api/ledger` response has `tab_at_cost = 1` on the `tab_payment` entry. |
+| 13 | Tab payment entry includes tab_opened_by field | Pay any tab; `GET /api/ledger` response includes `tab_opened_by` key on the `tab_payment` entry. |
+| 14 | At-cost tab payment shows COST badge in ledger (E2E) | Paid at-cost tab in DB; Ledger Entries shows purple COST badge on the `tab payment` row. |
 
 ---
 

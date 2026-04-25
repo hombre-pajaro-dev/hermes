@@ -76,6 +76,24 @@ Feature: General Ledger and Accounts
     Then the sale ledger entry has discount_name "Happy Hour"
     And the sale ledger entry discount_amount is greater than 0
 
+  Scenario: Tab payment entry for at-cost tab includes tab_at_cost flag
+    When I open an at-cost tab named "Staff Tab"
+    And I add items to the tab
+      | product_name | quantity |
+      | Espresso     | 1        |
+    And I pay the tab with card
+    And I fetch the ledger
+    Then the tab_payment entry has tab_at_cost set to true
+
+  Scenario: Tab payment entry includes tab_opened_by field
+    When I open a new tab named "Track Tab"
+    And I add items to the tab
+      | product_name | quantity |
+      | Espresso     | 1        |
+    And I pay the tab with card
+    And I fetch the ledger
+    Then the tab_payment entry has a tab_opened_by field
+
   Scenario: Admin can add money to an account via adjustment
     When I post an account adjustment of 100.00 to "cash" with description "Cash deposit"
     And I fetch the ledger

@@ -11,6 +11,14 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+#### Ledger entry enrichment for tab payments
+- `GET /api/ledger` now JOINs the `tabs` table for `tab_payment` entries; response includes `tab_at_cost` and `tab_opened_by`
+- **COST badge:** purple inline badge shown on any `tab payment` row when the tab was opened at cost — visible to all users
+- **Opened by (admin only):** shows who created the tab below the description on `tab payment` rows
+- **Contextual actor labels (admin only):** `tab_payment` → "paid by", `payroll`/`expense`/`savings_transfer` → "recorded by", others → "by"
+- Bugfix: entry type label now uses `replace(/_/g, ' ')` (was `replace('_', ' ')`) — multi-underscore types now render fully (e.g. `savings transfer`, `account adjustment`)
+- BDD: 2 new backend scenarios (`tab_at_cost` flag, `tab_opened_by` field); 1 new frontend E2E scenario (COST badge visible)
+
 #### Account Adjustment (admin only)
 - Admins can manually add or remove money from any ledger account (cash, credit_card, etc.) with a required description
 - **API:** `POST /api/ledger/adjustment` — admin-only; creates an `account_adjustment` ledger entry; positive amount = credit, negative = debit

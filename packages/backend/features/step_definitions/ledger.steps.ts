@@ -126,6 +126,25 @@ Then('the sale ledger entry discount_amount is greater than 0', function (this: 
   expect(sale!.discount_amount).to.be.greaterThan(0);
 });
 
+When('I open an at-cost tab named {string}', async function (this: PosWorld, name: string) {
+  const res = await this.agent.post('/api/tabs').send({ name, at_cost: true });
+  this.context.tabId = (res.body as { id: number }).id;
+});
+
+Then('the tab_payment entry has tab_at_cost set to true', function (this: PosWorld) {
+  const entries = this.response.body as { entry_type: string; tab_at_cost?: number | null }[];
+  const entry = entries.find(e => e.entry_type === 'tab_payment');
+  expect(entry, 'Expected a tab_payment entry').to.exist;
+  expect(entry!.tab_at_cost).to.equal(1);
+});
+
+Then('the tab_payment entry has a tab_opened_by field', function (this: PosWorld) {
+  const entries = this.response.body as { entry_type: string; tab_opened_by?: unknown }[];
+  const entry = entries.find(e => e.entry_type === 'tab_payment');
+  expect(entry, 'Expected a tab_payment entry').to.exist;
+  expect(Object.prototype.hasOwnProperty.call(entry, 'tab_opened_by'), 'Expected tab_opened_by key in entry').to.be.true;
+});
+
 When('I post an account adjustment of {float} to {string} with description {string}', async function (this: PosWorld, amount: number, account: string, description: string) {
   this.response = await this.agent.post('/api/ledger/adjustment').send({ account, amount, description });
 });

@@ -143,7 +143,7 @@ export interface Order { id: number; status: string; total: number; discount_amo
 export interface Tab { id: number; name: string; status: string; at_cost: number; total: number; discount_amount?: number; payment_method?: string; created_at: string; updated_at?: string; paid_at?: string; items?: TabItem[]; created_by?: string | null; paid_by?: string | null; }
 export interface TabItem { id: number; product_id: number; name?: string; quantity: number; unit_price: number; unit_cost: number; subtotal: number; added_by?: string | null; added_at?: string | null; }
 export interface TabsSummary { open_count: number; total_amount: number; }
-export interface LedgerEntry { id: number; entry_type: string; account?: string; amount: number; description: string; ref_id?: number; ref_type?: string; created_at: string; discount_name?: string; discount_amount?: number; created_by?: string | null; }
+export interface LedgerEntry { id: number; entry_type: string; account?: string; amount: number; description: string; ref_id?: number; ref_type?: string; created_at: string; discount_name?: string; discount_amount?: number; created_by?: string | null; tab_at_cost?: number | null; tab_opened_by?: string | null; }
 export interface LedgerEntryItem { product_id: number; name: string; quantity: number; unit_price: number; subtotal: number; }
 export interface Account { id: number; name: string; label: string; }
 export interface Balance { account: string; balance: number; }

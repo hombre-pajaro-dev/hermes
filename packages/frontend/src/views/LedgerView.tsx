@@ -207,7 +207,10 @@ export default function LedgerView() {
                 >
                   <div className="list-item__main">
                     <div className="list-item__name" style={{ color: TYPE_COLORS[e.entry_type] ?? 'inherit', display: 'flex', alignItems: 'center', gap: 6 }}>
-                      {e.entry_type.replace('_', ' ')}
+                      {e.entry_type.replace(/_/g, ' ')}
+                      {e.entry_type === 'tab_payment' && e.tab_at_cost ? (
+                        <span data-testid="at-cost-badge" title="Staff at-cost tab" style={{ fontSize: '0.65rem', background: '#7c3aed', color: '#fff', borderRadius: 4, padding: '1px 5px', fontWeight: 700, letterSpacing: '0.02em' }}>COST</span>
+                      ) : null}
                       {expandable && (
                         <span style={{ fontSize: '0.7rem', opacity: 0.7 }}>{expanded ? '▲' : '▼'}</span>
                       )}
@@ -219,9 +222,14 @@ export default function LedgerView() {
                       </div>
                     )}
                     <div className="list-item__sub">{fmtLocal(e.created_at)}</div>
+                    {isAdmin && e.entry_type === 'tab_payment' && e.tab_opened_by && (
+                      <div className="list-item__sub" style={{ fontSize: '0.75rem', opacity: 0.7 }}>
+                        opened by {e.tab_opened_by}
+                      </div>
+                    )}
                     {isAdmin && e.created_by && (
                       <div className="list-item__sub" style={{ fontSize: '0.75rem', opacity: 0.7 }}>
-                        by {e.created_by}
+                        {e.entry_type === 'tab_payment' ? 'paid by' : ['payroll', 'expense', 'savings_transfer'].includes(e.entry_type) ? 'recorded by' : 'by'} {e.created_by}
                       </div>
                     )}
                   </div>
