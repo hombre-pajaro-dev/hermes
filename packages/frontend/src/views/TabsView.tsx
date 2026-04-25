@@ -8,6 +8,10 @@ import ProductPicker from '../components/ProductPicker';
 import { computeSavings, getBestAutoDiscount } from '../lib/discounts';
 import type { CartItem } from '../lib/discounts';
 
+function fmtShort(iso: string): string {
+  return new Date(iso).toLocaleString(undefined, { dateStyle: 'short', timeStyle: 'short' });
+}
+
 function TabItemsSummary({ items, testId }: { items?: TabItem[]; testId?: string }) {
   if (!items || items.length === 0) return <div className="list-item__sub" style={{ fontStyle: 'italic' }} data-testid={testId}>Empty</div>;
   const MAX = 4;
@@ -360,6 +364,11 @@ export default function TabsView() {
                 <div className="list-item__main" style={{ minWidth: 0 }}>
                   <div className="list-item__name" data-testid="tab-name">{t.name || `Tab #${t.id}`}</div>
                   <TabItemsSummary items={t.items} testId={`tab-items-summary-${t.id}`} />
+                  {t.updated_at && (
+                    <div className="list-item__sub" style={{ fontSize: '0.75rem' }}>
+                      Updated {fmtShort(t.updated_at)}
+                    </div>
+                  )}
                 </div>
                 <div className="list-item__right" style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
                   <div style={{ fontWeight: 700 }}>${t.total.toFixed(2)}</div>
@@ -379,9 +388,14 @@ export default function TabsView() {
                     <div className="list-item__main" style={{ minWidth: 0 }}>
                       <div className="list-item__name">{t.name || `Tab #${t.id}`}</div>
                       <TabItemsSummary items={t.items} />
+                      {t.updated_at && (
+                        <div className="list-item__sub" style={{ fontSize: '0.75rem' }}>
+                          Updated {fmtShort(t.updated_at)}
+                        </div>
+                      )}
                       {t.paid_at && (
                         <div className="list-item__sub">
-                          Paid {new Date(t.paid_at).toLocaleString(undefined, { dateStyle: 'short', timeStyle: 'short' })}
+                          Paid {fmtShort(t.paid_at)}
                         </div>
                       )}
                     </div>
@@ -537,7 +551,14 @@ export default function TabsView() {
           <div className="card">
             <div className="card__title">{selectedTab.name}</div>
             <div style={{ fontWeight: 700, fontSize: '1.2rem', marginBottom: 8 }} data-testid="tab-total">Total: <span key={totalBump} className="value-bump">${selectedTab.total.toFixed(2)}</span></div>
-            <span className={`badge badge--${selectedTab.status}`}>{selectedTab.status.toUpperCase()}</span>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+              <span className={`badge badge--${selectedTab.status}`}>{selectedTab.status.toUpperCase()}</span>
+              {selectedTab.updated_at && (
+                <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
+                  Updated {fmtShort(selectedTab.updated_at)}
+                </span>
+              )}
+            </div>
           </div>
 
           {selectedTab.at_cost ? (

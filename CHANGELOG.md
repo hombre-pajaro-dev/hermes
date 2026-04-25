@@ -9,6 +9,17 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+
+#### Tab last-updated timestamp
+- `updated_at TIMESTAMPTZ` column added to the `tabs` table; set to `NOW()` on every mutation: create, add items, update item quantity, pay, void
+- Migration: `ALTER TABLE tabs ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ` + one-time backfill `SET updated_at = created_at WHERE updated_at IS NULL`
+- **Open tab list row:** shows "Updated {date time}" below the items summary
+- **Closed tab list row:** shows "Updated {date time}" between the items summary and the "Paid" date
+- **Tab detail header:** shows "Updated {date time}" inline with the status badge
+- `Tab` type in `api/client.ts` gains `updated_at?: string`
+- BDD: 2 new backend scenarios (updated_at set on add-items, advanced on qty update); 2 new frontend E2E scenarios (timestamp visible in list and detail)
+
 ### Changed
 
 #### Payments moved to Ledger; admin section restructured with submenu

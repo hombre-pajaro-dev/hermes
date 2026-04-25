@@ -122,3 +122,19 @@ Then('the tab items summary for {string} is visible', async function (this: PosW
   await this.page.waitForSelector(`[data-testid="${testId}"]`, { timeout: 8000 });
   expect(await this.page.locator(`[data-testid="${testId}"]`).isVisible()).to.be.true;
 });
+
+Then('I see an updated timestamp in the tab list', async function (this: PosWorld) {
+  const self = this as PosWorld & { tabId?: number };
+  const tabId = self.tabId;
+  await this.page.waitForSelector(`[data-testid="view-tab-${tabId}"]`, { timeout: 8000 });
+  const row = this.page.locator('[data-testid="tab-item"]').filter({ has: this.page.locator(`[data-testid="view-tab-${tabId}"]`) });
+  const text = await row.textContent();
+  expect(text).to.include('Updated');
+});
+
+Then('I see an updated timestamp in the tab detail', async function (this: PosWorld) {
+  await this.page.waitForSelector('[data-testid="tab-total"]', { timeout: 8000 });
+  const card = this.page.locator('[data-testid="tab-total"]').locator('..');
+  const text = await card.textContent();
+  expect(text).to.include('Updated');
+});

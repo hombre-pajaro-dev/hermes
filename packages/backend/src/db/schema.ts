@@ -55,6 +55,7 @@ export async function applySchema(db: Pool): Promise<void> {
       total          DOUBLE PRECISION NOT NULL DEFAULT 0,
       payment_method TEXT,
       created_at     TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      updated_at     TIMESTAMPTZ NOT NULL DEFAULT NOW(),
       paid_at        TIMESTAMPTZ
     )
   `);
@@ -323,4 +324,6 @@ export async function applySchema(db: Pool): Promise<void> {
     )
   `);
   await db.query(`INSERT INTO settings (key, value) VALUES ('pin', '1234') ON CONFLICT DO NOTHING`);
+  await db.query(`ALTER TABLE tabs ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ`);
+  await db.query(`UPDATE tabs SET updated_at = created_at WHERE updated_at IS NULL`);
 }

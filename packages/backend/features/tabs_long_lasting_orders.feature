@@ -115,3 +115,19 @@ Feature: Tabs (Long-lasting orders)
     And I fetch the tabs list
     Then each tab in the list has an items array
     And the tab named "Item List Tab" has items with product names
+
+  Scenario: Adding items to a tab sets updated_at
+    When I open a new tab named "UpdatedAt Tab"
+    And I add items to the tab
+      | product_name | quantity |
+      | Espresso     | 1        |
+    Then the response tab has an updated_at timestamp
+
+  Scenario: Updating item quantity advances updated_at
+    When I open a new tab named "UpdatedAt Qty Tab"
+    And I add items to the tab
+      | product_name | quantity |
+      | Espresso     | 1        |
+    And I record the tab updated_at
+    And I update the tab item "Espresso" to quantity 3
+    Then the tab updated_at is not earlier than the recorded value

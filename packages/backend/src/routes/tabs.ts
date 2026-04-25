@@ -38,7 +38,7 @@ router.post('/', async (req, res) => {
   const sessionId = sessionRows[0].id as number;
   const { name = '', at_cost = false } = req.body;
   const { rows } = await db.query(
-    "INSERT INTO tabs (session_id, name, status, at_cost, total, created_at) VALUES ($1, $2, 'open', $3, 0, NOW()) RETURNING *",
+    "INSERT INTO tabs (session_id, name, status, at_cost, total, created_at, updated_at) VALUES ($1, $2, 'open', $3, 0, NOW(), NOW()) RETURNING *",
     [sessionId, name, at_cost ? 1 : 0]
   );
   res.status(201).json(rows[0]);
@@ -87,7 +87,7 @@ router.post('/:id/items', async (req, res) => {
       }
       await deductProductStock(client, item.product_id, item.quantity);
     }
-    await client.query('UPDATE tabs SET total = total + $1 WHERE id = $2', [additionalTotal, tab.id]);
+    await client.query('UPDATE tabs SET total = total + $1, updated_at = NOW() WHERE id = $2', [additionalTotal, tab.id]);
     await client.query('COMMIT');
   } catch (err: unknown) {
     await client.query('ROLLBACK');
@@ -140,7 +140,7 @@ router.patch('/:id/items/:itemId', async (req, res) => {
     } else {
       await client.query('UPDATE tab_items SET quantity = $1, subtotal = $2 WHERE id = $3', [newQty, newSubtotal, item.id]);
     }
-    await client.query('UPDATE tabs SET total = GREATEST(0, total - $1 + $2) WHERE id = $3', [oldSubtotal, newSubtotal, tab.id]);
+    await client.query('UPDATE tabs SET total = GREATEST(0, total - $1 + $2), updated_at = NOW() WHERE id = $3', [oldSubtotal, newSubtotal, tab.id]);
     if (qtyDelta !== 0) {
       if (qtyDelta > 0) {
         await deductProductStock(client, item.product_id, qtyDelta);
@@ -171,7 +171,7 @@ router.post('/:id/void', async (req, res) => {
   const { rows: items } = await db.query('SELECT id FROM tab_items WHERE tab_id = $1', [req.params.id]);
   if (items.length > 0) return res.status(409).json({ error: 'Cannot void a tab that has items' });
   const { rows: [updated] } = await db.query(
-    "UPDATE tabs SET status = 'voided' WHERE id = $1 RETURNING *",
+    "UPDATE tabs SET status = 'voided', updated_at = NOW() WHERE id = $1 RETURNING *",
     [tab.id]
   );
   res.json(updated);
@@ -219,7 +219,7 @@ router.post('/:id/pay', async (req, res) => {
   const changeDue = payment_method === 'cash' ? (amount_received! - effectiveTotal) : null;
 
   const { rows: [updated] } = await db.query(
-    "UPDATE tabs SET status = 'paid', payment_method = $1, discount_amount = $2, paid_at = NOW() WHERE id = $3 RETURNING *",
+    "UPDATE tabs SET status = 'paid', payment_method = $1, discount_amount = $2, paid_at = NOW(), updated_at = NOW() WHERE id = $3 RETURNING *",
     [payment_method, discountAmount, tab.id],
   );
   await db.query(

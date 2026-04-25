@@ -28,6 +28,8 @@ This document lists all **features** and **scenarios** covered by the BDD test s
 
 **UI — Add Items panel:** Shared `ProductPicker` component with search input, grid / list toggle (persisted under `tabs-add-view`, defaults to list), **● Active** filter (on by default, shared `product-active-filter`), **◈ In Stock** filter (on by default, shared `product-stock-filter`), and **↑ Most Sold** sort toggle (on by default, shared `product-sort`). At-cost tabs display cost price with a `(cost)` label instead of the sale price.
 
+**Last updated timestamp:** Every tab mutation (add items, update quantity, pay, void) stamps `updated_at = NOW()` on the row. Displayed as "Updated {date time}" in the list row (open and closed) and in the detail view header.
+
 | # | Scenario | Description |
 |---|----------|-------------|
 | 1 | Open a new tab and add items | Create tab; add products; same product added twice is grouped into one line with combined quantity; tab total is correct. |
@@ -47,6 +49,10 @@ This document lists all **features** and **scenarios** covered by the BDD test s
 | 14 | Tab list includes items for each tab | `GET /api/tabs` returns each tab with an `items` array; items include product name and quantity. |
 | 15 | Tab list shows item summary without opening the tab | In the Tabs list view, each open tab row displays a one-line summary of its items (e.g. `Espresso ×2 · Latte ×1`) without navigating into the tab. |
 | 16 | Can open a tab when register is closed | Register is closed but a prior session exists; `POST /tabs` succeeds and the tab is linked to the most recent session. |
+| 17 | Adding items to a tab sets updated_at | After adding items; `GET /api/tabs/:id` returns `updated_at` as a non-null timestamp. |
+| 18 | Updating item quantity advances updated_at | Add items; record `updated_at`; update quantity; new `updated_at` is ≥ the recorded value. |
+| 19 | Tab list shows last updated timestamp (E2E) | Tab with items visible in list; row shows "Updated {date time}". |
+| 20 | Tab detail shows last updated timestamp (E2E) | Open tab detail; header card shows "Updated {date time}" next to status badge. |
 
 ---
 
@@ -301,10 +307,10 @@ This document lists all **features** and **scenarios** covered by the BDD test s
 ## Running the BDD tests
 
 - **Run backend tests only:**
-  `cd packages/backend && pnpm test` — 74 scenarios
+  `cd packages/backend && pnpm test` — 76 scenarios
 
 - **Run frontend tests only:**
-  `cd packages/frontend && pnpm test` — 62 scenarios
+  `cd packages/frontend && pnpm test` — 64 scenarios
   Requires Docker/Postgres running. The test script starts its own backend (`:3002`) and frontend (`:5174`) servers automatically.
 
 - **HTML report:**

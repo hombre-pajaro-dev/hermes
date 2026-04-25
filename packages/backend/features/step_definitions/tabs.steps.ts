@@ -110,3 +110,21 @@ Then('the tab named {string} has items with product names', function (this: PosW
   expect(tab!.items.length).to.be.greaterThan(0);
   expect(tab!.items[0]).to.have.property('name').that.is.a('string');
 });
+
+Then('the response tab has an updated_at timestamp', function (this: PosWorld) {
+  const body = this.response.body as { updated_at?: string };
+  expect(body.updated_at, 'Expected updated_at to be set').to.be.a('string').and.not.be.empty;
+});
+
+When('I record the tab updated_at', async function (this: PosWorld) {
+  const tabId = this.context.tabId as number;
+  const res = await this.agent.get(`/api/tabs/${tabId}`);
+  (this.context as { recordedUpdatedAt?: string }).recordedUpdatedAt = (res.body as { updated_at: string }).updated_at;
+});
+
+Then('the tab updated_at is not earlier than the recorded value', function (this: PosWorld) {
+  const body = this.response.body as { updated_at: string };
+  const recorded = (this.context as { recordedUpdatedAt?: string }).recordedUpdatedAt;
+  expect(recorded, 'No recorded updated_at').to.be.a('string');
+  expect(new Date(body.updated_at).getTime()).to.be.at.least(new Date(recorded!).getTime());
+});

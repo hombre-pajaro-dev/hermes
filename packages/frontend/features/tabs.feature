@@ -80,3 +80,14 @@ Feature: Tabs (Long-lasting orders)
     Given there is an open tab via the API named "Summary Tab"
     And I am on the Tabs page
     Then the tab items summary for "Summary Tab" is visible
+
+  Scenario: Tab list shows last updated timestamp
+    Given there is an open tab via the API named "Timestamp Tab"
+    And I am on the Tabs page
+    Then I see an updated timestamp in the tab list
+
+  Scenario: Tab detail shows last updated timestamp
+    Given there is an open tab via the API named "Detail Timestamp Tab"
+    And I am on the Tabs page
+    When I view the tab "Detail Timestamp Tab"
+    Then I see an updated timestamp in the tab detail
