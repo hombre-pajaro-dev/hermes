@@ -2,6 +2,16 @@ import { When, Then } from '@cucumber/cucumber';
 import { expect } from 'chai';
 import { PosWorld } from '../support/world';
 
+When('I navigate to the {word} admin section', async function (this: PosWorld, section: string) {
+  await this.page.click(`[data-testid="admin-section-${section.toLowerCase()}-btn"]`);
+  await this.page.waitForLoadState('networkidle');
+});
+
+Then('I see the PIN change form', async function (this: PosWorld) {
+  await this.page.waitForSelector('[data-testid="current-pin-input"]', { timeout: 5000 });
+  expect(await this.page.locator('[data-testid="current-pin-input"]').isVisible()).to.be.true;
+});
+
 When('I fill in current PIN as {string}', async function (this: PosWorld, pin: string) {
   await this.page.fill('[data-testid="current-pin-input"]', pin);
 });

@@ -2,8 +2,14 @@ Feature: Admin — PIN Security
   As an admin, I want to manage the security PIN and protect sensitive operations
   so that unauthorised staff cannot perform cash-outs, close the register, or open staff-cost tabs.
 
+  Scenario: Admin submenu navigates to PIN section
+    Given I am on the Admin page
+    When I navigate to the pin admin section
+    Then I see the PIN change form
+
   Scenario: Change the PIN successfully
     Given I am on the Admin page
+    And I navigate to the pin admin section
     When I fill in current PIN as "1234"
     And I fill in new PIN as "5678"
     And I fill in confirm PIN as "5678"
@@ -12,6 +18,7 @@ Feature: Admin — PIN Security
 
   Scenario: Cannot change PIN with incorrect current PIN
     Given I am on the Admin page
+    And I navigate to the pin admin section
     When I fill in current PIN as "0000"
     And I fill in new PIN as "5678"
     And I fill in confirm PIN as "5678"
@@ -20,6 +27,7 @@ Feature: Admin — PIN Security
 
   Scenario: Cannot change PIN when new PINs do not match
     Given I am on the Admin page
+    And I navigate to the pin admin section
     When I fill in current PIN as "1234"
     And I fill in new PIN as "5678"
     And I fill in confirm PIN as "9999"

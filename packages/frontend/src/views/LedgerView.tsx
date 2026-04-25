@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { api } from '../api/client';
-import type { LedgerEntry, LedgerEntryItem, Balance, Account } from '../api/client';
+import type { DailyTotal, LedgerEntry, LedgerEntryItem, Balance, Account, Payee } from '../api/client';
+import { authClient } from '../lib/auth-client';
 
 const EXPANDABLE = new Set(['sale', 'tab_payment']);
 const localTz = Intl.DateTimeFormat().resolvedOptions().timeZone;
@@ -10,21 +11,56 @@ function fmtLocal(iso: string): string {
     hour: '2-digit', minute: '2-digit', hour12: false,
   }).replace(',', '');
 }
+function todayLocal(): string {
+  return new Date().toLocaleDateString('en-CA', { timeZone: localTz });
+}
+function mondayLocal(): string {
+  const d = new Date();
+  const day = d.getDay();
+  const diff = day === 0 ? -6 : 1 - day;
+  const mon = new Date(d);
+  mon.setDate(d.getDate() + diff);
+  return mon.toLocaleDateString('en-CA', { timeZone: localTz });
+}
+
+function calcAmount(payee: Payee, active: Payee[], mode: 'equal' | 'weighted', total: number): number {
+  if (mode === 'equal') return active.length > 0 ? total / active.length : 0;
+  const sumW = active.reduce((s, p) => s + Number(p.default_weight), 0);
+  return sumW > 0 ? total * (Number(payee.default_weight) / sumW) : 0;
+}
 
 export default function LedgerView() {
+  const { data: session } = authClient.useSession();
+  const isAdmin = (session?.user as { role?: string } | undefined)?.role === 'admin';
+
   const [entries, setEntries] = useState<LedgerEntry[]>([]);
   const [balances, setBalances] = useState<Balance[]>([]);
   const [accounts, setAccounts] = useState<Account[]>([]);
-  const [tab, setTab] = useState<'entries' | 'balances' | 'payroll'>('entries');
-  const [payrollAmount, setPayrollAmount] = useState('');
-  const [payrollAccount, setPayrollAccount] = useState('cash');
-  const [payrollDesc, setPayrollDesc] = useState('');
+  const [tab, setTab] = useState<'entries' | 'balances' | 'payments'>('entries');
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [expandedId, setExpandedId] = useState<number | null>(null);
-  // null = fetch failed (allows retry), LedgerEntryItem[] = loaded (even if empty)
   const [itemsCache, setItemsCache] = useState<Record<number, LedgerEntryItem[] | null>>({});
   const [loadingId, setLoadingId] = useState<number | null>(null);
+
+  // ── Payments ─────────────────────────────────────────────────────────────────
+  const [payees, setPayees] = useState<Payee[]>([]);
+  const [paymentMode, setPaymentMode] = useState<'equal' | 'weighted' | 'manual'>('equal');
+  const [paymentTotal, setPaymentTotal] = useState('');
+  const [manualAmounts, setManualAmounts] = useState<Record<number, string>>({});
+  const [paymentNote, setPaymentNote] = useState('');
+  const [paymentsError, setPaymentsError] = useState('');
+  const [paymentsSuccess, setPaymentsSuccess] = useState('');
+  const [showManagePayees, setShowManagePayees] = useState(false);
+  const [newPayeeForm, setNewPayeeForm] = useState<{ name: string; type: Payee['type']; source_account: string; default_weight: string }>({
+    name: '', type: 'staff', source_account: 'cash', default_weight: '1',
+  });
+
+  // ── Period summary ────────────────────────────────────────────────────────────
+  const [beginsAt, setBeginsAt] = useState(mondayLocal);
+  const [endsAt, setEndsAt] = useState(todayLocal);
+  const [periodSummary, setPeriodSummary] = useState<DailyTotal | null>(null);
+  const [summaryLoading, setSummaryLoading] = useState(false);
 
   useEffect(() => {
     api.getLedger().then(setEntries).catch(() => {});
@@ -32,15 +68,62 @@ export default function LedgerView() {
     api.getAccounts().then(setAccounts).catch(() => {});
   }, []);
 
-  async function handlePayroll() {
-    setError(''); setSuccess('');
+  useEffect(() => {
+    if (isAdmin) loadPayees();
+  }, [isAdmin]);
+
+  async function loadPayees() {
+    try { setPayees(await api.getPayees()); }
+    catch (e: unknown) { setPaymentsError((e as Error).message); }
+  }
+
+  async function loadPeriodSummary() {
+    if (!beginsAt || !endsAt) return;
+    setSummaryLoading(true);
+    try { setPeriodSummary(await api.getDailyTotal(beginsAt, endsAt, localTz)); }
+    catch { setPeriodSummary(null); }
+    setSummaryLoading(false);
+  }
+
+  function previewTotal(): number {
+    const active = payees.filter(p => p.active);
+    if (paymentMode === 'manual') return active.reduce((s, p) => s + (Number(manualAmounts[p.id]) || 0), 0);
+    return Number(paymentTotal) || 0;
+  }
+
+  async function handleRunPayments() {
+    setPaymentsError(''); setPaymentsSuccess('');
+    const active = payees.filter(p => p.active);
+    const totalNum = Number(paymentTotal) || 0;
+    const entries = active.map(p => ({
+      payee_id: p.id,
+      amount: paymentMode === 'manual'
+        ? Number(manualAmounts[p.id] || 0)
+        : calcAmount(p, active, paymentMode as 'equal' | 'weighted', totalNum),
+      source_account: p.source_account,
+    })).filter(e => e.amount > 0);
+    if (entries.length === 0) { setPaymentsError('No amounts to record'); return; }
     try {
-      await api.recordPayroll(Number(payrollAmount), payrollAccount, payrollDesc);
-      setSuccess('Payroll recorded');
-      setPayrollAmount(''); setPayrollDesc('');
+      await api.runPayments(entries, paymentNote || undefined);
+      setPaymentsSuccess('Payments recorded');
+      setPaymentTotal(''); setManualAmounts({}); setPaymentNote('');
       const [e, b] = await Promise.all([api.getLedger(), api.getBalances()]);
       setEntries(e); setBalances(b);
-    } catch (e: unknown) { setError((e as Error).message); }
+    } catch (e: unknown) { setPaymentsError((e as Error).message); }
+  }
+
+  async function handleTogglePayee(id: number, active: boolean) {
+    try { await api.updatePayee(id, { active }); loadPayees(); }
+    catch (e: unknown) { setPaymentsError((e as Error).message); }
+  }
+
+  async function handleCreatePayee() {
+    if (!newPayeeForm.name) return;
+    try {
+      await api.createPayee({ name: newPayeeForm.name, type: newPayeeForm.type, source_account: newPayeeForm.source_account, default_weight: Number(newPayeeForm.default_weight) || 1 });
+      setNewPayeeForm({ name: '', type: 'staff', source_account: 'cash', default_weight: '1' });
+      loadPayees();
+    } catch (e: unknown) { setPaymentsError((e as Error).message); }
   }
 
   async function fetchEntryItems(entryId: number) {
@@ -57,16 +140,11 @@ export default function LedgerView() {
   async function toggleEntry(entry: LedgerEntry) {
     if (!EXPANDABLE.has(entry.entry_type)) return;
     if (expandedId === entry.id) {
-      // If it failed last time, retry instead of collapsing
-      if (itemsCache[entry.id] === null) {
-        fetchEntryItems(entry.id);
-        return;
-      }
+      if (itemsCache[entry.id] === null) { fetchEntryItems(entry.id); return; }
       setExpandedId(null);
       return;
     }
     setExpandedId(entry.id);
-    // Skip fetch if already loaded (truthy non-null array)
     if (itemsCache[entry.id]) return;
     fetchEntryItems(entry.id);
   }
@@ -74,7 +152,7 @@ export default function LedgerView() {
   const TYPE_COLORS: Record<string, string> = {
     sale: '#16a34a', tab_payment: '#2563eb', register_open: '#7c3aed',
     register_close: '#dc2626', cashout: '#d97706', restock: '#0891b2',
-    adjustment: '#db2777', payroll: '#ea580c',
+    adjustment: '#db2777', payroll: '#ea580c', savings_transfer: '#0d9488', expense: '#9333ea',
   };
 
   return (
@@ -85,7 +163,9 @@ export default function LedgerView() {
       <div className="tabs-nav">
         <button className={`tabs-nav__item${tab === 'entries' ? ' active' : ''}`} onClick={() => setTab('entries')}>Entries</button>
         <button className={`tabs-nav__item${tab === 'balances' ? ' active' : ''}`} onClick={() => setTab('balances')}>Balances</button>
-        <button className={`tabs-nav__item${tab === 'payroll' ? ' active' : ''}`} onClick={() => setTab('payroll')}>Payroll</button>
+        {isAdmin && (
+          <button className={`tabs-nav__item${tab === 'payments' ? ' active' : ''}`} onClick={() => setTab('payments')}>Payments</button>
+        )}
       </div>
 
       {tab === 'entries' && (
@@ -195,32 +275,278 @@ export default function LedgerView() {
         </div>
       )}
 
-      {tab === 'payroll' && (
-        <div className="card">
-          <div className="card__title">Record Payroll</div>
-          <div className="field">
-            <label className="label">Amount ($)</label>
-            <input data-testid="payroll-amount-input" className="input" type="number" min="0" step="0.01"
-              value={payrollAmount} onChange={e => setPayrollAmount(e.target.value)} />
+      {tab === 'payments' && isAdmin && (
+        <>
+          {paymentsError && <div className="error-banner">{paymentsError}</div>}
+          {paymentsSuccess && <div className="success-banner" data-testid="payments-success-banner">{paymentsSuccess}</div>}
+
+          {/* Account balances */}
+          {balances.length > 0 && (
+            <div className="stats" style={{ marginBottom: 4 }}>
+              {balances.filter(b => b.account === 'cash' || b.account === 'credit_card').map(b => (
+                <div className="stat" key={b.account} data-testid={`payments-balance-${b.account}`}>
+                  <div className="stat__label">{b.account === 'credit_card' ? 'Card' : 'Cash'}</div>
+                  <div className="stat__value" style={{ color: b.balance >= 0 ? 'var(--success)' : 'var(--danger)' }}>
+                    ${b.balance.toFixed(2)}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* Period summary */}
+          <div className="card">
+            <div className="card__title">Period Summary</div>
+            <div style={{ display: 'flex', gap: 8, alignItems: 'flex-end', flexWrap: 'wrap' }}>
+              <div className="field" style={{ flex: 1, minWidth: 120, marginBottom: 0 }}>
+                <label className="label">From</label>
+                <input className="input" type="date" value={beginsAt} onChange={e => setBeginsAt(e.target.value)} />
+              </div>
+              <div className="field" style={{ flex: 1, minWidth: 120, marginBottom: 0 }}>
+                <label className="label">To</label>
+                <input className="input" type="date" value={endsAt} onChange={e => setEndsAt(e.target.value)} />
+              </div>
+              <button
+                className="btn btn--ghost"
+                style={{ flexShrink: 0, marginBottom: 0 }}
+                onClick={loadPeriodSummary}
+                disabled={summaryLoading || !beginsAt || !endsAt}
+              >
+                {summaryLoading ? '…' : 'Load'}
+              </button>
+            </div>
+            {periodSummary && (
+              <div className="stats" style={{ marginTop: 12 }}>
+                <div className="stat">
+                  <div className="stat__label">Revenue</div>
+                  <div className="stat__value" style={{ color: 'var(--success)' }}>${Number(periodSummary.total_sales).toFixed(2)}</div>
+                </div>
+                <div className="stat">
+                  <div className="stat__label">Cost</div>
+                  <div className="stat__value" style={{ color: 'var(--danger)' }}>${Number(periodSummary.total_cost).toFixed(2)}</div>
+                </div>
+                <div className="stat">
+                  <div className="stat__label">Gross Profit</div>
+                  <div className="stat__value" style={{ color: (periodSummary.total_sales - periodSummary.total_cost) >= 0 ? 'var(--success)' : 'var(--danger)' }}>
+                    ${(Number(periodSummary.total_sales) - Number(periodSummary.total_cost)).toFixed(2)}
+                  </div>
+                </div>
+                <div className="stat">
+                  <div className="stat__label">Orders</div>
+                  <div className="stat__value">{periodSummary.order_count}</div>
+                </div>
+              </div>
+            )}
           </div>
-          <div className="field">
-            <label className="label">Account</label>
-            <select data-testid="payroll-account-select" className="select"
-              value={payrollAccount} onChange={e => setPayrollAccount(e.target.value)}>
-              <option value="cash">Cash</option>
-              <option value="credit_card">Credit Card</option>
-            </select>
+
+          {/* Distribution */}
+          <div className="card" data-testid="payments-section">
+            <div className="card__title">Distribute Payments</div>
+
+            <div className="field">
+              <label className="label">Distribution mode</label>
+              <div style={{ display: 'flex', gap: 8 }}>
+                {(['equal', 'weighted', 'manual'] as const).map(mode => (
+                  <button
+                    key={mode}
+                    data-testid={`payment-mode-${mode}-btn`}
+                    className={`btn btn--sm ${paymentMode === mode ? 'btn--primary' : 'btn--ghost'}`}
+                    style={{ flex: 1 }}
+                    onClick={() => setPaymentMode(mode)}
+                  >
+                    {mode.charAt(0).toUpperCase() + mode.slice(1)}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {paymentMode !== 'manual' && (
+              <div className="field">
+                <label className="label">Total to distribute ($)</label>
+                <input
+                  data-testid="payment-total-input"
+                  className="input"
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  placeholder="0.00"
+                  value={paymentTotal}
+                  onChange={e => setPaymentTotal(e.target.value)}
+                />
+              </div>
+            )}
+
+            <div className="field">
+              <label className="label">Note (optional)</label>
+              <input
+                className="input"
+                type="text"
+                placeholder="e.g. Week of Apr 14"
+                value={paymentNote}
+                onChange={e => setPaymentNote(e.target.value)}
+              />
+            </div>
+
+            {payees.filter(p => p.active).map(p => {
+              const slug = p.name.toLowerCase().replace(/\s+/g, '-');
+              const computed = paymentMode !== 'manual'
+                ? calcAmount(p, payees.filter(q => q.active), paymentMode as 'equal' | 'weighted', Number(paymentTotal) || 0)
+                : null;
+              return (
+                <div key={p.id} className="list-item" style={{ alignItems: 'center', gap: 10 }}>
+                  <div className="list-item__main">
+                    <div className="list-item__name">{p.name}</div>
+                    <div className="list-item__sub">
+                      <span className="badge badge--pending" style={{ fontSize: '0.65rem' }}>{p.type}</span>
+                      {' '}{p.source_account}
+                    </div>
+                  </div>
+                  <div style={{ flexShrink: 0, width: 110 }}>
+                    {paymentMode === 'manual' ? (
+                      <input
+                        data-testid={`payee-amount-${slug}`}
+                        className="input"
+                        type="number"
+                        min="0"
+                        step="0.01"
+                        placeholder="0.00"
+                        value={manualAmounts[p.id] ?? ''}
+                        onChange={e => setManualAmounts(a => ({ ...a, [p.id]: e.target.value }))}
+                        style={{ textAlign: 'right' }}
+                      />
+                    ) : (
+                      <div
+                        data-testid={`payee-amount-${slug}`}
+                        style={{ textAlign: 'right', fontWeight: 600, fontSize: '0.95rem' }}
+                      >
+                        ${(computed ?? 0).toFixed(2)}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+
+            {payees.filter(p => p.active).length === 0 && (
+              <div className="empty">No active payees — add one below</div>
+            )}
+
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 12, paddingTop: 12, borderTop: '1px solid var(--border)' }}>
+              <span style={{ fontWeight: 600 }}>Total</span>
+              <span data-testid="payment-preview-total" style={{ fontWeight: 700, fontSize: '1.05rem' }}>
+                ${previewTotal().toFixed(2)}
+              </span>
+            </div>
+
+            <button
+              data-testid="record-payments-btn"
+              className="btn btn--primary"
+              style={{ marginTop: 12 }}
+              onClick={handleRunPayments}
+              disabled={payees.filter(p => p.active).length === 0}
+            >
+              Record Payments
+            </button>
           </div>
-          <div className="field">
-            <label className="label">Description</label>
-            <input data-testid="payroll-desc-input" className="input" type="text"
-              placeholder="Weekly payroll…" value={payrollDesc} onChange={e => setPayrollDesc(e.target.value)} />
+
+          {/* Manage payees */}
+          <div className="card">
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+              <div className="card__title" style={{ marginBottom: 0 }}>Manage Payees</div>
+              <button className="btn btn--sm btn--ghost" onClick={() => setShowManagePayees(v => !v)}>
+                {showManagePayees ? 'Hide' : 'Show'}
+              </button>
+            </div>
+
+            {showManagePayees && (
+              <>
+                {payees.map(p => {
+                  const slug = p.name.toLowerCase().replace(/\s+/g, '-');
+                  return (
+                    <div key={p.id} className="list-item" style={{ opacity: p.active ? 1 : 0.55, alignItems: 'center', gap: 8 }}>
+                      <div className="list-item__main">
+                        <div className="list-item__name">{p.name}</div>
+                        <div className="list-item__sub">
+                          <span className="badge badge--pending" style={{ fontSize: '0.65rem' }}>{p.type}</span>
+                          {!p.active && <span className="badge badge--void" style={{ fontSize: '0.65rem', marginLeft: 4 }}>INACTIVE</span>}
+                        </div>
+                      </div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 4, flexShrink: 0 }}>
+                        <label style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', whiteSpace: 'nowrap' }}>W</label>
+                        <input
+                          data-testid={`payee-weight-${slug}`}
+                          className="input"
+                          type="number"
+                          min="0.1"
+                          step="0.1"
+                          value={p.default_weight}
+                          onChange={e => api.updatePayee(p.id, { default_weight: Number(e.target.value) }).then(loadPayees)}
+                          style={{ width: 52, textAlign: 'center', padding: '6px 4px' }}
+                        />
+                      </div>
+                      <button
+                        data-testid={`payee-active-toggle-${slug}`}
+                        className={`btn btn--sm ${p.active ? 'btn--ghost' : 'btn--primary'}`}
+                        onClick={() => handleTogglePayee(p.id, !p.active)}
+                      >
+                        {p.active ? 'Deactivate' : 'Activate'}
+                      </button>
+                    </div>
+                  );
+                })}
+
+                <div data-testid="add-payee-form" style={{ marginTop: 16, borderTop: '1px solid var(--border)', paddingTop: 16 }}>
+                  <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                    <input
+                      className="input"
+                      placeholder="Name"
+                      value={newPayeeForm.name}
+                      onChange={e => setNewPayeeForm(f => ({ ...f, name: e.target.value }))}
+                      style={{ flex: 2, minWidth: 120 }}
+                    />
+                    <select
+                      className="input"
+                      value={newPayeeForm.type}
+                      onChange={e => setNewPayeeForm(f => ({ ...f, type: e.target.value as Payee['type'] }))}
+                      style={{ width: 'auto' }}
+                    >
+                      <option value="staff">Staff</option>
+                      <option value="expense">Expense</option>
+                      <option value="savings">Savings</option>
+                    </select>
+                    <select
+                      className="input"
+                      value={newPayeeForm.source_account}
+                      onChange={e => setNewPayeeForm(f => ({ ...f, source_account: e.target.value }))}
+                      style={{ width: 'auto' }}
+                    >
+                      <option value="cash">Cash</option>
+                      <option value="credit_card">Card</option>
+                    </select>
+                    <input
+                      className="input"
+                      type="number"
+                      min="0.1"
+                      step="0.1"
+                      placeholder="Weight"
+                      value={newPayeeForm.default_weight}
+                      onChange={e => setNewPayeeForm(f => ({ ...f, default_weight: e.target.value }))}
+                      style={{ width: 70 }}
+                    />
+                    <button
+                      className="btn btn--primary"
+                      style={{ width: 'auto', padding: '10px 16px' }}
+                      onClick={handleCreatePayee}
+                      disabled={!newPayeeForm.name}
+                    >
+                      Add
+                    </button>
+                  </div>
+                </div>
+              </>
+            )}
           </div>
-          <button data-testid="record-payroll-btn" className="btn btn--primary"
-            onClick={handlePayroll} disabled={!payrollAmount}>
-            Record Payroll
-          </button>
-        </div>
+        </>
       )}
     </div>
   );

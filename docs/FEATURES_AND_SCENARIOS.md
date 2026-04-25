@@ -73,13 +73,15 @@ This document lists all **features** and **scenarios** covered by the BDD test s
 
 ## 4. General Ledger and Accounts
 
-**Feature:** As an employee or admin, I want the system to record all orders and events by timestamp and track money per account (cash, credit card), and record payroll, so that we have a full audit trail and account balances.
+**Feature:** As an employee or admin, I want the system to record all orders and events by timestamp and track money per account (cash, credit card), so that we have a full audit trail and account balances.
+
+**Payments tab (admin only):** Ledger now hosts the Payments panel under a third tab. Admin sees current Cash and Card balances, a date-range Period Summary (Revenue / Cost / Gross Profit / Orders via `GET /api/reports/daily-total`), then the full payment distribution form and Manage Payees section.
 
 | # | Scenario | Description |
 |---|----------|-------------|
 | 1 | Ledger records a sale with timestamp and account | Create and pay order; fetch ledger; latest sale entry has amount and account. |
 | 2 | View account balances | After a cash sale; fetch balances; cash account and credit_card account appear with correct balance logic. |
-| 3 | Record a payroll payment from an account | Record payroll amount from an account with description; payroll recorded; ledger has payroll entry; account balance decreases. |
+| 3 | Record a payroll payment from an account | (Backend only) Record payroll amount from an account with description; payroll recorded; ledger has payroll entry; account balance decreases. |
 | 4 | Ledger entries are ordered by timestamp | Ledger list is ordered by created_at descending. |
 | 5 | List accounts | Fetch accounts; list includes cash and credit_card. |
 | 6 | View items for a sale ledger entry | After a card order; fetch ledger; `GET /ledger/:id/items` on the sale entry returns items with correct product name and quantity. |
@@ -242,7 +244,9 @@ This document lists all **features** and **scenarios** covered by the BDD test s
 
 **Feature:** As an admin, I want to manage the security PIN, control register open/close, manage authorized users, configure discounts, and manage supplies so that operations are secure and stock is configured correctly.
 
-**Register sub-section:** The Register controls (open, cash out, close) live on the Admin page. All staff can open the register; cash out and close require PIN confirmation.
+**Submenu navigation:** Admin page uses a tab-based submenu — **Register**, **PIN**, **Discounts** (admin only), **Supplies** (admin only), **Users** (admin only). Staff only see Register and PIN tabs.
+
+**Register sub-section:** Open, cash out, and close controls. All staff can open the register; cash out and close require PIN confirmation.
 
 **Authorized Users sub-section (admin only):** Only users with `role: admin` see this section. Admins can add an email + role, change an existing user’s role, or remove a user. Changes take effect on the user’s next sign-in.
 
@@ -252,12 +256,13 @@ This document lists all **features** and **scenarios** covered by the BDD test s
 
 | # | Scenario | Description |
 |---|----------|-------------|
-| 1 | Change the PIN successfully | On Admin page; enter correct current PIN and matching new PIN; success message shown; PIN updated. |
-| 2 | Cannot change PIN with incorrect current PIN | Enter wrong current PIN; request rejected; error shown. |
-| 3 | Cannot change PIN when new PINs do not match | Enter current PIN but mismatched new/confirm PINs; rejected with error before API call. |
-| 4 | Wrong PIN on cash out is rejected | Fill in cashout fields; click Cash Out; enter wrong PIN in modal; PIN error shown in modal. |
-| 5 | Wrong PIN on close register is rejected | Fill in closing cash; click Close Register; enter wrong PIN; PIN error shown in modal. |
-| 6 | Wrong PIN on at-cost tab is rejected | Navigate to Tabs; fill new at-cost tab form; click Open Tab; enter wrong PIN; PIN error shown. |
+| 1 | Admin submenu navigates to PIN section | On Admin page; click PIN tab; PIN change form becomes visible. |
+| 2 | Change the PIN successfully | On Admin page; navigate to PIN section; enter correct current PIN and matching new PIN; success message shown; PIN updated. |
+| 3 | Cannot change PIN with incorrect current PIN | Navigate to PIN section; enter wrong current PIN; request rejected; error shown. |
+| 4 | Cannot change PIN when new PINs do not match | Navigate to PIN section; enter current PIN but mismatched new/confirm PINs; rejected with error before API call. |
+| 5 | Wrong PIN on cash out is rejected | Fill in cashout fields; click Cash Out; enter wrong PIN in modal; PIN error shown in modal. |
+| 6 | Wrong PIN on close register is rejected | Fill in closing cash; click Close Register; enter wrong PIN; PIN error shown in modal. |
+| 7 | Wrong PIN on at-cost tab is rejected | Navigate to Tabs; fill new at-cost tab form; click Open Tab; enter wrong PIN; PIN error shown. |
 
 ---
 
@@ -265,7 +270,15 @@ This document lists all **features** and **scenarios** covered by the BDD test s
 
 **Feature:** As an admin, I want to prepare and record weekly payments for staff and expenses so that all outflows are tracked in the ledger.
 
-**UI location / notes:** Admin page → Payments section (admin only). Supports three distribution modes: equal split, weighted by configurable `default_weight` per payee, and manual per-payee amounts. Manage Payees subsection allows activating/deactivating payees and adding new ones.
+**UI location:** Ledger page → Payments tab (admin only; staff do not see the tab). Not on the Admin page.
+
+**Period Summary:** Date-range pickers (default: current week Monday → today) load Revenue, Cost, Gross Profit, and Order count via `GET /api/reports/daily-total` — giving context for how much is available to distribute.
+
+**Account balances:** Current Cash and Card balances shown above the distribution form (no extra API call — uses already-loaded ledger balances).
+
+**Distribution modes:** Equal (total ÷ active payees), Weighted (proportional to each payee's `default_weight`, editable inline), Manual (cashier enters each amount). Weighted mode requires payees to have different weights — use the **W** input in Manage Payees to set them.
+
+**Manage Payees:** Collapsible panel to activate/deactivate payees, edit weights, and add new payees with name, type, source account, and weight.
 
 **Default payees:** Pajaro, MonGee, Mon, Paloma, Lola (staff); Rent, Utilities, Capital Payments, Maintenance, Sound Equipment (expense); Savings (savings). Seeded on first run and on test reset.
 
@@ -277,16 +290,18 @@ This document lists all **features** and **scenarios** covered by the BDD test s
 | 4 | Run a payment creates payroll ledger entry | `POST /api/payments/run` for a staff payee creates a `payroll` ledger entry with negative amount. |
 | 5 | Run a payment creates expense ledger entry | `POST /api/payments/run` for an expense payee creates an `expense` ledger entry with negative amount. |
 | 6 | Run a payment creates savings transfer ledger entry | `POST /api/payments/run` for a savings payee creates a `savings_transfer` ledger entry with negative amount. |
-| 7 | Payment creates a payroll ledger entry (E2E) | Record a payment via API; Ledger page shows a `payroll` entry. |
-| 8 | Payment creates an expense ledger entry (E2E) | Record a payment via API; Ledger page shows an `expense` entry. |
-| 9 | Payment creates a savings transfer ledger entry (E2E) | Record a payment via API; Ledger page shows a `savings transfer` entry. |
+| 7 | Update payee default weight | `PATCH /api/payees/:id` with `default_weight: 3` persists the weight; subsequent `GET /api/payees` returns the updated value. |
+| 8 | Run payments with a note appends note to ledger description | `POST /api/payments/run` with `note` field; ledger entry description is `"{payee} — {note}"`. |
+| 9 | Payment creates a payroll ledger entry (E2E) | Record a payment via API; Ledger page shows a `payroll` entry. |
+| 10 | Payment creates an expense ledger entry (E2E) | Record a payment via API; Ledger page shows an `expense` entry. |
+| 11 | Payment creates a savings transfer ledger entry (E2E) | Record a payment via API; Ledger page shows a `savings transfer` entry. |
 
 ---
 
 ## Running the BDD tests
 
 - **Run backend tests only:**
-  `cd packages/backend && pnpm test` — 72 scenarios
+  `cd packages/backend && pnpm test` — 74 scenarios
 
 - **Run frontend tests only:**
   `cd packages/frontend && pnpm test` — 62 scenarios

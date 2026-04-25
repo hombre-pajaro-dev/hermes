@@ -40,3 +40,15 @@ Feature: Payments
     When I POST /api/payments/run with the payee amount 200 from "cash"
     Then the response status is 201
     And a ledger entry exists for "TestSavings" with amount -200 and type "savings_transfer"
+
+  Scenario: Update payee default weight
+    Given there is a payee "WeightedStaff" of type "staff"
+    When I PATCH the payee default_weight to 3
+    Then the response status is 200
+    And the payee "WeightedStaff" has default_weight 3
+
+  Scenario: Run payments with a note appends note to ledger description
+    Given there is a payee "NoteStaff" of type "staff"
+    When I POST /api/payments/run with the payee amount 200 from "cash" and note "Week of Apr 14"
+    Then the response status is 201
+    And a ledger entry exists for "NoteStaff — Week of Apr 14" with amount -200 and type "payroll"

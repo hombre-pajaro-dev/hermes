@@ -14,14 +14,6 @@ Feature: General Ledger and Accounts
     Then I see the balances section
     And the cash account is visible
 
-  Scenario: Record a payroll payment
-    Given I am on the Ledger page
-    When I switch to the Payroll tab
-    And I enter payroll amount 500
-    And I enter payroll description "Weekly payroll"
-    And I click Record Payroll
-    Then I see a success message
-
   Scenario: View items in a sale ledger entry
     Given there is a paid order via the API with "Espresso"
     And I am on the Ledger page

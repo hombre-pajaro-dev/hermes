@@ -9,6 +9,16 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Changed
+
+#### Payments moved to Ledger; admin section restructured with submenu
+- Payments panel moved from **Admin → Payments** to **Ledger → Payments tab** (admin-only; hidden from staff)
+- Admin section now uses a tabbed submenu — **Register**, **PIN**, **Discounts**, **Supplies**, **Users** — eliminating the need to scroll through unrelated sections
+- Payments tab in Ledger opens with a **Period Summary** card: date-range pickers (default Monday → today) fetch `GET /api/reports/daily-total` and display Revenue, Cost, Gross Profit, and Order count for the period — giving context before entering payment amounts
+- Current **Cash** and **Card** account balances shown at the top of the Payments tab (from existing `GET /api/ledger/balances` — no extra request)
+- After recording payments, ledger entries and balances refresh automatically
+- Weighted distribution mode now functional end-to-end: `default_weight` per payee is editable inline in Manage Payees; new-payee form exposes a weight input (previously always defaulted to 1 with no UI to change it)
+
 ### Added
 
 #### Payments
@@ -20,7 +30,7 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 - Payment recording creates ledger entries per payee: `payroll` for staff, `expense` for expenses, `savings_transfer` for savings — each with negative amount to reflect outflow from the source account
 - New `savings` account in the ledger accounts table for tracking savings transfers
 - API endpoints: `GET /api/payees`, `POST /api/payees`, `PATCH /api/payees/:id`, `DELETE /api/payees/:id`, `POST /api/payments/run`
-- BDD: 6 new backend scenarios in `payments.feature`; 3 new frontend e2e scenarios in `payments.feature` (verifying ledger entries after payment runs)
+- BDD: 8 backend scenarios in `payments.feature` (adds weight update and payment-with-note); 3 frontend e2e scenarios in `payments.feature` (verifying ledger entries after payment runs); 1 new frontend scenario in `admin.feature` (submenu PIN navigation)
 
 ### Added
 

@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { api } from '../api/client';
-import type { AuthorizedUser, Discount, Payee, Product, RegisterSession, Supply } from '../api/client';
+import type { AuthorizedUser, Discount, Product, RegisterSession, Supply } from '../api/client';
 import { authClient } from '../lib/auth-client';
 import PinModal from '../components/PinModal';
 
@@ -295,71 +295,7 @@ export default function AdminView() {
     catch (e: unknown) { setSuppliesError((e as Error).message); }
   }
 
-  // ── Payments (admin only) ────────────────────────────────────────────────────
-  const [payees, setPayees] = useState<Payee[]>([]);
-  const [paymentMode, setPaymentMode] = useState<'equal' | 'weighted' | 'manual'>('equal');
-  const [paymentTotal, setPaymentTotal] = useState('');
-  const [manualAmounts, setManualAmounts] = useState<Record<number, string>>({});
-  const [paymentNote, setPaymentNote] = useState('');
-  const [paymentsError, setPaymentsError] = useState('');
-  const [paymentsSuccess, setPaymentsSuccess] = useState('');
-  const [showManagePayees, setShowManagePayees] = useState(false);
-  const [newPayeeForm, setNewPayeeForm] = useState<{ name: string; type: Payee['type']; source_account: string }>({
-    name: '', type: 'staff', source_account: 'cash',
-  });
-
-  async function loadPayees() {
-    if (!isAdmin) return;
-    try { setPayees(await api.getPayees()); }
-    catch (e: unknown) { setPaymentsError((e as Error).message); }
-  }
-
-  useEffect(() => { loadPayees(); }, [isAdmin]);
-
-  function calcAmount(payee: Payee, active: Payee[], mode: 'equal' | 'weighted', total: number): number {
-    if (mode === 'equal') return active.length > 0 ? total / active.length : 0;
-    const sumW = active.reduce((s, p) => s + Number(p.default_weight), 0);
-    return sumW > 0 ? total * (Number(payee.default_weight) / sumW) : 0;
-  }
-
-  function previewTotal(): number {
-    const active = payees.filter(p => p.active);
-    if (paymentMode === 'manual') return active.reduce((s, p) => s + (Number(manualAmounts[p.id]) || 0), 0);
-    return Number(paymentTotal) || 0;
-  }
-
-  async function handleRunPayments() {
-    setPaymentsError(''); setPaymentsSuccess('');
-    const active = payees.filter(p => p.active);
-    const totalNum = Number(paymentTotal) || 0;
-    const entries = active.map(p => ({
-      payee_id: p.id,
-      amount: paymentMode === 'manual'
-        ? Number(manualAmounts[p.id] || 0)
-        : calcAmount(p, active, paymentMode as 'equal' | 'weighted', totalNum),
-      source_account: p.source_account,
-    })).filter(e => e.amount > 0);
-    if (entries.length === 0) { setPaymentsError('No amounts to record'); return; }
-    try {
-      await api.runPayments(entries, paymentNote || undefined);
-      setPaymentsSuccess('Payments recorded successfully');
-      setPaymentTotal(''); setManualAmounts({}); setPaymentNote('');
-    } catch (e: unknown) { setPaymentsError((e as Error).message); }
-  }
-
-  async function handleTogglePayee(id: number, active: boolean) {
-    try { await api.updatePayee(id, { active }); loadPayees(); }
-    catch (e: unknown) { setPaymentsError((e as Error).message); }
-  }
-
-  async function handleCreatePayee() {
-    if (!newPayeeForm.name) return;
-    try {
-      await api.createPayee({ name: newPayeeForm.name, type: newPayeeForm.type, source_account: newPayeeForm.source_account, default_weight: 1 });
-      setNewPayeeForm({ name: '', type: 'staff', source_account: 'cash' });
-      loadPayees();
-    } catch (e: unknown) { setPaymentsError((e as Error).message); }
-  }
+  const [adminSection, setAdminSection] = useState<'register' | 'pin' | 'discounts' | 'supplies' | 'users'>('register');
 
   return (
     <div>
@@ -390,11 +326,34 @@ export default function AdminView() {
         </button>
       </div>
 
-      {/* Register */}
-      {registerError && <div className="error-banner" data-testid="error-banner">{registerError}</div>}
-      {registerSuccess && <div className="success-banner" data-testid="success-banner">{registerSuccess}</div>}
+      {/* Submenu */}
+      <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', marginBottom: 4 }}>
+        {([
+          { key: 'register', label: 'Register' },
+          { key: 'pin', label: 'PIN' },
+          ...(isAdmin ? [
+            { key: 'discounts', label: 'Discounts' },
+            { key: 'supplies', label: 'Supplies' },
+            { key: 'users', label: 'Users' },
+          ] : []),
+        ] as { key: typeof adminSection; label: string }[]).map(({ key, label }) => (
+          <button
+            key={key}
+            className={`btn btn--sm ${adminSection === key ? 'btn--primary' : 'btn--ghost'}`}
+            style={{ flex: '1 1 auto' }}
+            data-testid={`admin-section-${key}-btn`}
+          onClick={() => setAdminSection(key)}
+          >
+            {label}
+          </button>
+        ))}
+      </div>
 
-      {registerLoading ? (
+      {/* Register */}
+      {adminSection === 'register' && registerError && <div className="error-banner" data-testid="error-banner">{registerError}</div>}
+      {adminSection === 'register' && registerSuccess && <div className="success-banner" data-testid="success-banner">{registerSuccess}</div>}
+
+      {adminSection === 'register' && (registerLoading ? (
         <div className="spinner">⏳</div>
       ) : (
         <>
@@ -462,13 +421,14 @@ export default function AdminView() {
             </>
           )}
         </>
-      )}
+      ))}
 
       {/* PIN management */}
-      {pinError && <div className="error-banner" data-testid="error-banner">{pinError}</div>}
-      {pinSuccess && <div className="success-banner" data-testid="success-banner">{pinSuccess}</div>}
-
-      <div className="card">
+      {adminSection === 'pin' && (
+        <>
+          {pinError && <div className="error-banner" data-testid="error-banner">{pinError}</div>}
+          {pinSuccess && <div className="success-banner" data-testid="success-banner">{pinSuccess}</div>}
+          <div className="card">
         <div className="card__title">Change PIN</div>
         <p style={{ fontSize: '0.9rem', color: 'var(--text-secondary)', marginBottom: 12 }}>
           The PIN protects cash-outs, closing the register, and opening staff cost tabs.
@@ -493,9 +453,11 @@ export default function AdminView() {
           Change PIN
         </button>
       </div>
+        </>
+      )}
 
       {/* Discounts — admin only */}
-      {isAdmin && (
+      {adminSection === 'discounts' && isAdmin && (
         <>
           {discountsError && <div className="error-banner">{discountsError}</div>}
 
@@ -698,7 +660,7 @@ export default function AdminView() {
       )}
 
       {/* Supplies — admin only */}
-      {isAdmin && (
+      {adminSection === 'supplies' && isAdmin && (
         <>
           {suppliesError && <div className="error-banner">{suppliesError}</div>}
 
@@ -773,198 +735,8 @@ export default function AdminView() {
         </>
       )}
 
-      {/* Payments — admin only */}
-      {isAdmin && (
-        <>
-          {paymentsError && <div className="error-banner">{paymentsError}</div>}
-          {paymentsSuccess && <div className="success-banner" data-testid="payments-success-banner">{paymentsSuccess}</div>}
-
-          <div className="card" data-testid="payments-section">
-            <div className="card__title">Payments</div>
-            <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', marginBottom: 12 }}>
-              Prepare and record weekly payments for staff and expenses.
-            </p>
-
-            <div className="field">
-              <label className="label">Distribution mode</label>
-              <div style={{ display: 'flex', gap: 8 }}>
-                {(['equal', 'weighted', 'manual'] as const).map(mode => (
-                  <button
-                    key={mode}
-                    data-testid={`payment-mode-${mode}-btn`}
-                    className={`btn btn--sm ${paymentMode === mode ? 'btn--primary' : 'btn--ghost'}`}
-                    style={{ flex: 1 }}
-                    onClick={() => setPaymentMode(mode)}
-                  >
-                    {mode.charAt(0).toUpperCase() + mode.slice(1)}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            {paymentMode !== 'manual' && (
-              <div className="field">
-                <label className="label">Total to distribute ($)</label>
-                <input
-                  data-testid="payment-total-input"
-                  className="input"
-                  type="number"
-                  min="0"
-                  step="0.01"
-                  placeholder="0.00"
-                  value={paymentTotal}
-                  onChange={e => setPaymentTotal(e.target.value)}
-                />
-              </div>
-            )}
-
-            <div className="field">
-              <label className="label">Note (optional)</label>
-              <input
-                className="input"
-                type="text"
-                placeholder="e.g. Week of Apr 14"
-                value={paymentNote}
-                onChange={e => setPaymentNote(e.target.value)}
-              />
-            </div>
-
-            {payees.filter(p => p.active).map(p => {
-              const slug = p.name.toLowerCase().replace(/\s+/g, '-');
-              const computed = paymentMode !== 'manual'
-                ? calcAmount(p, payees.filter(q => q.active), paymentMode as 'equal' | 'weighted', Number(paymentTotal) || 0)
-                : null;
-              return (
-                <div key={p.id} className="list-item" style={{ alignItems: 'center', gap: 10 }}>
-                  <div className="list-item__main">
-                    <div className="list-item__name">{p.name}</div>
-                    <div className="list-item__sub">
-                      <span className="badge badge--pending" style={{ fontSize: '0.65rem' }}>{p.type}</span>
-                      {' '}{p.source_account}
-                    </div>
-                  </div>
-                  <div style={{ flexShrink: 0, width: 110 }}>
-                    {paymentMode === 'manual' ? (
-                      <input
-                        data-testid={`payee-amount-${slug}`}
-                        className="input"
-                        type="number"
-                        min="0"
-                        step="0.01"
-                        placeholder="0.00"
-                        value={manualAmounts[p.id] ?? ''}
-                        onChange={e => setManualAmounts(a => ({ ...a, [p.id]: e.target.value }))}
-                        style={{ textAlign: 'right' }}
-                      />
-                    ) : (
-                      <div
-                        data-testid={`payee-amount-${slug}`}
-                        style={{ textAlign: 'right', fontWeight: 600, fontSize: '0.95rem' }}
-                      >
-                        ${(computed ?? 0).toFixed(2)}
-                      </div>
-                    )}
-                  </div>
-                </div>
-              );
-            })}
-
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 12, paddingTop: 12, borderTop: '1px solid var(--border)' }}>
-              <span style={{ fontWeight: 600 }}>Total</span>
-              <span data-testid="payment-preview-total" style={{ fontWeight: 700, fontSize: '1.05rem' }}>
-                ${previewTotal().toFixed(2)}
-              </span>
-            </div>
-
-            <button
-              data-testid="record-payments-btn"
-              className="btn btn--primary"
-              style={{ marginTop: 12 }}
-              onClick={handleRunPayments}
-              disabled={payees.filter(p => p.active).length === 0}
-            >
-              Record Payments
-            </button>
-          </div>
-
-          <div className="card">
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-              <div className="card__title" style={{ marginBottom: 0 }}>Manage Payees</div>
-              <button className="btn btn--sm btn--ghost" onClick={() => setShowManagePayees(v => !v)}>
-                {showManagePayees ? 'Hide' : 'Show'}
-              </button>
-            </div>
-
-            {showManagePayees && (
-              <>
-                {payees.map(p => {
-                  const slug = p.name.toLowerCase().replace(/\s+/g, '-');
-                  return (
-                    <div key={p.id} className="list-item" style={{ opacity: p.active ? 1 : 0.55 }}>
-                      <div className="list-item__main">
-                        <div className="list-item__name">{p.name}</div>
-                        <div className="list-item__sub">
-                          <span className="badge badge--pending" style={{ fontSize: '0.65rem' }}>{p.type}</span>
-                          {!p.active && <span className="badge badge--void" style={{ fontSize: '0.65rem', marginLeft: 4 }}>INACTIVE</span>}
-                        </div>
-                      </div>
-                      <button
-                        data-testid={`payee-active-toggle-${slug}`}
-                        className={`btn btn--sm ${p.active ? 'btn--ghost' : 'btn--primary'}`}
-                        onClick={() => handleTogglePayee(p.id, !p.active)}
-                      >
-                        {p.active ? 'Deactivate' : 'Activate'}
-                      </button>
-                    </div>
-                  );
-                })}
-
-                <div data-testid="add-payee-form" style={{ marginTop: 16, borderTop: '1px solid var(--border)', paddingTop: 16 }}>
-                  <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                    <input
-                      className="input"
-                      placeholder="Name"
-                      value={newPayeeForm.name}
-                      onChange={e => setNewPayeeForm(f => ({ ...f, name: e.target.value }))}
-                      style={{ flex: 2, minWidth: 120 }}
-                    />
-                    <select
-                      className="input"
-                      value={newPayeeForm.type}
-                      onChange={e => setNewPayeeForm(f => ({ ...f, type: e.target.value as Payee['type'] }))}
-                      style={{ width: 'auto' }}
-                    >
-                      <option value="staff">Staff</option>
-                      <option value="expense">Expense</option>
-                      <option value="savings">Savings</option>
-                    </select>
-                    <select
-                      className="input"
-                      value={newPayeeForm.source_account}
-                      onChange={e => setNewPayeeForm(f => ({ ...f, source_account: e.target.value }))}
-                      style={{ width: 'auto' }}
-                    >
-                      <option value="cash">Cash</option>
-                      <option value="credit_card">Card</option>
-                    </select>
-                    <button
-                      className="btn btn--primary"
-                      style={{ width: 'auto', padding: '10px 16px' }}
-                      onClick={handleCreatePayee}
-                      disabled={!newPayeeForm.name}
-                    >
-                      Add
-                    </button>
-                  </div>
-                </div>
-              </>
-            )}
-          </div>
-        </>
-      )}
-
       {/* Authorized users — admin only */}
-      {isAdmin && (
+      {adminSection === 'users' && isAdmin && (
         <>
           {usersError && <div className="error-banner">{usersError}</div>}
 

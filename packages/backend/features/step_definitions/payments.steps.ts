@@ -45,6 +45,29 @@ When('I POST /api/payments/run with the payee amount {float} from {string}',
   }
 );
 
+When('I PATCH the payee default_weight to {float}', async function (this: PosWorld, weight: number) {
+  const id = (this.context as { payeeId?: number }).payeeId;
+  this.response = await this.agent.patch(`/api/payees/${id}`).send({ default_weight: weight });
+});
+
+Then('the payee {string} has default_weight {float}', async function (this: PosWorld, name: string, weight: number) {
+  const res = await this.agent.get('/api/payees');
+  const payees = res.body as { name: string; default_weight: number }[];
+  const payee = payees.find(p => p.name === name);
+  expect(payee, `Payee "${name}" not found`).to.exist;
+  expect(Number(payee!.default_weight)).to.be.closeTo(weight, 0.01);
+});
+
+When('I POST /api/payments/run with the payee amount {float} from {string} and note {string}',
+  async function (this: PosWorld, amount: number, account: string, note: string) {
+    const id = (this.context as { payeeId?: number }).payeeId;
+    this.response = await this.agent.post('/api/payments/run').send({
+      entries: [{ payee_id: id, amount, source_account: account }],
+      note,
+    });
+  }
+);
+
 Then('a ledger entry exists for {string} with amount {float} and type {string}',
   async function (this: PosWorld, description: string, amount: number, type: string) {
     const res = await this.agent.get('/api/ledger');
