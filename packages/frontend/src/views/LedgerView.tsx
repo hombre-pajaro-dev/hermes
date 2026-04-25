@@ -43,6 +43,14 @@ export default function LedgerView() {
   const [itemsCache, setItemsCache] = useState<Record<number, LedgerEntryItem[] | null>>({});
   const [loadingId, setLoadingId] = useState<number | null>(null);
 
+  // ── Account adjustment ───────────────────────────────────────────────────────
+  const [adjAccount, setAdjAccount] = useState('cash');
+  const [adjType, setAdjType] = useState<'add' | 'remove'>('add');
+  const [adjAmount, setAdjAmount] = useState('');
+  const [adjDescription, setAdjDescription] = useState('');
+  const [adjError, setAdjError] = useState('');
+  const [adjSuccess, setAdjSuccess] = useState('');
+
   // ── Payments ─────────────────────────────────────────────────────────────────
   const [payees, setPayees] = useState<Payee[]>([]);
   const [paymentMode, setPaymentMode] = useState<'equal' | 'weighted' | 'manual'>('equal');
@@ -149,10 +157,26 @@ export default function LedgerView() {
     fetchEntryItems(entry.id);
   }
 
+  async function handleAccountAdjustment() {
+    setAdjError(''); setAdjSuccess('');
+    const num = Number(adjAmount);
+    if (!adjAmount || isNaN(num) || num <= 0) { setAdjError('Enter a positive amount'); return; }
+    if (!adjDescription.trim()) { setAdjError('Description is required'); return; }
+    const signed = adjType === 'add' ? num : -num;
+    try {
+      await api.adjustAccount(adjAccount, signed, adjDescription.trim());
+      setAdjSuccess('Adjustment recorded');
+      setAdjAmount(''); setAdjDescription('');
+      const [e, b] = await Promise.all([api.getLedger(), api.getBalances()]);
+      setEntries(e); setBalances(b);
+    } catch (e: unknown) { setAdjError((e as Error).message); }
+  }
+
   const TYPE_COLORS: Record<string, string> = {
     sale: '#16a34a', tab_payment: '#2563eb', register_open: '#7c3aed',
     register_close: '#dc2626', cashout: '#d97706', restock: '#0891b2',
     adjustment: '#db2777', payroll: '#ea580c', savings_transfer: '#0d9488', expense: '#9333ea',
+    account_adjustment: '#6b7280',
   };
 
   return (
@@ -277,6 +301,79 @@ export default function LedgerView() {
               </div>
             ))}
           </div>
+          {isAdmin && (
+            <div className="card" data-testid="account-adjustment-form">
+              <div className="card__title">Account Adjustment</div>
+              {adjError && <div className="error-banner" style={{ marginBottom: 8 }}>{adjError}</div>}
+              {adjSuccess && <div className="success-banner" data-testid="adjustment-success-banner" style={{ marginBottom: 8 }}>{adjSuccess}</div>}
+              <div className="field">
+                <label className="label">Account</label>
+                <select
+                  data-testid="adjustment-account-select"
+                  className="input"
+                  value={adjAccount}
+                  onChange={e => setAdjAccount(e.target.value)}
+                >
+                  {accounts.map(a => (
+                    <option key={a.name} value={a.name}>{a.label} ({a.name})</option>
+                  ))}
+                </select>
+              </div>
+              <div className="field">
+                <label className="label">Type</label>
+                <div style={{ display: 'flex', gap: 8 }}>
+                  <button
+                    data-testid="adjustment-type-add"
+                    className={`btn btn--sm ${adjType === 'add' ? 'btn--primary' : 'btn--ghost'}`}
+                    style={{ flex: 1 }}
+                    onClick={() => setAdjType('add')}
+                  >
+                    Add
+                  </button>
+                  <button
+                    data-testid="adjustment-type-remove"
+                    className={`btn btn--sm ${adjType === 'remove' ? 'btn--danger' : 'btn--ghost'}`}
+                    style={{ flex: 1 }}
+                    onClick={() => setAdjType('remove')}
+                  >
+                    Remove
+                  </button>
+                </div>
+              </div>
+              <div className="field">
+                <label className="label">Amount ($)</label>
+                <input
+                  data-testid="adjustment-amount-input"
+                  className="input"
+                  type="number"
+                  min="0.01"
+                  step="0.01"
+                  placeholder="0.00"
+                  value={adjAmount}
+                  onChange={e => setAdjAmount(e.target.value)}
+                />
+              </div>
+              <div className="field">
+                <label className="label">Description</label>
+                <input
+                  data-testid="adjustment-description-input"
+                  className="input"
+                  type="text"
+                  placeholder="Reason for adjustment"
+                  value={adjDescription}
+                  onChange={e => setAdjDescription(e.target.value)}
+                />
+              </div>
+              <button
+                data-testid="adjustment-submit-btn"
+                className={`btn ${adjType === 'remove' ? 'btn--danger' : 'btn--primary'}`}
+                onClick={handleAccountAdjustment}
+                disabled={!adjAmount || !adjDescription.trim()}
+              >
+                {adjType === 'add' ? 'Add to Account' : 'Remove from Account'}
+              </button>
+            </div>
+          )}
         </div>
       )}
 

@@ -2,7 +2,7 @@ import { Given, When, Then } from '@cucumber/cucumber';
 import { expect } from 'chai';
 import { PosWorld } from '../support/world';
 
-When('I GET /api/payees', async function (this: PosWorld) {
+When(/^I GET \/api\/payees$/, async function (this: PosWorld) {
   this.response = await this.agent.get('/api/payees');
 });
 
@@ -11,7 +11,7 @@ Then('the response includes a payee named {string}', function (this: PosWorld, n
   expect(body.some(p => p.name === name), `Expected payee "${name}" in list`).to.be.true;
 });
 
-When('I POST /api/payees with name {string} type {string}', async function (this: PosWorld, name: string, type: string) {
+When(/^I POST \/api\/payees with name "([^"]+)" type "([^"]+)"$/, async function (this: PosWorld, name: string, type: string) {
   this.response = await this.agent.post('/api/payees').send({ name, type });
   if (this.response.status === 201) {
     (this.context as { payeeId?: number }).payeeId = (this.response.body as { id: number }).id;
@@ -36,11 +36,11 @@ Then('the payee {string} is inactive', async function (this: PosWorld, name: str
   expect(payee!.active).to.be.false;
 });
 
-When('I POST /api/payments/run with the payee amount {float} from {string}',
-  async function (this: PosWorld, amount: number, account: string) {
+When(/^I POST \/api\/payments\/run with the payee amount ([\d.]+) from "([^"]+)"$/,
+  async function (this: PosWorld, amountStr: string, account: string) {
     const id = (this.context as { payeeId?: number }).payeeId;
     this.response = await this.agent.post('/api/payments/run').send({
-      entries: [{ payee_id: id, amount, source_account: account }],
+      entries: [{ payee_id: id, amount: Number(amountStr), source_account: account }],
     });
   }
 );
@@ -58,11 +58,11 @@ Then('the payee {string} has default_weight {float}', async function (this: PosW
   expect(Number(payee!.default_weight)).to.be.closeTo(weight, 0.01);
 });
 
-When('I POST /api/payments/run with the payee amount {float} from {string} and note {string}',
-  async function (this: PosWorld, amount: number, account: string, note: string) {
+When(/^I POST \/api\/payments\/run with the payee amount ([\d.]+) from "([^"]+)" and note "([^"]+)"$/,
+  async function (this: PosWorld, amountStr: string, account: string, note: string) {
     const id = (this.context as { payeeId?: number }).payeeId;
     this.response = await this.agent.post('/api/payments/run').send({
-      entries: [{ payee_id: id, amount, source_account: account }],
+      entries: [{ payee_id: id, amount: Number(amountStr), source_account: account }],
       note,
     });
   }

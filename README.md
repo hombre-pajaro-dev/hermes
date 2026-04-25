@@ -41,7 +41,7 @@ docker run --name hermes-db \
 Subsequent starts (container already exists):
 
 ```bash
-docker start hermes-db
+docker start hermes-db 2>&1
 ```
 
 Then set in `packages/backend/.env`:

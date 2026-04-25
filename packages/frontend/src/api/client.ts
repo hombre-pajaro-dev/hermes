@@ -62,6 +62,8 @@ export const api = {
   getBalances: () => req<Balance[]>('/ledger/balances'),
   recordPayroll: (amount: number, account: string, description: string) =>
     req<LedgerEntry>('/ledger/payroll', { method: 'POST', body: JSON.stringify({ amount, account, description }) }),
+  adjustAccount: (account: string, amount: number, description: string) =>
+    req<LedgerEntry>('/ledger/adjustment', { method: 'POST', body: JSON.stringify({ account, amount, description }) }),
 
   // Reports
   getSalesByItem: (from: string, to: string, tz: string) => req<SalesByItem[]>(`/reports/sales-by-item?from=${from}&to=${to}&tz=${encodeURIComponent(tz)}`),

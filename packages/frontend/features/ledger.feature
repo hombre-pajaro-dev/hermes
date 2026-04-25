@@ -19,3 +19,10 @@ Feature: General Ledger and Accounts
     And I am on the Ledger page
     When I expand the first sale entry
     Then I see item rows for that entry
+
+  Scenario: Admin sees account adjustment form in Balances tab
+    Given I am on the Ledger page
+    When I switch to the Balances tab
+    Then I see the account adjustment form
+    And the adjustment account selector is visible
+    And the adjustment submit button is visible

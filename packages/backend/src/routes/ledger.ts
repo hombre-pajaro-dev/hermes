@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import { getDb } from '../db/database.js';
+import { requireAdmin } from '../middleware/require-admin.js';
 
 const router = Router();
 
@@ -73,6 +74,25 @@ router.post('/payroll', async (req, res) => {
   const { rows } = await db.query(
     "INSERT INTO ledger_entries (entry_type, account, amount, description) VALUES ('payroll', $1, $2, $3) RETURNING *",
     [account, -Math.abs(amount), description]
+  );
+  res.status(201).json(rows[0]);
+});
+
+router.post('/adjustment', requireAdmin, async (req, res) => {
+  const { account, amount, description = '' } = req.body;
+  if (!account || amount === undefined || amount === null) {
+    return res.status(400).json({ error: 'account and amount are required' });
+  }
+  const num = Number(amount);
+  if (isNaN(num) || num === 0) {
+    return res.status(400).json({ error: 'amount must be a non-zero number' });
+  }
+  const db = await getDb();
+  const { rows: accts } = await db.query('SELECT name FROM accounts WHERE name = $1', [account]);
+  if (accts.length === 0) return res.status(400).json({ error: 'Unknown account' });
+  const { rows } = await db.query(
+    "INSERT INTO ledger_entries (entry_type, account, amount, description) VALUES ('account_adjustment', $1, $2, $3) RETURNING *",
+    [account, num, description]
   );
   res.status(201).json(rows[0]);
 });

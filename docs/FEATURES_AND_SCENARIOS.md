@@ -83,6 +83,8 @@ This document lists all **features** and **scenarios** covered by the BDD test s
 
 **Payments tab (admin only):** Ledger now hosts the Payments panel under a third tab. Admin sees current Cash and Card balances, a date-range Period Summary (Revenue / Cost / Gross Profit / Orders via `GET /api/reports/daily-total`), then the full payment distribution form and Manage Payees section.
 
+**Account Adjustment (admin only, Balances tab):** Below the accounts list, admins see an "Account Adjustment" card to manually add or remove money from any account. Fields: account selector, Add/Remove toggle, amount, description (required). Posts to `POST /api/ledger/adjustment`; creates an `account_adjustment` ledger entry. Positive amount = credit; negative = debit. Balances and ledger entries refresh after submit.
+
 | # | Scenario | Description |
 |---|----------|-------------|
 | 1 | Ledger records a sale with timestamp and account | Create and pay order; fetch ledger; latest sale entry has amount and account. |
@@ -93,6 +95,9 @@ This document lists all **features** and **scenarios** covered by the BDD test s
 | 6 | View items for a sale ledger entry | After a card order; fetch ledger; `GET /ledger/:id/items` on the sale entry returns items with correct product name and quantity. |
 | 7 | View items for a tab payment ledger entry | After a paid tab; fetch ledger; `GET /ledger/:id/items` on the tab_payment entry returns items with correct product name and quantity. |
 | 8 | Ledger entry includes discount info when a discount was applied | After paying an order with a discount; fetch ledger; the sale entry includes `discount_name` matching the discount and a `discount_amount` greater than zero. |
+| 9 | Admin can add money to an account via adjustment | `POST /api/ledger/adjustment` with positive amount; `account_adjustment` ledger entry created with correct account and amount. |
+| 10 | Admin can remove money from an account via adjustment | `POST /api/ledger/adjustment` with negative amount; `account_adjustment` ledger entry created with negative amount. |
+| 11 | Admin sees account adjustment form in Balances tab (E2E) | On Ledger Balances tab; account selector, type toggle, amount/description inputs, and submit button are visible. |
 
 ---
 

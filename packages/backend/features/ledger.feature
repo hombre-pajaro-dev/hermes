@@ -75,3 +75,13 @@ Feature: General Ledger and Accounts
     And I fetch the ledger
     Then the sale ledger entry has discount_name "Happy Hour"
     And the sale ledger entry discount_amount is greater than 0
+
+  Scenario: Admin can add money to an account via adjustment
+    When I post an account adjustment of 100.00 to "cash" with description "Cash deposit"
+    And I fetch the ledger
+    Then there is an "account_adjustment" ledger entry with account "cash" and amount 100.00
+
+  Scenario: Admin can remove money from an account via adjustment
+    When I post an account adjustment of -50.00 to "credit_card" with description "Card correction"
+    And I fetch the ledger
+    Then there is an "account_adjustment" ledger entry with account "credit_card" and amount -50.00

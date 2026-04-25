@@ -58,3 +58,20 @@ Then('I see item rows for that entry', async function (this: PosWorld) {
   const rows = await this.page.locator('[data-testid="ledger-item-row"]').count();
   expect(rows).to.be.greaterThan(0);
 });
+
+Then('I see the account adjustment form', async function (this: PosWorld) {
+  await this.page.waitForSelector('[data-testid="account-adjustment-form"]', { timeout: 5000 });
+  expect(await this.page.locator('[data-testid="account-adjustment-form"]').isVisible()).to.be.true;
+});
+
+Then('the adjustment account selector is visible', async function (this: PosWorld) {
+  const el = this.page.locator('[data-testid="adjustment-account-select"]');
+  await el.waitFor({ timeout: 5000 });
+  expect(await el.isVisible()).to.be.true;
+});
+
+Then('the adjustment submit button is visible', async function (this: PosWorld) {
+  const el = this.page.locator('[data-testid="adjustment-submit-btn"]');
+  await el.waitFor({ timeout: 5000 });
+  expect(await el.isVisible()).to.be.true;
+});

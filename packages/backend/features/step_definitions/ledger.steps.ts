@@ -125,3 +125,14 @@ Then('the sale ledger entry discount_amount is greater than 0', function (this: 
   expect(sale, 'Expected a sale entry').to.exist;
   expect(sale!.discount_amount).to.be.greaterThan(0);
 });
+
+When('I post an account adjustment of {float} to {string} with description {string}', async function (this: PosWorld, amount: number, account: string, description: string) {
+  this.response = await this.agent.post('/api/ledger/adjustment').send({ account, amount, description });
+});
+
+Then('there is an {string} ledger entry with account {string} and amount {float}', function (this: PosWorld, type: string, account: string, amount: number) {
+  const entries = this.response.body as { entry_type: string; account: string; amount: number }[];
+  const found = entries.find(e => e.entry_type === type && e.account === account);
+  expect(found, `Expected a '${type}' entry with account '${account}'`).to.exist;
+  expect(found!.amount).to.be.closeTo(amount, 0.001);
+});

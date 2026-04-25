@@ -11,6 +11,12 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+#### Account Adjustment (admin only)
+- Admins can manually add or remove money from any ledger account (cash, credit_card, etc.) with a required description
+- **API:** `POST /api/ledger/adjustment` — admin-only; creates an `account_adjustment` ledger entry; positive amount = credit, negative = debit
+- **UI:** "Account Adjustment" card in Ledger → Balances tab; account selector, Add/Remove toggle, amount and description inputs; balances and ledger entries refresh on submit
+- BDD: 2 new backend scenarios ("Admin can add money to an account via adjustment", "Admin can remove money from an account via adjustment"); 1 new frontend E2E scenario ("Admin sees account adjustment form in Balances tab")
+
 #### Audit trail (admin-only)
 - Every significant action now records **who did it** in the database
 - **New columns:** `tabs.created_by`, `tabs.paid_by`, `tab_items.added_by`, `tab_items.added_at`, `orders.created_by`, `orders.paid_by`, `ledger_entries.created_by`
