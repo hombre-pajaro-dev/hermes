@@ -11,6 +11,25 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+#### Restock ledger entries are now expandable
+- `restock` added to the expandable entry types in the Ledger Entries tab (alongside `sale` and `tab_payment`)
+- `GET /api/ledger/entries/:id/items` now handles `ref_type = 'restock'` — returns restocked products with name, quantity, unit cost, and subtotal from `restock_items`
+- Expanding a restock entry shows the same product/qty/unit/subtotal table used for sales and tab payments
+- BDD: 1 new backend scenario (restock entry items); 1 new frontend E2E scenario (expandable restock entry in ledger)
+
+#### Restock — provider, per-item unit cost, and payment tracking (admin only)
+- Restock is now **admin-only** (`requireAdmin` on `POST /api/restock`)
+- New **`providers`** table and `GET/POST /api/providers` endpoints to manage restock suppliers
+- `restock_orders` gains `provider_id`, `payment_amount` (calculated), `payment_account`; `restock_items` gains `previous_cost`
+- `POST /api/restock` now accepts `unit_cost` per item: if it differs from `product.cost`, `products.cost` is updated and the old value stored as `previous_cost` in `restock_items`
+- `payment_amount` is auto-calculated server-side as Σ(qty × unit_cost); no longer sent from the client
+- `restock` ledger entry carries the real (negative) payment amount and the selected account; description reads `Restock from {provider_name}`
+- **UI — Purchase Details card:** Provider combobox (find or create as you type), Pay from Account selector
+- **UI — Product rows:** "Total paid ($)" input per product; unit cost derived read-only as total ÷ qty; amber warning when derived unit cost differs from stored cost; auto-computed total displayed before submit
+- **UI — Ledger expanded restock row:** Amber "was $X.XX" badge on any item where the paid unit cost differed from the stored cost at time of restock
+- Non-admin users see an "Admin access required" message instead of the restock form
+- BDD: 4 new backend scenarios; 4 new frontend E2E scenarios
+
 #### Ledger entry enrichment for tab payments
 - `GET /api/ledger` now JOINs the `tabs` table for `tab_payment` entries; response includes `tab_at_cost` and `tab_opened_by`
 - **COST badge:** purple inline badge shown on any `tab payment` row when the tab was opened at cost — visible to all users

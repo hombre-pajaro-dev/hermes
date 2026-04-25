@@ -145,15 +145,38 @@ This document lists all **features** and **scenarios** covered by the BDD test s
 
 ## 6. Restock inventory
 
-**Feature:** As an employee, I want to insert a restock order to increase product units and restock supplies so that inventory reflects new stock.
+**Feature:** As an admin, I want to insert a restock order linked to a provider and record the payment so that purchase costs are tracked in the ledger.
 
-> **Unit-based products** (no supply ingredients) are restocked directly via the Products section. **Supply-based products** cannot be directly restocked — their available units are computed from supplies. Use the Supplies section to restock the underlying supplies instead. **Inactive products** are hidden from the restock form.
+> **Admin only.** Unit-based products restocked directly; supply-based products via the Supplies section. Inactive products hidden from the form.
+
+**Provider combobox:** Type to filter existing providers; select from dropdown. If typed name has no exact match, a "Create ‘{name}’" option appears and creates the provider on selection. Providers are stored in the `providers` table.
+
+**Purchase Details card:** Provider (required), Payment Amount (required, > 0), Pay from Account (Cash or Card). These are captured before the product quantities.
+
+**Per-item unit cost:** Each product row has an editable unit cost input pre-filled with `product.cost`. If the user changes the cost, the stored `product.cost` is updated after the restock and `restock_items.previous_cost` records the old value.
+
+**Auto-computed total:** Payment amount = Σ(quantity × unit_cost) across all items; shown in the form before submit and stored on `restock_orders.payment_amount`.
+
+**Cost-changed tag in ledger:** When expanding a `restock` entry, any item whose `unit_price` differs from `previous_cost` shows an amber "was $X.XX" badge in the Unit column.
+
+**Ledger:** The `restock` ledger entry is created with `amount = −payment_amount` and `account = payment_account`, and the description reads `Restock from {provider_name}`.
+
+**API:** `GET /api/providers`, `POST /api/providers`. `POST /api/restock` now accepts `provider_id`, `payment_amount`, `payment_account` (all optional for backward compat; UI enforces them).
 
 | # | Scenario | Description |
 |---|----------|-------------|
 | 1 | Restock selected items with quantities | Restock order with product and quantities; product units increase; ledger has restock entry. |
 | 2 | Restock only some products | Restock one product; that product’s units increase; others unchanged. |
 | 3 | Cannot restock when register is closed | Register closed; restock order is rejected. |
+| 4 | Restock with provider and payment creates ledger entry with amount | Submit restock with provider + payment; response includes provider info; ledger `restock` entry has negative payment amount. |
+| 5 | List providers returns created providers | `GET /api/providers` returns previously created provider. |
+| 6 | Restock form shows provider input, total paid inputs, and payment account (E2E) | On Restock page; provider input, per-product total paid input, and account selector all visible. |
+| 7 | Products in restock form show unit cost (E2E) | On Restock page; each product row shows current `product.cost`; unit cost derived as total ÷ qty and displayed read-only. |
+| 8 | Restock with provider and payment creates ledger entry with amount | Submit restock with provider + per-item unit cost; ledger `restock` entry amount = −sum(qty × unit_cost). |
+| 9 | Custom unit cost updates product cost and stores previous_cost | Submit restock with unit_cost ≠ product.cost; `products.cost` updated; ledger items include `previous_cost`. |
+| 10 | Restock ledger entry items show restocked products | After restock; `GET /api/ledger/entries/:id/items` returns products with name, quantity, unit_price, subtotal, previous_cost. |
+| 11 | Restock ledger entry is expandable and shows products (E2E) | On Ledger Entries; restock row expandable; shows item rows. |
+| 12 | Restock ledger entry shows cost-updated tag when unit cost changed (E2E) | Expand restock entry where cost changed; amber "was $X.XX" badge visible on that item row. |
 
 ---
 

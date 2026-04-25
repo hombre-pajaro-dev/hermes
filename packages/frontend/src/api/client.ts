@@ -78,7 +78,12 @@ export const api = {
     req<WeekdayReport>(`/reports/by-weekday?tz=${encodeURIComponent(tz)}${year ? `&year=${year}` : ''}`),
 
   // Restock
-  restock: (items: OrderItem[]) => req<RestockOrder>('/restock', { method: 'POST', body: JSON.stringify({ items }) }),
+  restock: (items: RestockItem[], meta?: { provider_id?: number; payment_account?: string }) =>
+    req<RestockOrder>('/restock', { method: 'POST', body: JSON.stringify({ items, ...meta }) }),
+
+  // Providers
+  getProviders: () => req<Provider[]>('/providers'),
+  createProvider: (name: string) => req<Provider>('/providers', { method: 'POST', body: JSON.stringify({ name }) }),
 
   // Inventory
   adjustInventory: (adjustments: { product_id: number; physical_count: number }[]) =>
@@ -144,7 +149,8 @@ export interface Tab { id: number; name: string; status: string; at_cost: number
 export interface TabItem { id: number; product_id: number; name?: string; quantity: number; unit_price: number; unit_cost: number; subtotal: number; added_by?: string | null; added_at?: string | null; }
 export interface TabsSummary { open_count: number; total_amount: number; }
 export interface LedgerEntry { id: number; entry_type: string; account?: string; amount: number; description: string; ref_id?: number; ref_type?: string; created_at: string; discount_name?: string; discount_amount?: number; created_by?: string | null; tab_at_cost?: number | null; tab_opened_by?: string | null; }
-export interface LedgerEntryItem { product_id: number; name: string; quantity: number; unit_price: number; subtotal: number; }
+export interface LedgerEntryItem { product_id: number; name: string; quantity: number; unit_price: number; subtotal: number; previous_cost?: number | null; }
+export interface RestockItem { product_id: number; quantity: number; unit_cost: number; }
 export interface Account { id: number; name: string; label: string; }
 export interface Balance { account: string; balance: number; }
 export interface SalesByItem { product_id: number; name: string; units_sold: number; revenue: number; cost: number; }
@@ -153,7 +159,8 @@ export interface DailyRange { date: string; revenue: number; cost: number; order
 export interface TopProduct { product_id: number; units_sold: number; }
 export interface InventoryAdjustmentItem { product_id: number; name: string; adjustment_count: number; total_delta: number; total_cost_impact: number; }
 export interface CloseBrief { session_id: number; revenue: number; total_cost: number; gross_profit: number; most_sold?: { name: string; units_sold: number } | null; most_profitable?: { name: string; profit: number } | null; by_item: SalesByItem[]; }
-export interface RestockOrder { id: number; session_id: number; items: { product_id: number; name: string; quantity: number; new_units: number }[]; }
+export interface RestockOrder { id: number; session_id: number; provider_id?: number | null; payment_amount?: number | null; payment_account?: string | null; items: { product_id: number; name: string; quantity: number; new_units: number }[]; }
+export interface Provider { id: number; name: string; created_at: string; }
 export interface AdjustResult { adjustments: { product_id: number; name: string; previous_units: number; physical_count: number; delta: number; new_units: number }[]; }
 export interface AuthorizedUser { id: number; email: string; role: 'staff' | 'admin'; created_at: string; }
 export interface HistoricPeriod { label: string; period_start: string; period_end: string; revenue: number; cost: number; profit: number; order_count: number; }

@@ -3,7 +3,7 @@ import { api } from '../api/client';
 import type { DailyTotal, LedgerEntry, LedgerEntryItem, Balance, Account, Payee } from '../api/client';
 import { authClient } from '../lib/auth-client';
 
-const EXPANDABLE = new Set(['sale', 'tab_payment']);
+const EXPANDABLE = new Set(['sale', 'tab_payment', 'restock']);
 const localTz = Intl.DateTimeFormat().resolvedOptions().timeZone;
 function fmtLocal(iso: string): string {
   return new Date(iso).toLocaleString('en-CA', {
@@ -257,14 +257,24 @@ export default function LedgerView() {
                           </tr>
                         </thead>
                         <tbody>
-                          {items.map(item => (
-                            <tr key={item.product_id} data-testid="ledger-item-row">
-                              <td style={{ padding: '2px 0' }}>{item.name}</td>
-                              <td style={{ padding: '2px 0', textAlign: 'center' }}>{item.quantity}</td>
-                              <td style={{ padding: '2px 0', textAlign: 'right' }}>${item.unit_price.toFixed(2)}</td>
-                              <td style={{ padding: '2px 0', textAlign: 'right', fontWeight: 600 }}>${item.subtotal.toFixed(2)}</td>
-                            </tr>
-                          ))}
+                          {items.map(item => {
+                            const costChanged = e.entry_type === 'restock' && item.previous_cost != null && Math.abs(item.previous_cost - item.unit_price) > 0.0001;
+                            return (
+                              <tr key={item.product_id} data-testid="ledger-item-row">
+                                <td style={{ padding: '2px 0' }}>{item.name}</td>
+                                <td style={{ padding: '2px 0', textAlign: 'center' }}>{item.quantity}</td>
+                                <td style={{ padding: '2px 0', textAlign: 'right' }}>
+                                  <span>${item.unit_price.toFixed(2)}</span>
+                                  {costChanged && (
+                                    <span data-testid="cost-updated-tag" style={{ marginLeft: 4, fontSize: '0.65rem', background: 'var(--warning, #d97706)', color: '#fff', borderRadius: 4, padding: '1px 5px', fontWeight: 700, whiteSpace: 'nowrap' }}>
+                                      was ${item.previous_cost!.toFixed(2)}
+                                    </span>
+                                  )}
+                                </td>
+                                <td style={{ padding: '2px 0', textAlign: 'right', fontWeight: 600 }}>${item.subtotal.toFixed(2)}</td>
+                              </tr>
+                            );
+                          })}
                           {e.discount_name && e.discount_amount != null && (
                             <tr>
                               <td colSpan={3} style={{ padding: '4px 0 2px', color: 'var(--warning, #d97706)', borderTop: '1px solid var(--border)' }}>

@@ -327,6 +327,19 @@ export async function applySchema(db: Pool): Promise<void> {
   await db.query(`ALTER TABLE tabs ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ`);
   await db.query(`UPDATE tabs SET updated_at = created_at WHERE updated_at IS NULL`);
 
+  // Providers (restock suppliers)
+  await db.query(`
+    CREATE TABLE IF NOT EXISTS providers (
+      id         SERIAL PRIMARY KEY,
+      name       TEXT NOT NULL UNIQUE,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    )
+  `);
+  await db.query(`ALTER TABLE restock_orders ADD COLUMN IF NOT EXISTS provider_id      INTEGER REFERENCES providers(id)`);
+  await db.query(`ALTER TABLE restock_orders ADD COLUMN IF NOT EXISTS payment_amount   DOUBLE PRECISION`);
+  await db.query(`ALTER TABLE restock_orders ADD COLUMN IF NOT EXISTS payment_account  TEXT`);
+  await db.query(`ALTER TABLE restock_items  ADD COLUMN IF NOT EXISTS previous_cost    DOUBLE PRECISION`);
+
   // Audit trail
   await db.query(`ALTER TABLE tabs         ADD COLUMN IF NOT EXISTS created_by TEXT`);
   await db.query(`ALTER TABLE tabs         ADD COLUMN IF NOT EXISTS paid_by    TEXT`);

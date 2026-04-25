@@ -50,6 +50,17 @@ router.get('/entries/:id/items', async (req, res) => {
     return res.json(items);
   }
 
+  if (entry.ref_type === 'restock') {
+    const { rows: items } = await db.query(
+      `SELECT ri.product_id, p.name, ri.quantity, ri.unit_cost AS unit_price,
+              (ri.quantity * ri.unit_cost) AS subtotal, ri.previous_cost
+       FROM restock_items ri JOIN products p ON p.id = ri.product_id
+       WHERE ri.restock_order_id = $1`,
+      [entry.ref_id]
+    );
+    return res.json(items);
+  }
+
   res.json([]);
 });
 
