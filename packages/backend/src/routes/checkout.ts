@@ -3,6 +3,7 @@ import { getDb, pool } from '../db/database.js';
 import { requireOpenRegister } from '../middleware/requireOpenRegister.js';
 import { isDiscountEligibleNow, computeDiscountAmount } from '../lib/discount-engine.js';
 import { getProductAvailableUnits, deductProductStock } from '../lib/supply-utils.js';
+import { actorEmail } from '../lib/actor.js';
 
 const router = Router();
 
@@ -20,12 +21,13 @@ router.post('/orders', requireOpenRegister, async (req, res) => {
     if (available < item.quantity) return res.status(409).json({ error: `Insufficient stock for product '${product.name}': requested ${item.quantity}, available ${available}` });
   }
 
+  const actor = actorEmail(req);
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
     const { rows: [orderRow] } = await client.query(
-      "INSERT INTO orders (session_id, status, created_at) VALUES ($1, 'pending', NOW()) RETURNING *",
-      [sessionId]
+      "INSERT INTO orders (session_id, status, created_at, created_by) VALUES ($1, 'pending', NOW(), $2) RETURNING *",
+      [sessionId, actor]
     );
     const orderId = orderRow.id;
     let total = 0;
@@ -87,14 +89,15 @@ router.post('/orders/:id/pay', async (req, res) => {
 
   const account = payment_method === 'card' ? 'credit_card' : 'cash';
   const changeDue = payment_method === 'cash' ? (amount_received! - effectiveTotal) : null;
+  const actor = actorEmail(req);
 
   const { rows: [updated] } = await db.query(
-    "UPDATE orders SET status = 'paid', payment_method = $1, amount_received = $2, change_due = $3, discount_amount = $4, paid_at = NOW() WHERE id = $5 RETURNING *",
-    [payment_method, amount_received ?? null, changeDue, discountAmount, order.id],
+    "UPDATE orders SET status = 'paid', payment_method = $1, amount_received = $2, change_due = $3, discount_amount = $4, paid_at = NOW(), paid_by = $6 WHERE id = $5 RETURNING *",
+    [payment_method, amount_received ?? null, changeDue, discountAmount, order.id, actor],
   );
   await db.query(
-    "INSERT INTO ledger_entries (entry_type, account, amount, description, ref_id, ref_type) VALUES ('sale', $1, $2, $3, $4, 'order')",
-    [account, effectiveTotal, `Order #${order.id} paid with ${payment_method}`, order.id],
+    "INSERT INTO ledger_entries (entry_type, account, amount, description, ref_id, ref_type, created_by) VALUES ('sale', $1, $2, $3, $4, 'order', $5)",
+    [account, effectiveTotal, `Order #${order.id} paid with ${payment_method}`, order.id, actor],
   );
 
   if (discountRow && discountAmount > 0) {

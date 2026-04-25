@@ -326,4 +326,13 @@ export async function applySchema(db: Pool): Promise<void> {
   await db.query(`INSERT INTO settings (key, value) VALUES ('pin', '1234') ON CONFLICT DO NOTHING`);
   await db.query(`ALTER TABLE tabs ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ`);
   await db.query(`UPDATE tabs SET updated_at = created_at WHERE updated_at IS NULL`);
+
+  // Audit trail
+  await db.query(`ALTER TABLE tabs         ADD COLUMN IF NOT EXISTS created_by TEXT`);
+  await db.query(`ALTER TABLE tabs         ADD COLUMN IF NOT EXISTS paid_by    TEXT`);
+  await db.query(`ALTER TABLE tab_items    ADD COLUMN IF NOT EXISTS added_by   TEXT`);
+  await db.query(`ALTER TABLE tab_items    ADD COLUMN IF NOT EXISTS added_at   TIMESTAMPTZ`);
+  await db.query(`ALTER TABLE orders       ADD COLUMN IF NOT EXISTS created_by TEXT`);
+  await db.query(`ALTER TABLE orders       ADD COLUMN IF NOT EXISTS paid_by    TEXT`);
+  await db.query(`ALTER TABLE ledger_entries ADD COLUMN IF NOT EXISTS created_by TEXT`);
 }

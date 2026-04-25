@@ -195,6 +195,11 @@ export default function LedgerView() {
                       </div>
                     )}
                     <div className="list-item__sub">{fmtLocal(e.created_at)}</div>
+                    {isAdmin && e.created_by && (
+                      <div className="list-item__sub" style={{ fontSize: '0.75rem', opacity: 0.7 }}>
+                        by {e.created_by}
+                      </div>
+                    )}
                   </div>
                   <div className="list-item__right">
                     <div style={{ fontWeight: 700, color: e.amount >= 0 ? 'var(--success)' : 'var(--danger)' }}>

@@ -138,10 +138,10 @@ export interface SessionReport {
 export interface Cashout { id: number; session_id: number; amount: number; reason: string; created_at: string; }
 export interface OrderItem { product_id: number; quantity: number; }
 export interface Order { id: number; status: string; total: number; discount_amount?: number; payment_method?: string; amount_received?: number; change_due?: number; items?: unknown[]; }
-export interface Tab { id: number; name: string; status: string; at_cost: number; total: number; discount_amount?: number; payment_method?: string; created_at: string; updated_at?: string; paid_at?: string; items?: TabItem[]; }
-export interface TabItem { id: number; product_id: number; name?: string; quantity: number; unit_price: number; unit_cost: number; subtotal: number; }
+export interface Tab { id: number; name: string; status: string; at_cost: number; total: number; discount_amount?: number; payment_method?: string; created_at: string; updated_at?: string; paid_at?: string; items?: TabItem[]; created_by?: string | null; paid_by?: string | null; }
+export interface TabItem { id: number; product_id: number; name?: string; quantity: number; unit_price: number; unit_cost: number; subtotal: number; added_by?: string | null; added_at?: string | null; }
 export interface TabsSummary { open_count: number; total_amount: number; }
-export interface LedgerEntry { id: number; entry_type: string; account?: string; amount: number; description: string; ref_id?: number; ref_type?: string; created_at: string; discount_name?: string; discount_amount?: number; }
+export interface LedgerEntry { id: number; entry_type: string; account?: string; amount: number; description: string; ref_id?: number; ref_type?: string; created_at: string; discount_name?: string; discount_amount?: number; created_by?: string | null; }
 export interface LedgerEntryItem { product_id: number; name: string; quantity: number; unit_price: number; subtotal: number; }
 export interface Account { id: number; name: string; label: string; }
 export interface Balance { account: string; balance: number; }

@@ -333,6 +333,11 @@ export default function TabsView() {
                       Updated {fmtShort(t.updated_at)}
                     </div>
                   )}
+                  {isAdmin && t.created_by && (
+                    <div className="list-item__sub" style={{ fontSize: '0.72rem', opacity: 0.7 }}>
+                      {t.created_by}
+                    </div>
+                  )}
                 </div>
                 <div className="list-item__right" style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
                   <div style={{ fontWeight: 700 }}>${t.total.toFixed(2)}</div>
@@ -360,6 +365,11 @@ export default function TabsView() {
                       {t.paid_at && (
                         <div className="list-item__sub">
                           Paid {fmtShort(t.paid_at)}
+                        </div>
+                      )}
+                      {isAdmin && t.paid_by && (
+                        <div className="list-item__sub" style={{ fontSize: '0.72rem', opacity: 0.7 }}>
+                          by {t.paid_by}
                         </div>
                       )}
                     </div>
@@ -522,6 +532,11 @@ export default function TabsView() {
                   Updated {fmtShort(selectedTab.updated_at)}
                 </span>
               )}
+              {isAdmin && selectedTab.created_by && (
+                <span style={{ fontSize: '0.78rem', color: 'var(--text-secondary)' }}>
+                  · Opened by {selectedTab.created_by}
+                </span>
+              )}
             </div>
           </div>
 
@@ -553,6 +568,11 @@ export default function TabsView() {
                           <div className="list-item__main">
                             <div className="list-item__name">{product?.name ?? `Product #${item.product_id}`}</div>
                             <div className="list-item__sub">@ ${item.unit_price.toFixed(2)} each</div>
+                            {isAdmin && item.added_by && (
+                              <div className="list-item__sub" style={{ fontSize: '0.72rem', opacity: 0.7 }}>
+                                {item.added_by}{item.added_at ? ` · ${fmtShort(item.added_at)}` : ''}
+                              </div>
+                            )}
                           </div>
                           <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                             <button

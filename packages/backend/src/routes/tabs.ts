@@ -3,6 +3,7 @@ import { getDb, pool } from '../db/database.js';
 import { isDiscountEligibleNow, computeDiscountAmount } from '../lib/discount-engine.js';
 import { getProductAvailableUnits, deductProductStock, restoreProductStock } from '../lib/supply-utils.js';
 import { requireAdmin } from '../middleware/require-admin.js';
+import { actorEmail } from '../lib/actor.js';
 
 const router = Router();
 
@@ -12,7 +13,8 @@ router.get('/', async (_req, res) => {
     SELECT t.*,
       COALESCE(json_agg(
         json_build_object('id', ti.id, 'product_id', ti.product_id, 'name', p.name,
-          'quantity', ti.quantity, 'unit_price', ti.unit_price, 'unit_cost', ti.unit_cost, 'subtotal', ti.subtotal)
+          'quantity', ti.quantity, 'unit_price', ti.unit_price, 'unit_cost', ti.unit_cost, 'subtotal', ti.subtotal,
+          'added_by', ti.added_by, 'added_at', ti.added_at)
         ORDER BY ti.id
       ) FILTER (WHERE ti.id IS NOT NULL), '[]') AS items
     FROM tabs t
@@ -38,9 +40,10 @@ router.post('/', async (req, res) => {
   if (!sessionRows[0]) return res.status(409).json({ error: 'No register session exists — open the register first' });
   const sessionId = sessionRows[0].id as number;
   const { name = '', at_cost = false } = req.body;
+  const actor = actorEmail(req);
   const { rows } = await db.query(
-    "INSERT INTO tabs (session_id, name, status, at_cost, total, created_at, updated_at) VALUES ($1, $2, 'open', $3, 0, NOW(), NOW()) RETURNING *",
-    [sessionId, name, at_cost ? 1 : 0]
+    "INSERT INTO tabs (session_id, name, status, at_cost, total, created_at, updated_at, created_by) VALUES ($1, $2, 'open', $3, 0, NOW(), NOW(), $4) RETURNING *",
+    [sessionId, name, at_cost ? 1 : 0, actor]
   );
   res.status(201).json(rows[0]);
 });
@@ -70,6 +73,7 @@ router.post('/:id/items', async (req, res) => {
     if (available < item.quantity) return res.status(409).json({ error: `Insufficient stock for '${product.name}': requested ${item.quantity}, available ${available}` });
   }
 
+  const actor = actorEmail(req);
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
@@ -84,7 +88,7 @@ router.post('/:id/items', async (req, res) => {
       if (existing) {
         await client.query('UPDATE tab_items SET quantity = quantity + $1, subtotal = subtotal + $2 WHERE id = $3', [item.quantity, subtotal, existing.id]);
       } else {
-        await client.query('INSERT INTO tab_items (tab_id, product_id, quantity, unit_price, unit_cost, subtotal) VALUES ($1, $2, $3, $4, $5, $6)', [tab.id, item.product_id, item.quantity, unitPrice, product.cost, subtotal]);
+        await client.query('INSERT INTO tab_items (tab_id, product_id, quantity, unit_price, unit_cost, subtotal, added_by, added_at) VALUES ($1, $2, $3, $4, $5, $6, $7, NOW())', [tab.id, item.product_id, item.quantity, unitPrice, product.cost, subtotal, actor]);
       }
       await deductProductStock(client, item.product_id, item.quantity);
     }
@@ -218,14 +222,15 @@ router.post('/:id/pay', async (req, res) => {
 
   const account = payment_method === 'card' ? 'credit_card' : 'cash';
   const changeDue = payment_method === 'cash' ? (amount_received! - effectiveTotal) : null;
+  const actor = actorEmail(req);
 
   const { rows: [updated] } = await db.query(
-    "UPDATE tabs SET status = 'paid', payment_method = $1, discount_amount = $2, paid_at = NOW(), updated_at = NOW() WHERE id = $3 RETURNING *",
-    [payment_method, discountAmount, tab.id],
+    "UPDATE tabs SET status = 'paid', payment_method = $1, discount_amount = $2, paid_at = NOW(), updated_at = NOW(), paid_by = $4 WHERE id = $3 RETURNING *",
+    [payment_method, discountAmount, tab.id, actor],
   );
   await db.query(
-    "INSERT INTO ledger_entries (entry_type, account, amount, description, ref_id, ref_type) VALUES ('tab_payment', $1, $2, $3, $4, 'tab')",
-    [account, effectiveTotal, `Tab #${tab.id} paid with ${payment_method}`, tab.id],
+    "INSERT INTO ledger_entries (entry_type, account, amount, description, ref_id, ref_type, created_by) VALUES ('tab_payment', $1, $2, $3, $4, 'tab', $5)",
+    [account, effectiveTotal, `Tab #${tab.id} paid with ${payment_method}`, tab.id, actor],
   );
 
   if (discountRow && discountAmount > 0) {

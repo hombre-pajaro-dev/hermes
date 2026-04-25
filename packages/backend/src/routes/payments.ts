@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import { getDb } from '../db/database.js';
+import { actorEmail } from '../lib/actor.js';
 
 const router = Router();
 
@@ -13,6 +14,7 @@ router.post('/run', async (req, res) => {
   }
 
   const db = await getDb();
+  const actor = actorEmail(req);
 
   const payeeIds = entries.map(e => e.payee_id);
   const placeholders = payeeIds.map((_, i) => `$${i + 1}`).join(', ');
@@ -37,8 +39,8 @@ router.post('/run', async (req, res) => {
     const description = note ? `${payee.name} — ${note}` : payee.name;
 
     const { rows } = await db.query(
-      'INSERT INTO ledger_entries (entry_type, account, amount, description) VALUES ($1, $2, $3, $4) RETURNING *',
-      [entryType, account, -Math.abs(entry.amount), description]
+      'INSERT INTO ledger_entries (entry_type, account, amount, description, created_by) VALUES ($1, $2, $3, $4, $5) RETURNING *',
+      [entryType, account, -Math.abs(entry.amount), description, actor]
     );
     createdEntries.push(rows[0]);
   }

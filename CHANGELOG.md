@@ -9,6 +9,17 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+
+#### Audit trail (admin-only)
+- Every significant action now records **who did it** in the database
+- **New columns:** `tabs.created_by`, `tabs.paid_by`, `tab_items.added_by`, `tab_items.added_at`, `orders.created_by`, `orders.paid_by`, `ledger_entries.created_by`
+- All values are the authenticated user's email; `NULL` for actions taken in test mode or by unauthenticated requests
+- **Tab detail view (admin only):** "Opened by {email}" shown in the header; each item in "On the Tab" shows who added it and when
+- **Tab list (admin only):** Open tab rows show the opener's email; closed tab rows show "by {email}" under the paid timestamp
+- **Ledger entries (admin only):** Each entry shows "by {email}" if present — covers sales, tab payments, and payroll/expense/savings runs
+- Shared helper `src/lib/actor.ts` extracts `req.session?.user?.email` with safe `null` fallback for test mode
+
 ### Changed
 
 #### PIN security replaced by RBAC
