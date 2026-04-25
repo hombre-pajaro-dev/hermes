@@ -92,6 +92,7 @@ export default function ProductsView() {
         units: formUsesSupplies ? 0 : Number(form.units),
         image: formImage,
         active: true,
+        track_inventory: true,
         supply_ingredients,
       });
       setForm({ name: '', description: '', cost: '', price: '', units: '' });

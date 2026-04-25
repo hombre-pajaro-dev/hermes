@@ -37,8 +37,6 @@ export default function LedgerView() {
   const [balances, setBalances] = useState<Balance[]>([]);
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [tab, setTab] = useState<'entries' | 'balances' | 'payments'>('entries');
-  const [error, setError] = useState('');
-  const [success, setSuccess] = useState('');
   const [expandedId, setExpandedId] = useState<number | null>(null);
   const [itemsCache, setItemsCache] = useState<Record<number, LedgerEntryItem[] | null>>({});
   const [loadingId, setLoadingId] = useState<number | null>(null);
@@ -181,9 +179,6 @@ export default function LedgerView() {
 
   return (
     <div>
-      {error && <div className="error-banner" data-testid="error-banner">{error}</div>}
-      {success && <div className="success-banner" data-testid="success-banner">{success}</div>}
-
       <div className="tabs-nav">
         <button className={`tabs-nav__item${tab === 'entries' ? ' active' : ''}`} onClick={() => setTab('entries')}>Entries</button>
         <button className={`tabs-nav__item${tab === 'balances' ? ' active' : ''}`} onClick={() => setTab('balances')}>Balances</button>
