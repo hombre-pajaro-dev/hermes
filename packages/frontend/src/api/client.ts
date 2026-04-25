@@ -82,10 +82,6 @@ export const api = {
   adjustInventory: (adjustments: { product_id: number; physical_count: number }[]) =>
     req<AdjustResult>('/inventory/adjust', { method: 'POST', body: JSON.stringify({ adjustments }) }),
 
-  // Admin — PIN
-  verifyPin: (pin: string) => req<{ ok: true }>('/admin/pin/verify', { method: 'POST', body: JSON.stringify({ pin }) }),
-  changePin: (current_pin: string, new_pin: string) => req<{ ok: true }>('/admin/pin/change', { method: 'POST', body: JSON.stringify({ current_pin, new_pin }) }),
-
   // Admin — Authorized users
   getAuthorizedUsers: () => req<AuthorizedUser[]>('/admin/users'),
   addAuthorizedUser: (email: string, role: 'staff' | 'admin') => req<AuthorizedUser>('/admin/users', { method: 'POST', body: JSON.stringify({ email, role }) }),

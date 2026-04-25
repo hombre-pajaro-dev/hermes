@@ -9,6 +9,22 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Changed
+
+#### PIN security replaced by RBAC
+- Removed the global PIN system entirely — no more `PinModal`, `/admin/pin/verify`, or `/admin/pin/change`
+- Operations previously gated by PIN are now controlled by user role:
+  - **Cash Out** — admin only (backend: `requireAdmin` on `POST /api/register/cashout`)
+  - **Close Register** — admin only (backend: `requireAdmin` on `POST /api/register/close`)
+  - **Void Tab** — admin only (backend: `requireAdmin` on `POST /api/tabs/:id/void`)
+  - **At-cost Tab** — any authenticated staff member (PIN restriction removed)
+  - **Admin-only courtesy discounts** — discounts marked `requires_pin` are now visible only to admins (`isAdmin` check in CheckoutView and TabsView); the field label changed from "Requires PIN" to "Admin only"
+- `PinModal` component deleted; `verifyPin` and `changePin` removed from `api/client.ts`
+- Admin submenu: **PIN** tab removed; only Register, Discounts, Supplies, Users remain
+- `RegisterView` hides Cash Out and Close Register cards from non-admin users
+- Backend: shared `requireAdmin` middleware in `src/middleware/require-admin.ts` — bypasses in `NODE_ENV=test` to preserve all BDD test behaviour
+- BDD tests: removed all 7 PIN-related E2E scenarios; "Close an empty tab" no longer enters a PIN; new admin feature scenarios test Register section and Discounts navigation
+
 ### Added
 
 #### Tab last-updated timestamp

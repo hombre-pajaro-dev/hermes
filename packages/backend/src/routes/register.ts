@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import { getDb } from '../db/database.js';
+import { requireAdmin } from '../middleware/require-admin.js';
 
 const router = Router();
 
@@ -138,7 +139,7 @@ router.post('/open', async (req, res) => {
   res.status(201).json(session);
 });
 
-router.post('/cashout', async (req, res) => {
+router.post('/cashout', requireAdmin, async (req, res) => {
   const session = await getOpenSession();
   if (!session) return res.status(403).json({ error: 'Register is not open' });
   const { amount, reason = '' } = req.body;
@@ -156,7 +157,7 @@ router.post('/cashout', async (req, res) => {
   res.status(201).json(cashout);
 });
 
-router.post('/close', async (req, res) => {
+router.post('/close', requireAdmin, async (req, res) => {
   const session = await getOpenSession();
   if (!session) return res.status(403).json({ error: 'Register is not open' });
   const { closing_cash } = req.body;

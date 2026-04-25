@@ -2,7 +2,7 @@
 
 ## Overview
 
-Hermes is a point-of-sale system for a café/bar. It supports checkout, long-lasting customer tabs, inventory management, a general ledger, sales reports, and admin controls (PIN security, product management).
+Hermes is a point-of-sale system for a café/bar. It supports checkout, long-lasting customer tabs, inventory management, a general ledger, sales reports, and admin controls (RBAC, product management).
 
 Stack: React 19 + TypeScript + Vite (frontend) / Express + TypeScript + PostgreSQL (backend) / pnpm monorepo / Vercel deployment.
 
@@ -189,14 +189,45 @@ Base path: `/api`
 | Reports | `GET /reports/sales`, `GET /reports/daily`, `GET /reports/top-products` |
 | Restock | `POST /restock` |
 | Adjustment | `POST /adjustment` |
-| Admin | `POST /admin/change-pin` |
+| Admin | `GET|POST|PATCH|DELETE /admin/users` |
 | Auth | Handled by Better Auth at `/api/auth/*` |
 
 ---
 
 ## Auth
 
-Better Auth v1.5+ with email/password and Google OAuth. An `authorized_users` table acts as an allowlist — only users in that table can log in. The admin page (`/admin`) is protected by PIN entry for sensitive operations (cashout, close register, at-cost tabs).
+Better Auth v1.5+ with email/password and Google OAuth. An `authorized_users` table acts as an allowlist — only users in that table can log in. Roles are managed in `authorized_users.role` (`staff` or `admin`) and synced to the Better Auth `user` table on every role change.
+
+---
+
+## Role permissions (ADMIN vs STAFF)
+
+Access is enforced at two levels: backend middleware (`requireAdmin` in `src/middleware/require-admin.ts`) and frontend UI gating (`isAdmin` from `authClient.useSession()`).
+
+| Operation | Staff | Admin |
+|-----------|-------|-------|
+| Open register | ✅ | ✅ |
+| View register status | ✅ | ✅ |
+| Cash out | ❌ | ✅ |
+| Close register | ❌ | ✅ |
+| Open tab (regular) | ✅ | ✅ |
+| Open tab at cost (staff drink) | ✅ | ✅ |
+| Add items to tab | ✅ | ✅ |
+| Pay tab | ✅ | ✅ |
+| Void tab (empty, no charge) | ❌ | ✅ |
+| Apply auto-discounts | ✅ (automatic) | ✅ |
+| Apply manual discounts (non-PIN) | ✅ | ✅ |
+| Apply admin-only courtesy discounts (`requires_pin = true`) | ❌ | ✅ |
+| Manage products, discounts, supplies | ❌ | ✅ |
+| Manage authorized users | ❌ | ✅ |
+| Run ledger payments | ❌ | ✅ |
+
+Backend enforcement notes:
+- `POST /api/register/cashout` — `requireAdmin`
+- `POST /api/register/close` — `requireAdmin`
+- `POST /api/tabs/:id/void` — `requireAdmin`
+- `GET|POST|PATCH|DELETE /api/admin/users` — `requireAdmin`
+- `requireAdmin` skips the check when `NODE_ENV === 'test'` to preserve BDD test behaviour
 
 ---
 

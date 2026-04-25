@@ -227,7 +227,7 @@ This document lists all **features** and **scenarios** covered by the BDD test s
 
 **Auto vs. manual:**
 - **Auto-discounts** activate automatically when all configured conditions match (active flag, day of week, date range, redemption cap); the discount with the highest computed savings is applied; cashier can remove it
-- **Manual / courtesy discounts** (`is_manual: true`) are never auto-applied; the cashier triggers them via "🎁 Apply courtesy…"; optionally protected by PIN
+- **Manual / courtesy discounts** (`is_manual: true`) are never auto-applied; the cashier triggers them via "🎁 Apply courtesy…"; optionally admin-only (`requires_pin: true` = visible to admins only)
 
 **Rules:**
 - Only one discount per order/tab at a time; manual override replaces the auto-selected discount
@@ -248,11 +248,11 @@ This document lists all **features** and **scenarios** covered by the BDD test s
 
 ## 11. Admin
 
-**Feature:** As an admin, I want to manage the security PIN, control register open/close, manage authorized users, configure discounts, and manage supplies so that operations are secure and stock is configured correctly.
+**Feature:** As an admin, I want to control register operations, manage authorized users, configure discounts, and manage supplies so that operations are secure and stock is configured correctly.
 
-**Submenu navigation:** Admin page uses a tab-based submenu — **Register**, **PIN**, **Discounts** (admin only), **Supplies** (admin only), **Users** (admin only). Staff only see Register and PIN tabs.
+**Submenu navigation:** Admin page uses a tab-based submenu — **Register**, **Discounts** (admin only), **Supplies** (admin only), **Users** (admin only). Staff see only the Register tab.
 
-**Register sub-section:** Open, cash out, and close controls. All staff can open the register; cash out and close require PIN confirmation.
+**Register sub-section:** Open, cash out, and close controls. All staff can open the register; cash out and close are admin-only (backend enforced via `requireAdmin` + frontend hides the cards for non-admins).
 
 **Authorized Users sub-section (admin only):** Only users with `role: admin` see this section. Admins can add an email + role, change an existing user’s role, or remove a user. Changes take effect on the user’s next sign-in.
 
@@ -260,15 +260,12 @@ This document lists all **features** and **scenarios** covered by the BDD test s
 
 **Supplies sub-section (admin only):** Create, edit, and delete supplies. See section 9 for detail.
 
+**Role-based access control:** PIN system removed entirely. Sensitive operations are gated by RBAC — see the Role permissions table in CLAUDE.md.
+
 | # | Scenario | Description |
 |---|----------|-------------|
-| 1 | Admin submenu navigates to PIN section | On Admin page; click PIN tab; PIN change form becomes visible. |
-| 2 | Change the PIN successfully | On Admin page; navigate to PIN section; enter correct current PIN and matching new PIN; success message shown; PIN updated. |
-| 3 | Cannot change PIN with incorrect current PIN | Navigate to PIN section; enter wrong current PIN; request rejected; error shown. |
-| 4 | Cannot change PIN when new PINs do not match | Navigate to PIN section; enter current PIN but mismatched new/confirm PINs; rejected with error before API call. |
-| 5 | Wrong PIN on cash out is rejected | Fill in cashout fields; click Cash Out; enter wrong PIN in modal; PIN error shown in modal. |
-| 6 | Wrong PIN on close register is rejected | Fill in closing cash; click Close Register; enter wrong PIN; PIN error shown in modal. |
-| 7 | Wrong PIN on at-cost tab is rejected | Navigate to Tabs; fill new at-cost tab form; click Open Tab; enter wrong PIN; PIN error shown. |
+| 1 | Admin submenu shows Register section by default | On Admin page; Register section (session status card) is visible without any navigation. |
+| 2 | Admin can navigate to Discounts section | On Admin page; click Discounts tab; Discounts section becomes active. |
 
 ---
 
@@ -310,7 +307,7 @@ This document lists all **features** and **scenarios** covered by the BDD test s
   `cd packages/backend && pnpm test` — 76 scenarios
 
 - **Run frontend tests only:**
-  `cd packages/frontend && pnpm test` — 64 scenarios
+  `cd packages/frontend && pnpm test` — 59 scenarios
   Requires Docker/Postgres running. The test script starts its own backend (`:3002`) and frontend (`:5174`) servers automatically.
 
 - **HTML report:**
@@ -334,4 +331,4 @@ This document lists all **features** and **scenarios** covered by the BDD test s
 | Products | backend + frontend | `features/products.feature` |
 | Discounts | backend + frontend | `features/discounts.feature` |
 | Payments | backend + frontend | `features/payments.feature` |
-| Admin (PIN, Register, Users, Discounts, Supplies) | frontend | `features/admin.feature` |
+| Admin (Register, Users, Discounts, Supplies) | frontend | `features/admin.feature` |

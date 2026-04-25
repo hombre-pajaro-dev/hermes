@@ -1,11 +1,11 @@
 import { useEffect, useRef, useState } from 'react';
 import { api } from '../api/client';
 import type { Discount, Product, Supply } from '../api/client';
+import { authClient } from '../lib/auth-client';
 import { computeCartAwareProducts } from '../lib/cart-utils';
 import ReceiptModal, { type ReceiptLine, type ReceiptDiscount } from '../components/ReceiptModal';
 import ProductThumb from '../components/ProductThumb';
 import ProductPicker from '../components/ProductPicker';
-import PinModal from '../components/PinModal';
 import { computeSavings, getBestAutoDiscount } from '../lib/discounts';
 import type { CartItem } from '../lib/discounts';
 
@@ -24,6 +24,9 @@ interface Receipt {
 }
 
 export default function CheckoutView() {
+  const { data: session } = authClient.useSession();
+  const isAdmin = (session?.user as { role?: string } | undefined)?.role === 'admin';
+
   const [products, setProducts] = useState<Product[]>([]);
   const [supplies, setSupplies] = useState<Supply[]>([]);
   const [lines, setLines] = useState<LineItem[]>([]);
@@ -44,7 +47,6 @@ export default function CheckoutView() {
   const [manualDiscountOverride, setManualDiscountOverride] = useState<
     { discount: Discount; savings: number } | null | undefined
   >(undefined);
-  const [showCourtesyPin, setShowCourtesyPin] = useState(false);
   const [showManualPicker, setShowManualPicker] = useState(false);
 
   function setView(mode: ViewMode) {
@@ -120,7 +122,7 @@ export default function CheckoutView() {
   const cashNum = Number(cashReceived) || 0;
   const liveChange = cashReceived !== '' ? cashNum - effectiveTotal : null;
 
-  const manualDiscounts = discounts.filter(d => d.is_manual && d.active);
+  const manualDiscounts = discounts.filter(d => d.is_manual && d.active && (isAdmin || !d.requires_pin));
 
   function toReceiptLines(items: LineItem[]): ReceiptLine[] {
     return items.map(l => ({ id: l.product.id, name: l.product.name, quantity: l.quantity, unitPrice: l.product.price }));
@@ -208,18 +210,6 @@ export default function CheckoutView() {
           total={receipt.total}
           changeDue={receipt.changeDue}
           onClose={handleCloseReceipt}
-        />
-      )}
-
-      {showCourtesyPin && (
-        <PinModal
-          title="Courtesy Discount — Enter PIN"
-          onConfirm={async (pin) => {
-            await api.verifyPin(pin);
-            setShowCourtesyPin(false);
-            setShowManualPicker(true);
-          }}
-          onCancel={() => setShowCourtesyPin(false)}
         />
       )}
 
@@ -400,13 +390,7 @@ export default function CheckoutView() {
                   <button
                     className="btn btn--sm btn--ghost"
                     style={{ fontSize: '0.8rem' }}
-                    onClick={() => {
-                      if (manualDiscounts.some(d => d.requires_pin)) {
-                        setShowCourtesyPin(true);
-                      } else {
-                        setShowManualPicker(true);
-                      }
-                    }}
+                    onClick={() => setShowManualPicker(true)}
                   >
                     🎁 Apply courtesy…
                   </button>

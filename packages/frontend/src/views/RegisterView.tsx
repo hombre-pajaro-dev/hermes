@@ -1,10 +1,13 @@
 import { useEffect, useState } from 'react';
 import { api } from '../api/client';
 import type { RegisterSession } from '../api/client';
-import PinModal from '../components/PinModal';
+import { authClient } from '../lib/auth-client';
 
 export default function RegisterView() {
-  const [session, setSession] = useState<RegisterSession | null>(null);
+  const { data: session } = authClient.useSession();
+  const isAdmin = (session?.user as { role?: string } | undefined)?.role === 'admin';
+
+  const [registerSession, setRegisterSession] = useState<RegisterSession | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
@@ -12,11 +15,10 @@ export default function RegisterView() {
   const [closingCash, setClosingCash] = useState('');
   const [cashoutAmount, setCashoutAmount] = useState('');
   const [cashoutReason, setCashoutReason] = useState('');
-  const [pinTarget, setPinTarget] = useState<'cashout' | 'close' | null>(null);
 
   async function load() {
-    try { setSession(await api.getSession()); }
-    catch { setSession(null); }
+    try { setRegisterSession(await api.getSession()); }
+    catch { setRegisterSession(null); }
     finally { setLoading(false); }
   }
 
@@ -51,30 +53,16 @@ export default function RegisterView() {
 
   return (
     <div>
-      {pinTarget && (
-        <PinModal
-          title={pinTarget === 'cashout' ? 'Cash Out — Enter PIN' : 'Close Register — Enter PIN'}
-          onConfirm={async (pin) => {
-            await api.verifyPin(pin);
-            const target = pinTarget;
-            setPinTarget(null);
-            if (target === 'cashout') await handleCashout();
-            else await handleClose();
-          }}
-          onCancel={() => setPinTarget(null)}
-        />
-      )}
-
       {error && <div className="error-banner" data-testid="error-banner">{error}</div>}
       {success && <div className="success-banner" data-testid="success-banner">{success}</div>}
 
       <div className="card" data-testid="session-status">
         <div className="card__title">Status</div>
-        {session ? (
+        {registerSession ? (
           <>
             <span className="badge badge--open">OPEN</span>
             <p style={{ marginTop: 8, fontSize: '0.9rem', color: 'var(--text-secondary)' }}>
-              Opened with <strong>${session.opening_cash.toFixed(2)}</strong>
+              Opened with <strong>${registerSession.opening_cash.toFixed(2)}</strong>
             </p>
           </>
         ) : (
@@ -82,7 +70,7 @@ export default function RegisterView() {
         )}
       </div>
 
-      {!session && (
+      {!registerSession && (
         <div className="card">
           <div className="card__title">Open Register</div>
           <div className="field">
@@ -97,7 +85,7 @@ export default function RegisterView() {
         </div>
       )}
 
-      {session && (
+      {registerSession && isAdmin && (
         <>
           <div className="card">
             <div className="card__title">Cash Out</div>
@@ -112,7 +100,7 @@ export default function RegisterView() {
                 placeholder="Safe drop…" value={cashoutReason} onChange={e => setCashoutReason(e.target.value)} />
             </div>
             <button data-testid="cashout-btn" className="btn btn--ghost"
-              onClick={() => setPinTarget('cashout')} disabled={!cashoutAmount}>
+              onClick={handleCashout} disabled={!cashoutAmount}>
               Cash Out
             </button>
           </div>
@@ -125,7 +113,7 @@ export default function RegisterView() {
                 placeholder="0.00" value={closingCash} onChange={e => setClosingCash(e.target.value)} />
             </div>
             <button data-testid="close-register-btn" className="btn btn--danger"
-              onClick={() => setPinTarget('close')} disabled={!closingCash}>
+              onClick={handleClose} disabled={!closingCash}>
               Close Register
             </button>
           </div>

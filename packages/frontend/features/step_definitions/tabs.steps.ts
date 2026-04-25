@@ -102,11 +102,8 @@ Then('I see the close tab button', async function (this: PosWorld) {
   expect(await this.page.locator('[data-testid="void-tab-btn"]').isVisible()).to.be.true;
 });
 
-When('I close the empty tab with PIN {string}', async function (this: PosWorld, pin: string) {
+When('I close the empty tab', async function (this: PosWorld) {
   await this.page.click('[data-testid="void-tab-btn"]');
-  await this.page.waitForSelector('[data-testid="pin-input"]', { timeout: 5000 });
-  await this.page.fill('[data-testid="pin-input"]', pin);
-  await this.page.click('[data-testid="pin-confirm-btn"]');
   await this.page.waitForLoadState('networkidle');
 });
 

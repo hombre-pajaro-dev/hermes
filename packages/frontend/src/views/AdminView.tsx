@@ -2,7 +2,6 @@ import { useEffect, useState } from 'react';
 import { api } from '../api/client';
 import type { AuthorizedUser, Discount, Product, RegisterSession, Supply } from '../api/client';
 import { authClient } from '../lib/auth-client';
-import PinModal from '../components/PinModal';
 
 const DAY_LABELS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
@@ -44,7 +43,6 @@ export default function AdminView() {
   const [closingCash, setClosingCash] = useState('');
   const [cashoutAmount, setCashoutAmount] = useState('');
   const [cashoutReason, setCashoutReason] = useState('');
-  const [pinTarget, setPinTarget] = useState<'cashout' | 'close' | null>(null);
 
   async function loadRegister() {
     try { setRegisterSession(await api.getSession()); }
@@ -77,24 +75,6 @@ export default function AdminView() {
       await api.closeRegister(Number(closingCash));
       setRegisterSuccess('Register closed'); setClosingCash(''); loadRegister();
     } catch (e: unknown) { setRegisterError((e as Error).message); }
-  }
-
-  // ── PIN management ──────────────────────────────────────────────────────────
-  const [currentPin, setCurrentPin] = useState('');
-  const [newPin, setNewPin] = useState('');
-  const [confirmPin, setConfirmPin] = useState('');
-  const [pinError, setPinError] = useState('');
-  const [pinSuccess, setPinSuccess] = useState('');
-
-  async function handleChangePin() {
-    setPinError(''); setPinSuccess('');
-    if (newPin !== confirmPin) { setPinError('New PINs do not match'); return; }
-    if (newPin.length < 4) { setPinError('PIN must be at least 4 characters'); return; }
-    try {
-      await api.changePin(currentPin, newPin);
-      setPinSuccess('PIN changed successfully');
-      setCurrentPin(''); setNewPin(''); setConfirmPin('');
-    } catch (e: unknown) { setPinError((e as Error).message); }
   }
 
   // ── Authorized users management (admin only) ────────────────────────────────
@@ -295,24 +275,10 @@ export default function AdminView() {
     catch (e: unknown) { setSuppliesError((e as Error).message); }
   }
 
-  const [adminSection, setAdminSection] = useState<'register' | 'pin' | 'discounts' | 'supplies' | 'users'>('register');
+  const [adminSection, setAdminSection] = useState<'register' | 'discounts' | 'supplies' | 'users'>('register');
 
   return (
     <div>
-      {pinTarget && (
-        <PinModal
-          title={pinTarget === 'cashout' ? 'Cash Out — Enter PIN' : 'Close Register — Enter PIN'}
-          onConfirm={async (pin) => {
-            await api.verifyPin(pin);
-            const target = pinTarget;
-            setPinTarget(null);
-            if (target === 'cashout') await handleCashout();
-            else await handleCloseRegister();
-          }}
-          onCancel={() => setPinTarget(null)}
-        />
-      )}
-
       {/* Session info + sign out */}
       <div className="card" style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
         <div style={{ flex: 1 }}>
@@ -330,7 +296,6 @@ export default function AdminView() {
       <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', marginBottom: 4 }}>
         {([
           { key: 'register', label: 'Register' },
-          { key: 'pin', label: 'PIN' },
           ...(isAdmin ? [
             { key: 'discounts', label: 'Discounts' },
             { key: 'supplies', label: 'Supplies' },
@@ -401,7 +366,7 @@ export default function AdminView() {
                     placeholder="Safe drop…" value={cashoutReason} onChange={e => setCashoutReason(e.target.value)} />
                 </div>
                 <button data-testid="cashout-btn" className="btn btn--ghost"
-                  onClick={() => setPinTarget('cashout')} disabled={!cashoutAmount}>
+                  onClick={handleCashout} disabled={!cashoutAmount}>
                   Cash Out
                 </button>
               </div>
@@ -414,7 +379,7 @@ export default function AdminView() {
                     placeholder="0.00" value={closingCash} onChange={e => setClosingCash(e.target.value)} />
                 </div>
                 <button data-testid="close-register-btn" className="btn btn--danger"
-                  onClick={() => setPinTarget('close')} disabled={!closingCash}>
+                  onClick={handleCloseRegister} disabled={!closingCash}>
                   Close Register
                 </button>
               </div>
@@ -422,39 +387,6 @@ export default function AdminView() {
           )}
         </>
       ))}
-
-      {/* PIN management */}
-      {adminSection === 'pin' && (
-        <>
-          {pinError && <div className="error-banner" data-testid="error-banner">{pinError}</div>}
-          {pinSuccess && <div className="success-banner" data-testid="success-banner">{pinSuccess}</div>}
-          <div className="card">
-        <div className="card__title">Change PIN</div>
-        <p style={{ fontSize: '0.9rem', color: 'var(--text-secondary)', marginBottom: 12 }}>
-          The PIN protects cash-outs, closing the register, and opening staff cost tabs.
-        </p>
-        <div className="field">
-          <label className="label">Current PIN</label>
-          <input data-testid="current-pin-input" className="input" type="password" inputMode="numeric"
-            value={currentPin} onChange={e => setCurrentPin(e.target.value)} />
-        </div>
-        <div className="field">
-          <label className="label">New PIN</label>
-          <input data-testid="new-pin-input" className="input" type="password" inputMode="numeric"
-            value={newPin} onChange={e => setNewPin(e.target.value)} />
-        </div>
-        <div className="field">
-          <label className="label">Confirm New PIN</label>
-          <input data-testid="confirm-pin-input" className="input" type="password" inputMode="numeric"
-            value={confirmPin} onChange={e => setConfirmPin(e.target.value)} />
-        </div>
-        <button data-testid="change-pin-btn" className="btn btn--primary"
-          onClick={handleChangePin} disabled={!currentPin || !newPin || !confirmPin}>
-          Change PIN
-        </button>
-      </div>
-        </>
-      )}
 
       {/* Discounts — admin only */}
       {adminSection === 'discounts' && isAdmin && (
@@ -605,7 +537,7 @@ export default function AdminView() {
                       <input type="checkbox" checked={discountForm.requires_pin}
                         onChange={e => setDiscountForm(f => ({ ...f, requires_pin: e.target.checked }))}
                         style={{ width: 18, height: 18, accentColor: 'var(--primary)' }} />
-                      <span style={{ fontSize: '0.9rem' }}>Requires PIN</span>
+                      <span style={{ fontSize: '0.9rem' }}>Admin only</span>
                     </label>
                   )}
                 </div>

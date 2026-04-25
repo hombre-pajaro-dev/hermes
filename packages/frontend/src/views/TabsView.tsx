@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { api } from '../api/client';
 import type { Discount, Tab, TabItem, Product } from '../api/client';
-import PinModal from '../components/PinModal';
+import { authClient } from '../lib/auth-client';
 import ReceiptModal, { type ReceiptLine, type ReceiptDiscount } from '../components/ReceiptModal';
 import ProductThumb from '../components/ProductThumb';
 import ProductPicker from '../components/ProductPicker';
@@ -35,6 +35,9 @@ interface Receipt {
 }
 
 export default function TabsView() {
+  const { data: session } = authClient.useSession();
+  const isAdmin = (session?.user as { role?: string } | undefined)?.role === 'admin';
+
   const [tabs, setTabs] = useState<Tab[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
   const [selectedTab, setSelectedTab] = useState<(Tab & { items?: TabItem[] }) | null>(null);
@@ -45,8 +48,6 @@ export default function TabsView() {
   const [error, setError] = useState('');
   const [view, setView] = useState<'list' | 'new' | 'detail'>('list');
   const [closedPage, setClosedPage] = useState(0);
-  const [showPinForTab, setShowPinForTab] = useState(false);
-  const [showPinForVoid, setShowPinForVoid] = useState(false);
   const [receipt, setReceipt] = useState<Receipt | null>(null);
   const [soldCounts, setSoldCounts] = useState<Record<number, number>>({});
   const [addViewMode, setAddViewMode] = useState<'grid' | 'list'>(() => {
@@ -61,7 +62,6 @@ export default function TabsView() {
   const [manualDiscountOverride, setManualDiscountOverride] = useState<
     { discount: Discount; savings: number } | null | undefined
   >(undefined);
-  const [showCourtesyPin, setShowCourtesyPin] = useState(false);
   const [showManualPicker, setShowManualPicker] = useState(false);
 
   function setAddView(mode: 'grid' | 'list') {
@@ -246,7 +246,7 @@ export default function TabsView() {
   const tabEffectiveSavings = tabActiveDiscount && tabActiveDiscount.savings > 0 ? tabActiveDiscount.savings : 0;
   const tabEffectiveTotal = Math.max(0, tabTotal - tabEffectiveSavings);
 
-  const manualDiscounts = discounts.filter(d => d.is_manual && d.active);
+  const manualDiscounts = discounts.filter(d => d.is_manual && d.active && (isAdmin || !d.requires_pin));
 
   const cashNum = Number(cashReceived) || 0;
   const liveChange = cashReceived !== '' ? cashNum - tabEffectiveTotal : null;
@@ -262,42 +262,6 @@ export default function TabsView() {
 
   return (
     <div>
-      {showPinForTab && (
-        <PinModal
-          title="Staff Tab — Enter PIN"
-          onConfirm={async (pin) => {
-            await api.verifyPin(pin);
-            setShowPinForTab(false);
-            await handleCreateTab();
-          }}
-          onCancel={() => setShowPinForTab(false)}
-        />
-      )}
-
-      {showPinForVoid && (
-        <PinModal
-          title="Close Tab — Enter PIN"
-          onConfirm={async (pin) => {
-            await api.verifyPin(pin);
-            setShowPinForVoid(false);
-            await handleVoidTab();
-          }}
-          onCancel={() => setShowPinForVoid(false)}
-        />
-      )}
-
-      {showCourtesyPin && (
-        <PinModal
-          title="Courtesy Discount — Enter PIN"
-          onConfirm={async (pin) => {
-            await api.verifyPin(pin);
-            setShowCourtesyPin(false);
-            setShowManualPicker(true);
-          }}
-          onCancel={() => setShowCourtesyPin(false)}
-        />
-      )}
-
       {showManualPicker && (
         <div style={{
           position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.55)',
@@ -442,7 +406,7 @@ export default function TabsView() {
             </span>
           </label>
           <button data-testid="open-tab-btn" className="btn btn--primary"
-            onClick={() => atCost ? setShowPinForTab(true) : handleCreateTab()}
+            onClick={handleCreateTab}
             disabled={!tabName}>Open Tab</button>
         </div>
       )}
@@ -616,7 +580,7 @@ export default function TabsView() {
                   <button
                     data-testid="void-tab-btn"
                     className="btn btn--danger"
-                    onClick={() => setShowPinForVoid(true)}
+                    onClick={handleVoidTab}
                   >
                     Close Tab (no charge)
                   </button>
@@ -647,13 +611,7 @@ export default function TabsView() {
                           <button
                             className="btn btn--sm btn--ghost"
                             style={{ fontSize: '0.8rem', marginBottom: 4 }}
-                            onClick={() => {
-                              if (manualDiscounts.some(d => d.requires_pin)) {
-                                setShowCourtesyPin(true);
-                              } else {
-                                setShowManualPicker(true);
-                              }
-                            }}
+                            onClick={() => setShowManualPicker(true)}
                           >
                             🎁 Apply courtesy…
                           </button>

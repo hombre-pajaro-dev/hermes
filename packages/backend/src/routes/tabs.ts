@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { getDb, pool } from '../db/database.js';
 import { isDiscountEligibleNow, computeDiscountAmount } from '../lib/discount-engine.js';
 import { getProductAvailableUnits, deductProductStock, restoreProductStock } from '../lib/supply-utils.js';
+import { requireAdmin } from '../middleware/require-admin.js';
 
 const router = Router();
 
@@ -162,7 +163,7 @@ router.patch('/:id/items/:itemId', async (req, res) => {
   res.json({ ...updatedTab, item_count: itemCount, items: tabItems });
 });
 
-router.post('/:id/void', async (req, res) => {
+router.post('/:id/void', requireAdmin, async (req, res) => {
   const db = await getDb();
   const { rows } = await db.query('SELECT * FROM tabs WHERE id = $1', [req.params.id]);
   const tab = rows[0] as { id: number; status: string } | undefined;
