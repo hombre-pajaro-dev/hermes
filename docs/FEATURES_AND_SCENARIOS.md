@@ -203,6 +203,8 @@ This document lists all **features** and **scenarios** covered by the BDD test s
 
 **Feature:** Products have name, description, cost, price, and available units (inventory). Products are either **unit-based** (stock tracked directly) or **supply-based** (stock computed from linked supply ingredients).
 
+**Admin-only editing:** All product mutations (create, edit price/cost, activate/deactivate, toggle inventory tracking, change image, edit supply links) are visible and accessible **only to admins**. Staff see the product catalogue in read-only mode — no buttons, no edit inputs, no image picker interaction.
+
 **UI:** The product catalogue is displayed via the shared `ProductPicker` component. All three views — Checkout, Tabs Add Items, and Products — share a consistent **search input** (filters by name, case-insensitive) and **grid / list toggle** (⊞ / ☰). View preference is persisted per-view in `localStorage`.
 
 **Active / Inactive status:** Each product can be deactivated from the Products view. Inactive products appear at 55% opacity with an INACTIVE badge. The Add Items panel in Checkout and Tabs has a **● Active** filter toggle (on by default, shared `product-active-filter` key) that hides inactive products from the selling UI.
@@ -229,6 +231,7 @@ This document lists all **features** and **scenarios** covered by the BDD test s
 | 14 | Disable inventory tracking on a product | `PATCH /api/products/:id/track-inventory` with `{ track_inventory: false }`; product returns with `track_inventory: false`; available units reported as 999999. |
 | 15 | Untracked product is always available and never deducted | Sell an untracked product; `products.units` unchanged; `getProductAvailableUnits` always returns 999999. |
 | 16 | Restock and adjustment reject untracked products | Attempt to restock or inventory-adjust an untracked product; rejected with error "inventory tracking disabled". |
+| 17 | Staff cannot see product edit controls (E2E) | As staff user on Products page; Add Product button, Edit price/cost buttons, Activate/Deactivate buttons, and image picker are all hidden. |
 
 ---
 

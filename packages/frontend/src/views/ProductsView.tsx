@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { api } from '../api/client';
 import type { Product, Supply, Tab } from '../api/client';
 import ImagePicker from '../components/ImagePicker';
+import { authClient } from '../lib/auth-client';
 
 type EditField = 'price' | 'cost';
 type ViewMode = 'list' | 'grid';
@@ -12,6 +13,9 @@ interface SupplyIngredientDraft {
 }
 
 export default function ProductsView() {
+  const { data: session } = authClient.useSession();
+  const isAdmin = (session?.user as { role?: string } | undefined)?.role === 'admin';
+
   const [products, setProducts] = useState<Product[]>([]);
   const [supplies, setSupplies] = useState<Supply[]>([]);
   const [lockedIds, setLockedIds] = useState<Set<number>>(new Set());
@@ -229,6 +233,14 @@ export default function ProductsView() {
   }
 
   function renderEditableField(p: Product, field: EditField, value: number, locked: boolean) {
+    if (!isAdmin) {
+      return (
+        <span style={{ fontWeight: field === 'price' ? 700 : 400 }} data-testid={`product-${field}`}>
+          ${value.toFixed(2)}
+        </span>
+      );
+    }
+
     const isEditing = field === 'price' ? p.id in editingPrice : p.id in editingCost;
     const editVal = field === 'price' ? editingPrice[p.id] : editingCost[p.id];
     const setEdit = (v: string) =>
@@ -273,6 +285,18 @@ export default function ProductsView() {
   }
 
   function renderSupplySection(p: Product) {
+    if (!isAdmin) {
+      return p.uses_supplies ? (
+        <div style={{ marginTop: 6, fontSize: '0.78rem', color: 'var(--text-secondary)' }}>
+          {p.supply_ingredients.map(si => (
+            <span key={si.supply_id} style={{ marginRight: 8 }}>
+              {si.quantity_per_unit}{si.unit} {si.supply_name}
+            </span>
+          ))}
+        </div>
+      ) : null;
+    }
+
     const isEditing = editingSupplyIds.has(p.id);
     const drafts = supplyDrafts[p.id] ?? [];
 
@@ -317,11 +341,13 @@ export default function ProductsView() {
     <div>
       {error && <div className="error-banner" data-testid="error-banner">{error}</div>}
 
-      <button data-testid="add-product-btn" className="btn btn--primary"
-        style={{ marginBottom: 8 }}
-        onClick={() => setShowForm(!showForm)}>
-        {showForm ? 'Cancel' : '+ Add Product'}
-      </button>
+      {isAdmin && (
+        <button data-testid="add-product-btn" className="btn btn--primary"
+          style={{ marginBottom: 8 }}
+          onClick={() => setShowForm(!showForm)}>
+          {showForm ? 'Cancel' : '+ Add Product'}
+        </button>
+      )}
 
       <div style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 8, marginBottom: 16 }}>
         <input
@@ -349,7 +375,7 @@ export default function ProductsView() {
         </div>
       </div>
 
-      {showForm && (
+      {isAdmin && showForm && (
         <div className="card" data-testid="product-form">
           <div className="card__title">New Product</div>
 
@@ -437,12 +463,16 @@ export default function ProductsView() {
             return (
               <div className="product-card" key={p.id} data-testid="product-item" style={{ opacity: p.active ? 1 : 0.55 }}>
                 <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 10 }}>
-                  <ImagePicker
-                    image={p.image}
-                    testId={`product-thumbnail-${p.id}`}
-                    size={96}
-                    onChange={dataUrl => handleImageChange(p.id, dataUrl)}
-                  />
+                  {isAdmin ? (
+                    <ImagePicker image={p.image} testId={`product-thumbnail-${p.id}`} size={96}
+                      onChange={dataUrl => handleImageChange(p.id, dataUrl)} />
+                  ) : p.image ? (
+                    <img data-testid={`product-thumbnail-${p.id}`} src={p.image} alt="Product"
+                      style={{ width: 96, height: 96, objectFit: 'cover', borderRadius: 8 }} />
+                  ) : (
+                    <div data-testid={`product-thumbnail-${p.id}`}
+                      style={{ width: 96, height: 96, borderRadius: 8, background: '#f3f4f6', border: '2px dashed #d1d5db' }} />
+                  )}
                 </div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4 }}>
                   <div className="product-card__name" data-testid="product-name" style={{ flex: 1 }}>{p.name}</div>
@@ -460,23 +490,27 @@ export default function ProductsView() {
                 </div>
                 <div className="product-card__meta" data-testid="product-units">{p.track_inventory === false ? '∞' : p.units} units</div>
                 {renderSupplySection(p)}
-                <button
-                  data-testid={`toggle-active-${p.id}`}
-                  className={`btn btn--sm ${p.active ? 'btn--ghost' : 'btn--success'}`}
-                  style={{ marginTop: 8, width: '100%', fontSize: '0.75rem' }}
-                  onClick={() => handleToggleActive(p)}
-                >
-                  {p.active ? 'Deactivate' : 'Activate'}
-                </button>
-                {!p.uses_supplies && (
-                  <button
-                    data-testid={`toggle-track-inventory-${p.id}`}
-                    className={`btn btn--sm ${p.track_inventory === false ? 'btn--primary' : 'btn--ghost'}`}
-                    style={{ marginTop: 4, width: '100%', fontSize: '0.75rem' }}
-                    onClick={() => handleToggleTrackInventory(p)}
-                  >
-                    {p.track_inventory === false ? 'Enable tracking' : 'Disable tracking'}
-                  </button>
+                {isAdmin && (
+                  <>
+                    <button
+                      data-testid={`toggle-active-${p.id}`}
+                      className={`btn btn--sm ${p.active ? 'btn--ghost' : 'btn--success'}`}
+                      style={{ marginTop: 8, width: '100%', fontSize: '0.75rem' }}
+                      onClick={() => handleToggleActive(p)}
+                    >
+                      {p.active ? 'Deactivate' : 'Activate'}
+                    </button>
+                    {!p.uses_supplies && (
+                      <button
+                        data-testid={`toggle-track-inventory-${p.id}`}
+                        className={`btn btn--sm ${p.track_inventory === false ? 'btn--primary' : 'btn--ghost'}`}
+                        style={{ marginTop: 4, width: '100%', fontSize: '0.75rem' }}
+                        onClick={() => handleToggleTrackInventory(p)}
+                      >
+                        {p.track_inventory === false ? 'Enable tracking' : 'Disable tracking'}
+                      </button>
+                    )}
+                  </>
                 )}
               </div>
             );
@@ -489,12 +523,16 @@ export default function ProductsView() {
             return (
               <div key={p.id} data-testid="product-item" style={{ gap: 12, opacity: p.active ? 1 : 0.55, minWidth: 0 }}>
                 <div className="list-item" style={{ gap: 12, minWidth: 0 }}>
-                  <ImagePicker
-                    image={p.image}
-                    testId={`product-thumbnail-${p.id}`}
-                    size={56}
-                    onChange={dataUrl => handleImageChange(p.id, dataUrl)}
-                  />
+                  {isAdmin ? (
+                    <ImagePicker image={p.image} testId={`product-thumbnail-${p.id}`} size={56}
+                      onChange={dataUrl => handleImageChange(p.id, dataUrl)} />
+                  ) : p.image ? (
+                    <img data-testid={`product-thumbnail-${p.id}`} src={p.image} alt="Product"
+                      style={{ width: 56, height: 56, objectFit: 'cover', borderRadius: 8, flexShrink: 0 }} />
+                  ) : (
+                    <div data-testid={`product-thumbnail-${p.id}`}
+                      style={{ width: 56, height: 56, borderRadius: 8, background: '#f3f4f6', border: '2px dashed #d1d5db', flexShrink: 0 }} />
+                  )}
                   <div className="list-item__main" style={{ minWidth: 0 }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                       <div className="list-item__name" data-testid="product-name">{p.name}</div>
@@ -511,23 +549,27 @@ export default function ProductsView() {
                     <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginBottom: 2 }}>Price</div>
                     {renderEditableField(p, 'price', p.price, locked)}
                     <div className="list-item__sub" data-testid="product-units">{p.track_inventory === false ? '∞' : p.units} units</div>
-                    <button
-                      data-testid={`toggle-active-${p.id}`}
-                      className={`btn btn--sm ${p.active ? 'btn--ghost' : 'btn--success'}`}
-                      style={{ fontSize: '0.72rem', marginTop: 2 }}
-                      onClick={() => handleToggleActive(p)}
-                    >
-                      {p.active ? 'Deactivate' : 'Activate'}
-                    </button>
-                    {!p.uses_supplies && (
-                      <button
-                        data-testid={`toggle-track-inventory-${p.id}`}
-                        className={`btn btn--sm ${p.track_inventory === false ? 'btn--primary' : 'btn--ghost'}`}
-                        style={{ fontSize: '0.72rem', marginTop: 2 }}
-                        onClick={() => handleToggleTrackInventory(p)}
-                      >
-                        {p.track_inventory === false ? 'Enable tracking' : 'Disable tracking'}
-                      </button>
+                    {isAdmin && (
+                      <>
+                        <button
+                          data-testid={`toggle-active-${p.id}`}
+                          className={`btn btn--sm ${p.active ? 'btn--ghost' : 'btn--success'}`}
+                          style={{ fontSize: '0.72rem', marginTop: 2 }}
+                          onClick={() => handleToggleActive(p)}
+                        >
+                          {p.active ? 'Deactivate' : 'Activate'}
+                        </button>
+                        {!p.uses_supplies && (
+                          <button
+                            data-testid={`toggle-track-inventory-${p.id}`}
+                            className={`btn btn--sm ${p.track_inventory === false ? 'btn--primary' : 'btn--ghost'}`}
+                            style={{ fontSize: '0.72rem', marginTop: 2 }}
+                            onClick={() => handleToggleTrackInventory(p)}
+                          >
+                            {p.track_inventory === false ? 'Enable tracking' : 'Disable tracking'}
+                          </button>
+                        )}
+                      </>
                     )}
                   </div>
                 </div>

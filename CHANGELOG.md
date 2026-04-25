@@ -11,6 +11,12 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+#### Products view — admin-only editing
+- All product mutation controls are now hidden from staff: Add Product button, price/cost Edit buttons, Activate/Deactivate, Enable/Disable tracking, Edit/Link Supplies, and image picker
+- Staff see the product catalogue in read-only mode — static price/cost values, plain product image (no click-to-change), no action buttons
+- No backend changes — `requireAdmin` already enforces mutations server-side; this closes the frontend gap
+- Docs: scenario 17 added to Products section
+
 #### Restock ledger entries are now expandable
 - `restock` added to the expandable entry types in the Ledger Entries tab (alongside `sale` and `tab_payment`)
 - `GET /api/ledger/entries/:id/items` now handles `ref_type = 'restock'` — returns restocked products with name, quantity, unit cost, and subtotal from `restock_items`
