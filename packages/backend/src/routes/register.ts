@@ -92,6 +92,15 @@ router.get('/sessions/:id/report', async (req, res) => {
     GROUP BY p.id, p.name
   `, [sessionId]);
 
+  const { rows: [commRow] } = await db.query(`
+    SELECT COALESCE(SUM(amount), 0) as commission_total
+    FROM ledger_entries
+    WHERE entry_type = 'commission' AND account = 'commissions'
+      AND ref_type = 'order'
+      AND ref_id IN (SELECT id FROM orders WHERE session_id = $1 AND status = 'paid')
+  `, [sessionId]);
+  const commissionTotal = Math.abs(Number(commRow.commission_total));
+
   res.json({
     session: {
       id: session.id,
@@ -106,7 +115,8 @@ router.get('/sessions/:id/report', async (req, res) => {
     order_count: totals.order_count,
     revenue: Number(totals.revenue),
     total_cost: Number(costRow.total_cost),
-    gross_profit: Number(totals.revenue) - Number(costRow.total_cost),
+    commission_total: commissionTotal,
+    gross_profit: Number(totals.revenue) - Number(costRow.total_cost) - commissionTotal,
     cash_sales: Number(totals.cash_sales),
     card_sales: Number(totals.card_sales),
     by_item: byItem.map(r => ({

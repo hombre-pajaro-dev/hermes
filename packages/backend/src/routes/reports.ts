@@ -86,6 +86,12 @@ router.get('/daily-total', async (req, res) => {
     WHERE account = 'inventory_adjustment'
       AND (created_at AT TIME ZONE $3)::date BETWEEN $1::date AND $2::date
   `, [from, to, tz]);
+  const { rows: [commRow] } = await db.query(`
+    SELECT COALESCE(SUM(amount), 0) as commission_total
+    FROM ledger_entries
+    WHERE entry_type = 'commission' AND account = 'commissions'
+      AND (created_at AT TIME ZONE $3)::date BETWEEN $1::date AND $2::date
+  `, [from, to, tz]);
   res.json({
     date: from === to ? from : `${from}/${to}`,
     order_count: totals.order_count,
@@ -94,6 +100,7 @@ router.get('/daily-total', async (req, res) => {
     card_sales: Number(totals.card_sales),
     total_cost: Number(costRow.total_cost),
     inventory_adjustment_total: Number(adjRow.inventory_adjustment_total),
+    commission_total: Math.abs(Number(commRow.commission_total)),
   });
 });
 
@@ -137,10 +144,22 @@ router.get('/close-brief', async (req, res) => {
   const items = Array.from(merged.values());
   const revenue = items.reduce((s, i) => s + i.revenue, 0);
   const totalCost = items.reduce((s, i) => s + i.cost, 0);
+
+  const { rows: [briefCommRow] } = await db.query(`
+    SELECT COALESCE(SUM(amount), 0) as commission_total
+    FROM ledger_entries
+    WHERE entry_type = 'commission' AND account = 'commissions'
+      AND ref_type = 'order'
+      AND ref_id IN (SELECT id FROM orders WHERE session_id = $1 AND status = 'paid')
+  `, [sessionId]);
+  const briefCommissionTotal = Math.abs(Number(briefCommRow.commission_total));
+
   const mostSold = [...items].sort((a, b) => b.units_sold - a.units_sold)[0] ?? null;
   const mostProfitable = [...items].sort((a, b) => b.profit - a.profit)[0] ?? null;
   res.json({
-    session_id: sessionId, revenue, total_cost: totalCost, gross_profit: revenue - totalCost,
+    session_id: sessionId, revenue, total_cost: totalCost,
+    commission_total: briefCommissionTotal,
+    gross_profit: revenue - totalCost - briefCommissionTotal,
     most_sold: mostSold ? { product_id: mostSold.product_id, name: mostSold.name, units_sold: mostSold.units_sold } : null,
     most_profitable: mostProfitable ? { product_id: mostProfitable.product_id, name: mostProfitable.name, profit: mostProfitable.profit } : null,
     by_item: items,

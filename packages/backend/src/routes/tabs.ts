@@ -4,6 +4,7 @@ import { isDiscountEligibleNow, computeDiscountAmount } from '../lib/discount-en
 import { getProductAvailableUnits, deductProductStock, restoreProductStock } from '../lib/supply-utils.js';
 import { requireAdmin } from '../middleware/require-admin.js';
 import { actorEmail } from '../lib/actor.js';
+import { applyCardCommission } from '../lib/commission-utils.js';
 
 const router = Router();
 
@@ -239,6 +240,10 @@ router.post('/:id/pay', async (req, res) => {
       [discountRow.id, tab.id, discountRow.name, discountRow.type, discountAmount],
     );
     await db.query('UPDATE discounts SET redemptions = redemptions + 1 WHERE id = $1', [discountRow.id]);
+  }
+
+  if (payment_method === 'card' && effectiveTotal > 0) {
+    await applyCardCommission(db, effectiveTotal, tab.id, 'tab', actor);
   }
 
   res.json({ ...updated, change_due: changeDue });

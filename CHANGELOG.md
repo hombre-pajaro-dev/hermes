@@ -11,6 +11,15 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+#### Credit Card Commission Tracking
+- Card payments now automatically deduct a commission from the `credit_card` account balance (so the balance reflects net received) and record it in a separate `commissions` account (so total charged is visible)
+- Default rate: 3.5% + 16% IVA on the commission — configurable by admin
+- Admin → Commissions tab: view and edit commission rate and IVA rate; see cumulative total commissions paid; `GET/PATCH /api/admin/commissions`
+- Commission entries appear in Ledger Entries with type `commission` (amber color); automatically created for card orders and card tab payments
+- Set rate to 0 to disable commission tracking entirely
+- Per-payee account override in Distribute Payments: each payee row now has a dropdown to pick cash or card for that payment run (overrides their stored default)
+- BDD: 3 new backend scenarios (auto-applied on card, not on cash, rate configurable); 1 new frontend E2E scenario (settings visible in Admin)
+
 #### Provider Payments
 - Admins can record payments to providers directly from the Ledger → Payments tab (admin-only)
 - **Ad-hoc payment:** provider picker, amount, account (cash/card), optional description → `expense` ledger entry; description defaults to `"Provider payment: {name}"`; `POST /api/providers/:id/payment`

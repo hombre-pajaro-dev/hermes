@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { api } from '../api/client';
-import type { AuthorizedUser, Discount, Product, RegisterSession, Supply } from '../api/client';
+import type { AuthorizedUser, CommissionSettings, Discount, Product, RegisterSession, Supply } from '../api/client';
 import { authClient } from '../lib/auth-client';
 
 const DAY_LABELS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
@@ -275,7 +275,39 @@ export default function AdminView() {
     catch (e: unknown) { setSuppliesError((e as Error).message); }
   }
 
-  const [adminSection, setAdminSection] = useState<'register' | 'discounts' | 'supplies' | 'users'>('register');
+  // ── Commission settings (admin only) ────────────────────────────────────────
+  const [commissionSettings, setCommissionSettings] = useState<CommissionSettings | null>(null);
+  const [commissionRate, setCommissionRate] = useState('');
+  const [commissionIvaRate, setCommissionIvaRate] = useState('');
+  const [commissionError, setCommissionError] = useState('');
+  const [commissionSuccess, setCommissionSuccess] = useState('');
+
+  async function loadCommissionSettings() {
+    if (!isAdmin) return;
+    try {
+      const s = await api.getCommissionSettings();
+      setCommissionSettings(s);
+      setCommissionRate(String(+(s.rate * 100).toFixed(4)));
+      setCommissionIvaRate(String(+(s.iva_rate * 100).toFixed(4)));
+    } catch (e: unknown) { setCommissionError((e as Error).message); }
+  }
+
+  useEffect(() => { loadCommissionSettings(); }, [isAdmin]);
+
+  async function handleSaveCommissions() {
+    setCommissionError(''); setCommissionSuccess('');
+    const rate = Number(commissionRate) / 100;
+    const ivaRate = Number(commissionIvaRate) / 100;
+    if (isNaN(rate) || rate < 0 || rate > 1) { setCommissionError('Rate must be 0–100%'); return; }
+    if (isNaN(ivaRate) || ivaRate < 0 || ivaRate > 1) { setCommissionError('IVA rate must be 0–100%'); return; }
+    try {
+      const s = await api.updateCommissionSettings({ rate, iva_rate: ivaRate });
+      setCommissionSettings(s);
+      setCommissionSuccess('Commission settings saved');
+    } catch (e: unknown) { setCommissionError((e as Error).message); }
+  }
+
+  const [adminSection, setAdminSection] = useState<'register' | 'discounts' | 'supplies' | 'users' | 'commissions'>('register');
 
   return (
     <div>
@@ -300,6 +332,7 @@ export default function AdminView() {
             { key: 'discounts', label: 'Discounts' },
             { key: 'supplies', label: 'Supplies' },
             { key: 'users', label: 'Users' },
+            { key: 'commissions', label: 'Commissions' },
           ] : []),
         ] as { key: typeof adminSection; label: string }[]).map(({ key, label }) => (
           <button
@@ -664,6 +697,77 @@ export default function AdminView() {
               </div>
             )}
           </div>
+        </>
+      )}
+
+      {/* Commissions — admin only */}
+      {adminSection === 'commissions' && isAdmin && (
+        <>
+          {commissionError && <div className="error-banner">{commissionError}</div>}
+          {commissionSuccess && <div className="success-banner" data-testid="commission-success">{commissionSuccess}</div>}
+
+          <div className="card">
+            <div className="card__title">Credit Card Commission</div>
+            <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', marginBottom: 12 }}>
+              Commission is automatically deducted from card payment income and tracked separately.
+              Set rate to 0 to disable commission tracking.
+            </p>
+
+            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+              <div className="field" style={{ flex: 1, minWidth: 140 }}>
+                <label className="label">Commission rate (%)</label>
+                <input
+                  data-testid="commission-rate-input"
+                  className="input"
+                  type="number"
+                  min="0"
+                  max="100"
+                  step="0.001"
+                  value={commissionRate}
+                  onChange={e => setCommissionRate(e.target.value)}
+                />
+              </div>
+              <div className="field" style={{ flex: 1, minWidth: 140 }}>
+                <label className="label">IVA on commission (%)</label>
+                <input
+                  data-testid="commission-iva-rate-input"
+                  className="input"
+                  type="number"
+                  min="0"
+                  max="100"
+                  step="0.001"
+                  value={commissionIvaRate}
+                  onChange={e => setCommissionIvaRate(e.target.value)}
+                />
+              </div>
+            </div>
+
+            {commissionSettings && (
+              <div style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', marginBottom: 12 }}>
+                Example: $100 card payment → ${(100 * (Number(commissionRate) / 100) * (1 + Number(commissionIvaRate) / 100)).toFixed(2)} commission deducted
+              </div>
+            )}
+
+            <button
+              data-testid="save-commissions-btn"
+              className="btn btn--primary"
+              onClick={handleSaveCommissions}
+            >
+              Save
+            </button>
+          </div>
+
+          {commissionSettings && (
+            <div className="card">
+              <div className="card__title">Total Commissions Paid</div>
+              <div style={{ fontSize: '1.5rem', fontWeight: 700, color: '#f59e0b' }} data-testid="total-commissions-paid">
+                ${commissionSettings.total_paid.toFixed(2)}
+              </div>
+              <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginTop: 4 }}>
+                Cumulative card commissions charged since tracking began
+              </div>
+            </div>
+          )}
         </>
       )}
 

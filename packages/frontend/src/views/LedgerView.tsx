@@ -54,6 +54,7 @@ export default function LedgerView() {
   const [paymentMode, setPaymentMode] = useState<'equal' | 'weighted' | 'manual'>('equal');
   const [paymentTotal, setPaymentTotal] = useState('');
   const [manualAmounts, setManualAmounts] = useState<Record<number, string>>({});
+  const [paymentAccounts, setPaymentAccounts] = useState<Record<number, string>>({});
   const [paymentNote, setPaymentNote] = useState('');
   const [paymentsError, setPaymentsError] = useState('');
   const [paymentsSuccess, setPaymentsSuccess] = useState('');
@@ -123,13 +124,13 @@ export default function LedgerView() {
       amount: paymentMode === 'manual'
         ? Number(manualAmounts[p.id] || 0)
         : calcAmount(p, active, paymentMode as 'equal' | 'weighted', totalNum),
-      source_account: p.source_account,
+      source_account: paymentAccounts[p.id] ?? p.source_account,
     })).filter(e => e.amount > 0);
     if (entries.length === 0) { setPaymentsError('No amounts to record'); return; }
     try {
       await api.runPayments(entries, paymentNote || undefined);
       setPaymentsSuccess('Payments recorded');
-      setPaymentTotal(''); setManualAmounts({}); setPaymentNote('');
+      setPaymentTotal(''); setManualAmounts({}); setPaymentNote(''); setPaymentAccounts({});
       const [e, b] = await Promise.all([api.getLedger(), api.getBalances()]);
       setEntries(e); setBalances(b);
     } catch (e: unknown) { setPaymentsError((e as Error).message); }
@@ -225,7 +226,7 @@ export default function LedgerView() {
     sale: '#16a34a', tab_payment: '#2563eb', register_open: '#7c3aed',
     register_close: '#dc2626', cashout: '#d97706', restock: '#0891b2',
     adjustment: '#db2777', payroll: '#ea580c', savings_transfer: '#0d9488', expense: '#9333ea',
-    account_adjustment: '#6b7280',
+    account_adjustment: '#6b7280', commission: '#f59e0b',
   };
 
   return (
@@ -347,15 +348,41 @@ export default function LedgerView() {
       {tab === 'balances' && (
         <div>
           <div className="stats" data-testid="balances">
-            {balances.map(b => (
+            {balances.filter(b => b.account !== 'commissions').map(b => (
               <div className="stat" key={b.account} data-testid={`balance-${b.account}`}>
-                <div className="stat__label">{b.account}</div>
+                <div className="stat__label">{b.account === 'credit_card' ? 'Card (net)' : b.account}</div>
                 <div className="stat__value" style={{ color: b.balance >= 0 ? 'var(--success)' : 'var(--danger)' }}>
                   ${b.balance.toFixed(2)}
                 </div>
               </div>
             ))}
           </div>
+          {(() => {
+            const cardBal = balances.find(b => b.account === 'credit_card');
+            const commBal = balances.find(b => b.account === 'commissions');
+            if (!cardBal || !commBal || commBal.balance === 0) return null;
+            const gross = cardBal.balance + Math.abs(commBal.balance);
+            const commissions = Math.abs(commBal.balance);
+            return (
+              <div className="card" data-testid="card-commission-breakdown">
+                <div className="card__title" style={{ color: '#f59e0b' }}>Credit Card — Commission Breakdown</div>
+                <div className="stats" style={{ marginTop: 8 }}>
+                  <div className="stat">
+                    <div className="stat__label">Gross collected</div>
+                    <div className="stat__value" style={{ color: 'var(--success)' }}>${gross.toFixed(2)}</div>
+                  </div>
+                  <div className="stat">
+                    <div className="stat__label">Commissions charged</div>
+                    <div className="stat__value" style={{ color: '#f59e0b' }}>−${commissions.toFixed(2)}</div>
+                  </div>
+                  <div className="stat">
+                    <div className="stat__label">Net received</div>
+                    <div className="stat__value" style={{ color: cardBal.balance >= 0 ? 'var(--success)' : 'var(--danger)' }}>${cardBal.balance.toFixed(2)}</div>
+                  </div>
+                </div>
+              </div>
+            );
+          })()}
           <div className="card" data-testid="accounts-list">
             <div className="card__title">Accounts</div>
             {accounts.map(a => (
@@ -492,11 +519,18 @@ export default function LedgerView() {
                   <div className="stat__value" style={{ color: 'var(--danger)' }}>${Number(periodSummary.total_cost).toFixed(2)}</div>
                 </div>
                 <div className="stat">
-                  <div className="stat__label">Gross Profit</div>
-                  <div className="stat__value" style={{ color: (periodSummary.total_sales - periodSummary.total_cost) >= 0 ? 'var(--success)' : 'var(--danger)' }}>
-                    ${(Number(periodSummary.total_sales) - Number(periodSummary.total_cost)).toFixed(2)}
-                  </div>
+                  <div className="stat__label">Profit</div>
+                  {(() => {
+                    const profit = Number(periodSummary.total_sales) - Number(periodSummary.total_cost) - (periodSummary.commission_total ?? 0);
+                    return <div className="stat__value" style={{ color: profit >= 0 ? 'var(--success)' : 'var(--danger)' }}>${profit.toFixed(2)}</div>;
+                  })()}
                 </div>
+                {(periodSummary.commission_total ?? 0) > 0 && (
+                  <div className="stat">
+                    <div className="stat__label">Commissions</div>
+                    <div className="stat__value" style={{ color: '#f59e0b' }}>−${(periodSummary.commission_total ?? 0).toFixed(2)}</div>
+                  </div>
+                )}
                 <div className="stat">
                   <div className="stat__label">Orders</div>
                   <div className="stat__value">{periodSummary.order_count}</div>
@@ -558,13 +592,23 @@ export default function LedgerView() {
               const computed = paymentMode !== 'manual'
                 ? calcAmount(p, payees.filter(q => q.active), paymentMode as 'equal' | 'weighted', Number(paymentTotal) || 0)
                 : null;
+              const effectiveAccount = paymentAccounts[p.id] ?? p.source_account;
               return (
                 <div key={p.id} className="list-item" style={{ alignItems: 'center', gap: 10 }}>
                   <div className="list-item__main">
                     <div className="list-item__name">{p.name}</div>
-                    <div className="list-item__sub">
+                    <div className="list-item__sub" style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
                       <span className="badge badge--pending" style={{ fontSize: '0.65rem' }}>{p.type}</span>
-                      {' '}{p.source_account}
+                      <select
+                        data-testid={`payee-account-${slug}`}
+                        className="input"
+                        value={effectiveAccount}
+                        onChange={e => setPaymentAccounts(a => ({ ...a, [p.id]: e.target.value }))}
+                        style={{ padding: '2px 6px', fontSize: '0.75rem', height: 'auto', width: 'auto' }}
+                      >
+                        <option value="cash">Cash</option>
+                        <option value="credit_card">Card</option>
+                      </select>
                     </div>
                   </div>
                   <div style={{ flexShrink: 0, width: 110 }}>

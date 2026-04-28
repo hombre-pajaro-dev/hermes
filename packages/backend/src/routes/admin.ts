@@ -51,4 +51,49 @@ router.delete('/users/:id', requireAdmin, async (req, res) => {
   res.json({ ok: true });
 });
 
+// ── Commission settings ──────────────────────────────────────────────────────
+
+router.get('/commissions', requireAdmin, async (_req, res) => {
+  const db = await getDb();
+  const { rows } = await db.query(
+    "SELECT key, value FROM settings WHERE key IN ('card_commission_rate', 'card_commission_iva_rate')",
+  );
+  const rateMap = Object.fromEntries((rows as { key: string; value: string }[]).map(r => [r.key, Number(r.value)]));
+  const rate = rateMap['card_commission_rate'] ?? 0.035;
+  const ivaRate = rateMap['card_commission_iva_rate'] ?? 0.16;
+
+  const { rows: ledger } = await db.query(
+    "SELECT COALESCE(SUM(amount), 0) as total FROM ledger_entries WHERE entry_type = 'commission' AND account = 'commissions'",
+  );
+  const totalPaid = Math.abs(Number(ledger[0].total));
+
+  res.json({ rate, iva_rate: ivaRate, total_paid: totalPaid });
+});
+
+router.patch('/commissions', requireAdmin, async (req, res) => {
+  const { rate, iva_rate } = req.body as { rate?: number; iva_rate?: number };
+  if (rate !== undefined && (isNaN(Number(rate)) || Number(rate) < 0 || Number(rate) > 1)) {
+    return res.status(400).json({ error: 'rate must be between 0 and 1' });
+  }
+  if (iva_rate !== undefined && (isNaN(Number(iva_rate)) || Number(iva_rate) < 0 || Number(iva_rate) > 1)) {
+    return res.status(400).json({ error: 'iva_rate must be between 0 and 1' });
+  }
+  const db = await getDb();
+  if (rate !== undefined) {
+    await db.query("INSERT INTO settings (key, value) VALUES ('card_commission_rate', $1) ON CONFLICT (key) DO UPDATE SET value = $1", [String(rate)]);
+  }
+  if (iva_rate !== undefined) {
+    await db.query("INSERT INTO settings (key, value) VALUES ('card_commission_iva_rate', $1) ON CONFLICT (key) DO UPDATE SET value = $1", [String(iva_rate)]);
+  }
+  const { rows } = await db.query(
+    "SELECT key, value FROM settings WHERE key IN ('card_commission_rate', 'card_commission_iva_rate')",
+  );
+  const rateMap = Object.fromEntries((rows as { key: string; value: string }[]).map(r => [r.key, Number(r.value)]));
+  const { rows: ledger } = await db.query(
+    "SELECT COALESCE(SUM(amount), 0) as total FROM ledger_entries WHERE entry_type = 'commission' AND account = 'commissions'",
+  );
+  const totalPaid = Math.abs(Number(ledger[0].total));
+  res.json({ rate: rateMap['card_commission_rate'] ?? 0.035, iva_rate: rateMap['card_commission_iva_rate'] ?? 0.16, total_paid: totalPaid });
+});
+
 export default router;

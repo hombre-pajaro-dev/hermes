@@ -4,6 +4,7 @@ import { requireOpenRegister } from '../middleware/requireOpenRegister.js';
 import { isDiscountEligibleNow, computeDiscountAmount } from '../lib/discount-engine.js';
 import { getProductAvailableUnits, deductProductStock } from '../lib/supply-utils.js';
 import { actorEmail } from '../lib/actor.js';
+import { applyCardCommission } from '../lib/commission-utils.js';
 
 const router = Router();
 
@@ -106,6 +107,10 @@ router.post('/orders/:id/pay', async (req, res) => {
       [discountRow.id, order.id, discountRow.name, discountRow.type, discountAmount],
     );
     await db.query('UPDATE discounts SET redemptions = redemptions + 1 WHERE id = $1', [discountRow.id]);
+  }
+
+  if (payment_method === 'card' && effectiveTotal > 0) {
+    await applyCardCommission(db, effectiveTotal, order.id, 'order', actor);
   }
 
   res.json(updated);

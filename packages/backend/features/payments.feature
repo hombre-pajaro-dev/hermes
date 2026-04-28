@@ -84,3 +84,19 @@ Feature: Payments
     When I fetch the session bill for today
     Then the response status is 200
     And the session bill is empty
+
+  Scenario: Card payment auto-applies commission ledger entries
+    Given a product "Espresso" costs 3.00 and sells for 5.00 with 10 units
+    When I create and pay an order for 2x "Espresso" with card
+    Then a commission ledger entry exists on account "credit_card"
+    And a commission ledger entry exists on account "commissions"
+
+  Scenario: Cash payment does not create commission entries
+    Given a product "Espresso" costs 3.00 and sells for 5.00 with 10 units
+    When I create and pay an order for 2x "Espresso" with cash
+    Then no commission ledger entry exists for the order
+
+  Scenario: Commission rate is configurable
+    When I PATCH /api/admin/commissions with rate 0.05
+    Then the response status is 200
+    And the commission rate is 0.05

@@ -39,7 +39,7 @@ Feature: Tabs (Long-lasting orders)
       | Espresso     | 3        |
     And I pay the tab with card
     Then the tab status is "paid"
-    And the tab payment method is "credit_card"
+    And the tab payment method is "card"
 
   Scenario: Update item quantity on a tab
     When I open a new tab named "Table 5"

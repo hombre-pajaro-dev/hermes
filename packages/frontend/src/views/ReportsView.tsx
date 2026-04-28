@@ -123,12 +123,20 @@ export default function ReportsView() {
                   <div className="stat"><div className="stat__label">Cash</div><div className="stat__value" data-testid="cash-sales">${Number(dailyTotal.cash_sales ?? 0).toFixed(2)}</div></div>
                   <div className="stat"><div className="stat__label">Card</div><div className="stat__value" data-testid="card-sales">${Number(dailyTotal.card_sales ?? 0).toFixed(2)}</div></div>
                   <div className="stat"><div className="stat__label">Cost</div><div className="stat__value">${dailyTotal.total_cost.toFixed(2)}</div></div>
-                  <div className="stat"><div className="stat__label">Profit</div><div className="stat__value">${(dailyTotal.total_sales - dailyTotal.total_cost).toFixed(2)}</div></div>
+                  <div className="stat"><div className="stat__label">Profit</div><div className="stat__value">${(dailyTotal.total_sales - dailyTotal.total_cost - (dailyTotal.commission_total ?? 0)).toFixed(2)}</div></div>
                   {dailyTotal.inventory_adjustment_total != null && dailyTotal.inventory_adjustment_total !== 0 && (
                     <div className="stat">
                       <div className="stat__label">Inv. Adjustment</div>
                       <div className="stat__value" style={{ color: dailyTotal.inventory_adjustment_total >= 0 ? 'var(--success)' : 'var(--danger)' }}>
                         {dailyTotal.inventory_adjustment_total >= 0 ? '+' : ''}${dailyTotal.inventory_adjustment_total.toFixed(2)}
+                      </div>
+                    </div>
+                  )}
+                  {(dailyTotal.commission_total ?? 0) > 0 && (
+                    <div className="stat">
+                      <div className="stat__label">Commissions</div>
+                      <div className="stat__value" style={{ color: '#f59e0b' }}>
+                        −${(dailyTotal.commission_total ?? 0).toFixed(2)}
                       </div>
                     </div>
                   )}
@@ -214,6 +222,9 @@ export default function ReportsView() {
               <div className="stats">
                 <div className="stat"><div className="stat__label">Revenue</div><div className="stat__value" data-testid="brief-revenue">${closeBrief.revenue.toFixed(2)}</div></div>
                 <div className="stat"><div className="stat__label">Cost</div><div className="stat__value" data-testid="brief-cost">${closeBrief.total_cost.toFixed(2)}</div></div>
+                {(closeBrief.commission_total ?? 0) > 0 && (
+                  <div className="stat"><div className="stat__label">Commissions</div><div className="stat__value" style={{ color: '#f59e0b' }}>−${(closeBrief.commission_total ?? 0).toFixed(2)}</div></div>
+                )}
                 <div className="stat"><div className="stat__label">Profit</div><div className="stat__value">${closeBrief.gross_profit.toFixed(2)}</div></div>
               </div>
               {closeBrief.most_sold && <div className="card"><div className="card__title">Most Sold</div><div data-testid="most-sold">{closeBrief.most_sold.name} ({closeBrief.most_sold.units_sold} units)</div></div>}
@@ -363,6 +374,9 @@ export default function ReportsView() {
                           <div className="stat"><div className="stat__label">Cash</div><div className="stat__value">${cash_sales.toFixed(2)}</div></div>
                           <div className="stat"><div className="stat__label">Card</div><div className="stat__value">${card_sales.toFixed(2)}</div></div>
                           <div className="stat"><div className="stat__label">Cost</div><div className="stat__value">${total_cost.toFixed(2)}</div></div>
+                          {(sessionReport.commission_total ?? 0) > 0 && (
+                            <div className="stat"><div className="stat__label">Commissions</div><div className="stat__value" style={{ color: '#f59e0b' }}>−${(sessionReport.commission_total ?? 0).toFixed(2)}</div></div>
+                          )}
                           <div className="stat"><div className="stat__label">Profit</div><div className="stat__value">${gross_profit.toFixed(2)}</div></div>
                         </div>
 

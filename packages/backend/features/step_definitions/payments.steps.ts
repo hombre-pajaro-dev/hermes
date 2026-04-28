@@ -151,3 +151,75 @@ Then('a ledger entry exists for {string} with amount {float} and type {string}',
     expect(found, `Expected ledger entry for "${description}" amount ${amount} type ${type}`).to.exist;
   }
 );
+
+// ── Commission steps ─────────────────────────────────────────────────────────
+
+Given('a product {string} costs {float} and sells for {float} with {int} units',
+  async function (this: PosWorld, name: string, cost: number, price: number, units: number) {
+    const existing = await this.agent.get(`/api/products?name=${encodeURIComponent(name)}`);
+    let product = existing.body as { id: number };
+    if (!product.id) {
+      const res = await this.agent.post('/api/products').send({ name, description: '', cost, price, units });
+      product = res.body as { id: number };
+    } else {
+      await this.agent.patch(`/api/products/${product.id}/cost`).send({ cost });
+      await this.agent.patch(`/api/products/${product.id}/price`).send({ price });
+    }
+    (this.context as { commissionProductId?: number }).commissionProductId = product.id;
+  }
+);
+
+When('I create and pay an order for {int}x {string} with card',
+  async function (this: PosWorld, qty: number, productName: string) {
+    const productRes = await this.agent.get(`/api/products?name=${encodeURIComponent(productName)}`);
+    const product = productRes.body as { id: number };
+    const orderRes = await this.agent.post('/api/checkout/orders').send({ items: [{ product_id: product.id, quantity: qty }] });
+    const order = orderRes.body as { id: number };
+    this.context.orderId = order.id;
+    this.response = await this.agent.post(`/api/checkout/orders/${order.id}/pay`).send({ payment_method: 'card' });
+  }
+);
+
+When('I create and pay an order for {int}x {string} with cash',
+  async function (this: PosWorld, qty: number, productName: string) {
+    const productRes = await this.agent.get(`/api/products?name=${encodeURIComponent(productName)}`);
+    const product = productRes.body as { id: number };
+    const orderRes = await this.agent.post('/api/checkout/orders').send({ items: [{ product_id: product.id, quantity: qty }] });
+    const order = orderRes.body as { id: number };
+    this.context.orderId = order.id;
+    this.response = await this.agent.post(`/api/checkout/orders/${order.id}/pay`).send({ payment_method: 'cash', amount_received: 9999 });
+  }
+);
+
+Then('a commission ledger entry exists on account {string}',
+  async function (this: PosWorld, account: string) {
+    const orderId = this.context.orderId as number;
+    const res = await this.agent.get('/api/ledger');
+    const entries = res.body as { entry_type: string; account: string; ref_id: number }[];
+    const found = entries.find(e => e.entry_type === 'commission' && e.account === account && e.ref_id === orderId);
+    expect(found, `Expected commission entry on account "${account}" for order ${orderId}`).to.exist;
+  }
+);
+
+Then('no commission ledger entry exists for the order',
+  async function (this: PosWorld) {
+    const orderId = this.context.orderId as number;
+    const res = await this.agent.get('/api/ledger');
+    const entries = res.body as { entry_type: string; ref_id: number }[];
+    const found = entries.find(e => e.entry_type === 'commission' && e.ref_id === orderId);
+    expect(found, 'Expected no commission entry for cash order').to.not.exist;
+  }
+);
+
+When(/^I PATCH \/api\/admin\/commissions with rate ([\d.]+)$/,
+  async function (this: PosWorld, rateStr: string) {
+    this.response = await this.agent.patch('/api/admin/commissions').send({ rate: Number(rateStr) });
+  }
+);
+
+Then('the commission rate is {float}',
+  function (this: PosWorld, rate: number) {
+    const body = this.response.body as { rate: number };
+    expect(body.rate).to.be.closeTo(rate, 0.0001);
+  }
+);

@@ -101,6 +101,11 @@ export const api = {
   updateAuthorizedUserRole: (id: number, role: 'staff' | 'admin') => req<AuthorizedUser>(`/admin/users/${id}`, { method: 'PATCH', body: JSON.stringify({ role }) }),
   removeAuthorizedUser: (id: number) => req<{ ok: true }>(`/admin/users/${id}`, { method: 'DELETE' }),
 
+  // Admin — Commission settings
+  getCommissionSettings: () => req<CommissionSettings>('/admin/commissions'),
+  updateCommissionSettings: (body: Partial<{ rate: number; iva_rate: number }>) =>
+    req<CommissionSettings>('/admin/commissions', { method: 'PATCH', body: JSON.stringify(body) }),
+
   // Supplies
   getSupplies: () => req<Supply[]>('/supplies'),
   createSupply: (body: { name: string; unit: string; quantity: number }) =>
@@ -142,7 +147,7 @@ export interface SupplySnapshotEntry { id: number; name: string; unit: string; q
 export interface SessionInventorySnapshot { products: InventorySnapshotEntry[]; supplies: SupplySnapshotEntry[]; }
 export interface SessionReport {
   session: RegisterSessionSummary & { inventory_snapshot_open: SessionInventorySnapshot | null; inventory_snapshot_close: SessionInventorySnapshot | null; };
-  order_count: number; revenue: number; total_cost: number; gross_profit: number; cash_sales: number; card_sales: number;
+  order_count: number; revenue: number; total_cost: number; commission_total?: number; gross_profit: number; cash_sales: number; card_sales: number;
   by_item: { product_id: number; name: string; units_sold: number; revenue: number; cost: number; profit: number }[];
   cashouts: { id: number; amount: number; reason: string; created_at: string }[];
   restocked: { product_id: number; name: string; units_restocked: number }[];
@@ -160,11 +165,11 @@ export interface RestockItem { product_id: number; quantity: number; unit_cost: 
 export interface Account { id: number; name: string; label: string; }
 export interface Balance { account: string; balance: number; }
 export interface SalesByItem { product_id: number; name: string; units_sold: number; revenue: number; cost: number; }
-export interface DailyTotal { date: string; order_count: number; total_sales: number; cash_sales?: number; card_sales?: number; total_cost: number; inventory_adjustment_total?: number; }
+export interface DailyTotal { date: string; order_count: number; total_sales: number; cash_sales?: number; card_sales?: number; total_cost: number; inventory_adjustment_total?: number; commission_total?: number; }
 export interface DailyRange { date: string; revenue: number; cost: number; order_count: number; adjustment?: number; }
 export interface TopProduct { product_id: number; units_sold: number; }
 export interface InventoryAdjustmentItem { product_id: number; name: string; adjustment_count: number; total_delta: number; total_cost_impact: number; }
-export interface CloseBrief { session_id: number; revenue: number; total_cost: number; gross_profit: number; most_sold?: { name: string; units_sold: number } | null; most_profitable?: { name: string; profit: number } | null; by_item: SalesByItem[]; }
+export interface CloseBrief { session_id: number; revenue: number; total_cost: number; commission_total?: number; gross_profit: number; most_sold?: { name: string; units_sold: number } | null; most_profitable?: { name: string; profit: number } | null; by_item: SalesByItem[]; }
 export interface RestockOrder { id: number; session_id: number; provider_id?: number | null; payment_amount?: number | null; payment_account?: string | null; items: { product_id: number; name: string; quantity: number; new_units: number }[]; }
 export interface Provider { id: number; name: string; created_at: string; }
 export interface ProviderBillItem { product_id: number; product_name: string; qty_sold: number; unit_cost: number; subtotal: number; }
@@ -187,6 +192,8 @@ export interface Payee {
 }
 export interface PaymentEntry { payee_id: number; amount: number; source_account: string; }
 export interface PaymentRunResult { entries: LedgerEntry[]; }
+
+export interface CommissionSettings { rate: number; iva_rate: number; total_paid: number; }
 
 export interface Discount {
   id: number;

@@ -88,3 +88,13 @@ When('I record an ad-hoc payment of {float} for provider {string} from {string}'
     await this.page.click('button:has-text("Entries")');
   }
 );
+
+When('I click the Commissions tab', async function (this: PosWorld) {
+  await this.page.click('[data-testid="admin-section-commissions-btn"]');
+  await this.page.waitForSelector('[data-testid="commission-rate-input"]', { timeout: 5000 });
+});
+
+Then('I see the commission rate input', async function (this: PosWorld) {
+  const visible = await this.page.isVisible('[data-testid="commission-rate-input"]');
+  expect(visible, 'Commission rate input should be visible').to.be.true;
+});

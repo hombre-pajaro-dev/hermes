@@ -30,3 +30,8 @@ Feature: Payments
     And I click the Payments tab
     And I record an ad-hoc payment of 55.00 for provider "E2EProv" from "cash"
     Then I see an expense entry in the ledger
+
+  Scenario: Commission settings section is visible in Admin (E2E)
+    When I am on the Admin page
+    And I click the Commissions tab
+    Then I see the commission rate input

@@ -128,7 +128,8 @@ export async function applySchema(db: Pool): Promise<void> {
   await db.query(`
     INSERT INTO accounts (name, label) VALUES
     ('cash', 'Cash Drawer'), ('credit_card', 'Credit Card'), ('payroll', 'Payroll'),
-    ('inventory_adjustment', 'Inventory Adjustment'), ('savings', 'Savings')
+    ('inventory_adjustment', 'Inventory Adjustment'), ('savings', 'Savings'),
+    ('commissions', 'Card Commissions')
     ON CONFLICT DO NOTHING
   `);
   await db.query(`ALTER TABLE register_sessions ADD COLUMN IF NOT EXISTS inventory_snapshot_open JSONB`);
@@ -324,6 +325,8 @@ export async function applySchema(db: Pool): Promise<void> {
     )
   `);
   await db.query(`INSERT INTO settings (key, value) VALUES ('pin', '1234') ON CONFLICT DO NOTHING`);
+  await db.query(`INSERT INTO settings (key, value) VALUES ('card_commission_rate', '0.035') ON CONFLICT DO NOTHING`);
+  await db.query(`INSERT INTO settings (key, value) VALUES ('card_commission_iva_rate', '0.16') ON CONFLICT DO NOTHING`);
   await db.query(`ALTER TABLE tabs ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ`);
   await db.query(`UPDATE tabs SET updated_at = created_at WHERE updated_at IS NULL`);
 

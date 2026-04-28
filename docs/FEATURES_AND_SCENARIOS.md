@@ -349,6 +349,10 @@ This document lists all **features** and **scenarios** covered by the BDD test s
 | 16 | Session bill returns empty array when no provider-linked untracked sales | No provider-linked untracked products; session bill response is `[]`. |
 | 17 | Provider Payments section is visible in Payments tab (E2E) | Navigate Ledger → Payments; provider selector, amount input, and Load button are visible. |
 | 18 | Ad-hoc provider payment creates expense ledger entry (E2E) | Create provider via API; record ad-hoc payment via UI; Ledger Entries shows `expense` entry. |
+| 19 | Card payment auto-applies commission ledger entries | Pay an order with card; two `commission` ledger entries appear — one on `credit_card` (negative, reduces balance) and one on `commissions` (negative, tracks total paid). |
+| 20 | Cash payment does not create commission entries | Pay an order with cash; no `commission` ledger entries are created for that order. |
+| 21 | Commission rate is configurable | `PATCH /api/admin/commissions` with `rate: 0.05` persists the new rate; subsequent `GET /api/admin/commissions` returns `rate: 0.05`. |
+| 22 | Commission settings section is visible in Admin (E2E) | Navigate Admin → Commissions; commission rate input is visible. |
 
 ---
 
