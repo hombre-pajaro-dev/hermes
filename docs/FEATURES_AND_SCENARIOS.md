@@ -74,6 +74,11 @@ This document lists all **features** and **scenarios** covered by the BDD test s
 | 8 | Session report excludes tab sales | Paid tab in session; session report `order_count` is 0 (tab revenue not counted). |
 | 9 | Opening register captures inventory snapshot | After opening; session report `session.inventory_snapshot_open` is non-null with a `products` array. |
 | 10 | Closing register captures inventory snapshot | After closing; session report `session.inventory_snapshot_close` is non-null with a `products` array. |
+| 11 | Opening register records only the variance against current cash balance | Fresh DB (balance = 0); open with 200; `register_open` ledger entry amount = 200 (the full variance). |
+| 12 | Closing register records zero variance when counted cash matches expected | Open 200, no sales, close 200; `register_close` entry amount = 0. |
+| 13 | Closing register records negative variance when cash is short | Open 200, close 175; `register_close` entry amount = −25. |
+| 14 | Closing register records positive variance when cash is over | Open 200, close 210; `register_close` entry amount = +10. |
+| 15 | Session report includes expected_cash and cash_variance | Open 200, close 175; session report `expected_cash` = 200 and `cash_variance` = −25. |
 
 ---
 
@@ -103,6 +108,8 @@ This document lists all **features** and **scenarios** covered by the BDD test s
 | 12 | Tab payment entry for at-cost tab includes tab_at_cost flag | Pay an at-cost tab; `GET /api/ledger` response has `tab_at_cost = 1` on the `tab_payment` entry. |
 | 13 | Tab payment entry includes tab_opened_by field | Pay any tab; `GET /api/ledger` response includes `tab_opened_by` key on the `tab_payment` entry. |
 | 14 | At-cost tab payment shows COST badge in ledger (E2E) | Paid at-cost tab in DB; Ledger Entries shows purple COST badge on the `tab payment` row. |
+| 15 | Transfer between accounts creates debit and credit entries | `POST /api/ledger/transfer` from `cash` to `credit_card`; two `transfer` entries created — debit (negative) on source, credit (positive) on destination. |
+| 16 | Transfer to the same account is rejected | `POST /api/ledger/transfer` with identical `from_account` and `to_account`; request rejected with 400. |
 
 ---
 
@@ -359,10 +366,10 @@ This document lists all **features** and **scenarios** covered by the BDD test s
 ## Running the BDD tests
 
 - **Run backend tests only:**
-  `cd packages/backend && pnpm test` — 76 scenarios
+  `cd packages/backend && pnpm test` — 83 scenarios
 
 - **Run frontend tests only:**
-  `cd packages/frontend && pnpm test` — 59 scenarios
+  `cd packages/frontend && pnpm test` — 60 scenarios
   Requires Docker/Postgres running. The test script starts its own backend (`:3002`) and frontend (`:5174`) servers automatically.
 
 - **HTML report:**

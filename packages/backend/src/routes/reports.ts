@@ -154,12 +154,28 @@ router.get('/close-brief', async (req, res) => {
   `, [sessionId]);
   const briefCommissionTotal = Math.abs(Number(briefCommRow.commission_total));
 
+  // Cash reconciliation
+  const { rows: [sessionRow] } = await db.query('SELECT opening_cash, closing_cash FROM register_sessions WHERE id = $1', [sessionId]);
+  const { rows: [briefCashRow] } = await db.query(`
+    SELECT
+      $2::numeric
+      + COALESCE((SELECT SUM(total) FROM orders WHERE session_id = $1 AND status = 'paid' AND payment_method = 'cash'), 0)
+      + COALESCE((SELECT SUM(total) FROM tabs   WHERE session_id = $1 AND status = 'paid' AND payment_method = 'cash'), 0)
+      - COALESCE((SELECT SUM(amount) FROM cashouts WHERE session_id = $1), 0)
+    AS expected_cash
+  `, [sessionId, sessionRow?.opening_cash ?? 0]);
+  const briefExpectedCash = Number(briefCashRow.expected_cash);
+  const briefClosingCash = sessionRow?.closing_cash != null ? Number(sessionRow.closing_cash) : null;
+  const briefCashVariance = briefClosingCash != null ? briefClosingCash - briefExpectedCash : null;
+
   const mostSold = [...items].sort((a, b) => b.units_sold - a.units_sold)[0] ?? null;
   const mostProfitable = [...items].sort((a, b) => b.profit - a.profit)[0] ?? null;
   res.json({
     session_id: sessionId, revenue, total_cost: totalCost,
     commission_total: briefCommissionTotal,
     gross_profit: revenue - totalCost - briefCommissionTotal,
+    expected_cash: briefExpectedCash,
+    cash_variance: briefCashVariance,
     most_sold: mostSold ? { product_id: mostSold.product_id, name: mostSold.name, units_sold: mostSold.units_sold } : null,
     most_profitable: mostProfitable ? { product_id: mostProfitable.product_id, name: mostProfitable.name, profit: mostProfitable.profit } : null,
     by_item: items,

@@ -101,6 +101,19 @@ router.get('/sessions/:id/report', async (req, res) => {
   `, [sessionId]);
   const commissionTotal = Math.abs(Number(commRow.commission_total));
 
+  // Cash reconciliation
+  const { rows: [cashReconRow] } = await db.query(`
+    SELECT
+      $2::numeric
+      + COALESCE((SELECT SUM(total) FROM orders WHERE session_id = $1 AND status = 'paid' AND payment_method = 'cash'), 0)
+      + COALESCE((SELECT SUM(total) FROM tabs   WHERE session_id = $1 AND status = 'paid' AND payment_method = 'cash'), 0)
+      - COALESCE((SELECT SUM(amount) FROM cashouts WHERE session_id = $1), 0)
+    AS expected_cash
+  `, [sessionId, session.opening_cash]);
+  const expectedCash = Number(cashReconRow.expected_cash);
+  const closingCash = session.closing_cash != null ? Number(session.closing_cash) : null;
+  const cashVariance = closingCash != null ? closingCash - expectedCash : null;
+
   res.json({
     session: {
       id: session.id,
@@ -119,6 +132,8 @@ router.get('/sessions/:id/report', async (req, res) => {
     gross_profit: Number(totals.revenue) - Number(costRow.total_cost) - commissionTotal,
     cash_sales: Number(totals.cash_sales),
     card_sales: Number(totals.card_sales),
+    expected_cash: expectedCash,
+    cash_variance: cashVariance,
     by_item: byItem.map(r => ({
       product_id: r.product_id, name: r.name,
       units_sold: Number(r.units_sold), revenue: Number(r.revenue),
@@ -136,15 +151,30 @@ router.post('/open', async (req, res) => {
   const { opening_cash } = req.body;
   if (opening_cash == null) return res.status(400).json({ error: 'opening_cash is required' });
   const db = await getDb();
+
+  // Variance = counted - current cash balance
+  const { rows: [balanceRow] } = await db.query(
+    "SELECT COALESCE(SUM(amount), 0) AS cash_balance FROM ledger_entries WHERE account = 'cash'"
+  );
+  const currentBalance = Number(balanceRow.cash_balance);
+  const variance = Number(opening_cash) - currentBalance;
+
   const snapshot = await captureInventorySnapshot(db);
   const { rows } = await db.query(
     "INSERT INTO register_sessions (opening_cash, status, opened_at, inventory_snapshot_open) VALUES ($1, 'open', NOW(), $2) RETURNING *",
     [opening_cash, JSON.stringify(snapshot)]
   );
   const session = rows[0];
+
+  const openDesc = variance === 0
+    ? 'Register opened — balanced'
+    : variance > 0
+      ? `Register opened — cash over $${variance.toFixed(2)}`
+      : `Register opened — cash short $${Math.abs(variance).toFixed(2)}`;
+
   await db.query(
-    "INSERT INTO ledger_entries (entry_type, account, amount, description, ref_id, ref_type) VALUES ('register_open', 'cash', $1, 'Register opened', $2, 'session')",
-    [opening_cash, session.id]
+    "INSERT INTO ledger_entries (entry_type, account, amount, description, ref_id, ref_type) VALUES ('register_open', 'cash', $1, $2, $3, 'session')",
+    [variance, openDesc, session.id]
   );
   res.status(201).json(session);
 });
@@ -173,14 +203,34 @@ router.post('/close', requireAdmin, async (req, res) => {
   const { closing_cash } = req.body;
   if (closing_cash == null) return res.status(400).json({ error: 'closing_cash is required' });
   const db = await getDb();
+
+  // Compute expected cash: opening + cash sales (orders + tabs) - cashouts
+  const { rows: [expectedRow] } = await db.query(`
+    SELECT
+      $2::numeric
+      + COALESCE((SELECT SUM(total) FROM orders WHERE session_id = $1 AND status = 'paid' AND payment_method = 'cash'), 0)
+      + COALESCE((SELECT SUM(total) FROM tabs   WHERE session_id = $1 AND status = 'paid' AND payment_method = 'cash'), 0)
+      - COALESCE((SELECT SUM(amount) FROM cashouts WHERE session_id = $1), 0)
+    AS expected_cash
+  `, [session.id, session.opening_cash]);
+  const expectedCash = Number(expectedRow.expected_cash);
+  const variance = Number(closing_cash) - expectedCash;
+
   const snapshot = await captureInventorySnapshot(db);
   await db.query(
     "UPDATE register_sessions SET status = 'closed', closing_cash = $1, closed_at = NOW(), inventory_snapshot_close = $2 WHERE id = $3",
     [closing_cash, JSON.stringify(snapshot), session.id]
   );
+
+  const varianceDesc = variance === 0
+    ? 'Register closed — balanced'
+    : variance > 0
+      ? `Register closed — cash over $${variance.toFixed(2)}`
+      : `Register closed — cash short $${Math.abs(variance).toFixed(2)}`;
+
   await db.query(
-    "INSERT INTO ledger_entries (entry_type, account, amount, description, ref_id, ref_type) VALUES ('register_close', 'cash', $1, 'Register closed', $2, 'session')",
-    [-closing_cash, session.id]
+    "INSERT INTO ledger_entries (entry_type, account, amount, description, ref_id, ref_type) VALUES ('register_close', 'cash', $1, $2, $3, 'session')",
+    [variance, varianceDesc, session.id]
   );
   const { rows } = await db.query('SELECT * FROM register_sessions WHERE id = $1', [session.id]);
   res.json(rows[0]);

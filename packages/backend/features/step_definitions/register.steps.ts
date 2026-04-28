@@ -121,3 +121,13 @@ Then('the session has an inventory_snapshot_close with products', function (this
   expect(body.session.inventory_snapshot_close).to.not.be.null;
   expect(body.session.inventory_snapshot_close!.products).to.be.an('array').with.length.greaterThan(0);
 });
+
+Then('the session report expected_cash is {float}', function (this: PosWorld, expected: number) {
+  const body = this.response.body as { expected_cash: number };
+  expect(body.expected_cash).to.be.closeTo(expected, 0.001);
+});
+
+Then('the session report cash_variance is {float}', function (this: PosWorld, expected: number) {
+  const body = this.response.body as { cash_variance: number };
+  expect(body.cash_variance).to.be.closeTo(expected, 0.001);
+});

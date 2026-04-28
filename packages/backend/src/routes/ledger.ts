@@ -92,6 +92,31 @@ router.post('/payroll', async (req, res) => {
   res.status(201).json(rows[0]);
 });
 
+router.post('/transfer', requireAdmin, async (req, res) => {
+  const { from_account, to_account, amount, description = '' } = req.body as {
+    from_account?: string; to_account?: string; amount?: number; description?: string;
+  };
+  if (!from_account || !to_account) return res.status(400).json({ error: 'from_account and to_account are required' });
+  if (from_account === to_account) return res.status(400).json({ error: 'from_account and to_account must be different' });
+  const num = Number(amount);
+  if (!amount || isNaN(num) || num <= 0) return res.status(400).json({ error: 'amount must be a positive number' });
+  const db = await getDb();
+  const { rows: accts } = await db.query('SELECT name FROM accounts WHERE name = ANY($1)', [[from_account, to_account]]);
+  const found = (accts as { name: string }[]).map(a => a.name);
+  if (!found.includes(from_account)) return res.status(400).json({ error: `Unknown account: ${from_account}` });
+  if (!found.includes(to_account)) return res.status(400).json({ error: `Unknown account: ${to_account}` });
+  const desc = description.trim() || `Transfer ${from_account} → ${to_account}`;
+  const { rows: [debit] } = await db.query(
+    "INSERT INTO ledger_entries (entry_type, account, amount, description) VALUES ('transfer', $1, $2, $3) RETURNING *",
+    [from_account, -num, desc],
+  );
+  const { rows: [credit] } = await db.query(
+    "INSERT INTO ledger_entries (entry_type, account, amount, description) VALUES ('transfer', $1, $2, $3) RETURNING *",
+    [to_account, num, desc],
+  );
+  res.status(201).json({ debit, credit });
+});
+
 router.post('/adjustment', requireAdmin, async (req, res) => {
   const { account, amount, description = '' } = req.body;
   if (!account || amount === undefined || amount === null) {

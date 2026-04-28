@@ -11,6 +11,25 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+#### Register Open/Close Variance Model
+- Opening the register no longer injects the full `opening_cash` into the cash ledger account; instead only the **variance** (`opening_cash − current cash balance`) is recorded. A balanced open records 0; an over-count records a positive amount; a short records a negative amount.
+- Closing the register no longer withdraws `closing_cash` from the ledger; instead only the **variance** (`closing_cash − expected_cash`) is recorded. Expected cash = `opening_cash + cash order sales + cash tab payments − cashouts`.
+- Session report (`GET /api/register/sessions/:id/report`) now includes `expected_cash` and `cash_variance` fields for cash reconciliation.
+- BDD: 5 new backend scenarios (open records variance, close balanced/short/over, session report fields)
+
+#### Account Transfers
+- Admins can move money between ledger accounts (e.g. cash → credit card) without creating an external payment
+- **API:** `POST /api/ledger/transfer` — admin-only; accepts `from_account`, `to_account`, `amount`, optional `description`; creates two `transfer` ledger entries (debit on source, credit on destination); description defaults to `"Transfer {from} → {to}"`
+- **UI:** "Transfer Between Accounts" card in Ledger → Balances tab; From/To account selectors, amount input, optional description, Transfer button
+- BDD: 2 new backend scenarios (transfer creates debit + credit, same-account rejected)
+
+#### Commission Visibility and Profit Impact
+- **Ledger → Balances:** Credit Card breakdown card shows gross received, commissions paid (amber), and net balance; main balances list filters out the internal `commissions` account
+- **Ledger → Payments → Period Summary:** Commissions line (amber) appears when > 0 for the selected period; "Gross Profit" renamed to "Profit"; profit calculation subtracts commissions
+- **Reports → By Item:** Profit stat subtracts commissions for the selected period
+- **Reports → Brief:** Commissions stat and Cash Reconciliation card (expected cash vs. variance) added to the session brief
+- **Reports → Sessions:** Commissions stat and Cash Reconciliation card (expected / counted / variance) added to per-session view
+
 #### Credit Card Commission Tracking
 - Card payments now automatically deduct a commission from the `credit_card` account balance (so the balance reflects net received) and record it in a separate `commissions` account (so total charged is visible)
 - Default rate: 3.5% + 16% IVA on the commission — configurable by admin

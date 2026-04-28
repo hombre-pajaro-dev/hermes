@@ -66,3 +66,33 @@ Feature: Register (Open / Close / Cashout)
     When I close the register with closing cash 150.00
     And I fetch the session report for the last session
     Then the session has an inventory_snapshot_close with products
+
+  Scenario: Opening register records only the variance against current cash balance
+    When I open the register with opening cash 200.00
+    And I fetch the ledger
+    Then there is a "register_open" ledger entry with amount 200.00
+
+  Scenario: Closing register records zero variance when counted cash matches expected
+    Given the register is open with opening cash 200
+    When I close the register with closing cash 200.00
+    And I fetch the ledger
+    Then there is a "register_close" ledger entry with amount 0.00
+
+  Scenario: Closing register records negative variance when cash is short
+    Given the register is open with opening cash 200
+    When I close the register with closing cash 175.00
+    And I fetch the ledger
+    Then there is a "register_close" ledger entry with amount -25.00
+
+  Scenario: Closing register records positive variance when cash is over
+    Given the register is open with opening cash 200
+    When I close the register with closing cash 210.00
+    And I fetch the ledger
+    Then there is a "register_close" ledger entry with amount 10.00
+
+  Scenario: Session report includes expected_cash and cash_variance
+    Given the register is open with opening cash 200
+    When I close the register with closing cash 175.00
+    And I fetch the session report for the last session
+    Then the session report expected_cash is 200.00
+    And the session report cash_variance is -25.00

@@ -49,6 +49,14 @@ export default function LedgerView() {
   const [adjError, setAdjError] = useState('');
   const [adjSuccess, setAdjSuccess] = useState('');
 
+  // ── Account transfer ─────────────────────────────────────────────────────────
+  const [xferFrom, setXferFrom] = useState('cash');
+  const [xferTo, setXferTo] = useState('savings');
+  const [xferAmount, setXferAmount] = useState('');
+  const [xferDescription, setXferDescription] = useState('');
+  const [xferError, setXferError] = useState('');
+  const [xferSuccess, setXferSuccess] = useState('');
+
   // ── Payments ─────────────────────────────────────────────────────────────────
   const [payees, setPayees] = useState<Payee[]>([]);
   const [paymentMode, setPaymentMode] = useState<'equal' | 'weighted' | 'manual'>('equal');
@@ -222,11 +230,25 @@ export default function LedgerView() {
     } catch (e: unknown) { setAdjError((e as Error).message); }
   }
 
+  async function handleTransfer() {
+    setXferError(''); setXferSuccess('');
+    const num = Number(xferAmount);
+    if (!xferAmount || isNaN(num) || num <= 0) { setXferError('Enter a positive amount'); return; }
+    if (xferFrom === xferTo) { setXferError('From and To accounts must be different'); return; }
+    try {
+      await api.transferBetweenAccounts(xferFrom, xferTo, num, xferDescription.trim() || undefined);
+      setXferSuccess('Transfer recorded');
+      setXferAmount(''); setXferDescription('');
+      const [e, b] = await Promise.all([api.getLedger(), api.getBalances()]);
+      setEntries(e); setBalances(b);
+    } catch (e: unknown) { setXferError((e as Error).message); }
+  }
+
   const TYPE_COLORS: Record<string, string> = {
     sale: '#16a34a', tab_payment: '#2563eb', register_open: '#7c3aed',
     register_close: '#dc2626', cashout: '#d97706', restock: '#0891b2',
     adjustment: '#db2777', payroll: '#ea580c', savings_transfer: '#0d9488', expense: '#9333ea',
-    account_adjustment: '#6b7280', commission: '#f59e0b',
+    account_adjustment: '#6b7280', commission: '#f59e0b', transfer: '#0ea5e9',
   };
 
   return (
@@ -462,6 +484,74 @@ export default function LedgerView() {
                 disabled={!adjAmount || !adjDescription.trim()}
               >
                 {adjType === 'add' ? 'Add to Account' : 'Remove from Account'}
+              </button>
+            </div>
+          )}
+
+          {isAdmin && (
+            <div className="card" data-testid="transfer-form">
+              <div className="card__title">Transfer Between Accounts</div>
+              {xferError && <div className="error-banner" style={{ marginBottom: 8 }}>{xferError}</div>}
+              {xferSuccess && <div className="success-banner" data-testid="transfer-success-banner" style={{ marginBottom: 8 }}>{xferSuccess}</div>}
+              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                <div className="field" style={{ flex: 1, minWidth: 120 }}>
+                  <label className="label">From</label>
+                  <select
+                    data-testid="transfer-from-select"
+                    className="input"
+                    value={xferFrom}
+                    onChange={e => setXferFrom(e.target.value)}
+                  >
+                    {accounts.map(a => (
+                      <option key={a.name} value={a.name}>{a.label}</option>
+                    ))}
+                  </select>
+                </div>
+                <div className="field" style={{ flex: 1, minWidth: 120 }}>
+                  <label className="label">To</label>
+                  <select
+                    data-testid="transfer-to-select"
+                    className="input"
+                    value={xferTo}
+                    onChange={e => setXferTo(e.target.value)}
+                  >
+                    {accounts.map(a => (
+                      <option key={a.name} value={a.name}>{a.label}</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+              <div className="field">
+                <label className="label">Amount ($)</label>
+                <input
+                  data-testid="transfer-amount-input"
+                  className="input"
+                  type="number"
+                  min="0.01"
+                  step="0.01"
+                  placeholder="0.00"
+                  value={xferAmount}
+                  onChange={e => setXferAmount(e.target.value)}
+                />
+              </div>
+              <div className="field">
+                <label className="label">Description (optional)</label>
+                <input
+                  data-testid="transfer-description-input"
+                  className="input"
+                  type="text"
+                  placeholder="e.g. Weekly savings transfer"
+                  value={xferDescription}
+                  onChange={e => setXferDescription(e.target.value)}
+                />
+              </div>
+              <button
+                data-testid="transfer-submit-btn"
+                className="btn btn--primary"
+                onClick={handleTransfer}
+                disabled={!xferAmount || xferFrom === xferTo}
+              >
+                Transfer
               </button>
             </div>
           )}

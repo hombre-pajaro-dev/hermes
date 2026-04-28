@@ -149,6 +149,10 @@ When('I post an account adjustment of {float} to {string} with description {stri
   this.response = await this.agent.post('/api/ledger/adjustment').send({ account, amount, description });
 });
 
+When('I transfer {float} from account {string} to account {string}', async function (this: PosWorld, amount: number, from: string, to: string) {
+  this.response = await this.agent.post('/api/ledger/transfer').send({ from_account: from, to_account: to, amount });
+});
+
 Then('there is an {string} ledger entry with account {string} and amount {float}', function (this: PosWorld, type: string, account: string, amount: number) {
   const entries = this.response.body as { entry_type: string; account: string; amount: number }[];
   const found = entries.find(e => e.entry_type === type && e.account === account);

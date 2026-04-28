@@ -103,3 +103,14 @@ Feature: General Ledger and Accounts
     When I post an account adjustment of -50.00 to "credit_card" with description "Card correction"
     And I fetch the ledger
     Then there is an "account_adjustment" ledger entry with account "credit_card" and amount -50.00
+
+  Scenario: Transfer between accounts creates debit and credit entries
+    When I transfer 100.00 from account "cash" to account "credit_card"
+    And I fetch the ledger
+    Then there is an "transfer" ledger entry with account "cash" and amount -100.00
+    And there is an "transfer" ledger entry with account "credit_card" and amount 100.00
+
+  Scenario: Transfer to the same account is rejected
+    When I transfer 50.00 from account "cash" to account "cash"
+    Then the response status is 400
+    And the response error mentions "different"

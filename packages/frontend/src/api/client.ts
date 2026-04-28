@@ -64,6 +64,8 @@ export const api = {
     req<LedgerEntry>('/ledger/payroll', { method: 'POST', body: JSON.stringify({ amount, account, description }) }),
   adjustAccount: (account: string, amount: number, description: string) =>
     req<LedgerEntry>('/ledger/adjustment', { method: 'POST', body: JSON.stringify({ account, amount, description }) }),
+  transferBetweenAccounts: (from_account: string, to_account: string, amount: number, description?: string) =>
+    req<{ debit: LedgerEntry; credit: LedgerEntry }>('/ledger/transfer', { method: 'POST', body: JSON.stringify({ from_account, to_account, amount, description }) }),
 
   // Reports
   getSalesByItem: (from: string, to: string, tz: string) => req<SalesByItem[]>(`/reports/sales-by-item?from=${from}&to=${to}&tz=${encodeURIComponent(tz)}`),
@@ -147,7 +149,7 @@ export interface SupplySnapshotEntry { id: number; name: string; unit: string; q
 export interface SessionInventorySnapshot { products: InventorySnapshotEntry[]; supplies: SupplySnapshotEntry[]; }
 export interface SessionReport {
   session: RegisterSessionSummary & { inventory_snapshot_open: SessionInventorySnapshot | null; inventory_snapshot_close: SessionInventorySnapshot | null; };
-  order_count: number; revenue: number; total_cost: number; commission_total?: number; gross_profit: number; cash_sales: number; card_sales: number;
+  order_count: number; revenue: number; total_cost: number; commission_total?: number; gross_profit: number; cash_sales: number; card_sales: number; expected_cash?: number; cash_variance?: number | null;
   by_item: { product_id: number; name: string; units_sold: number; revenue: number; cost: number; profit: number }[];
   cashouts: { id: number; amount: number; reason: string; created_at: string }[];
   restocked: { product_id: number; name: string; units_restocked: number }[];
@@ -169,7 +171,7 @@ export interface DailyTotal { date: string; order_count: number; total_sales: nu
 export interface DailyRange { date: string; revenue: number; cost: number; order_count: number; adjustment?: number; }
 export interface TopProduct { product_id: number; units_sold: number; }
 export interface InventoryAdjustmentItem { product_id: number; name: string; adjustment_count: number; total_delta: number; total_cost_impact: number; }
-export interface CloseBrief { session_id: number; revenue: number; total_cost: number; commission_total?: number; gross_profit: number; most_sold?: { name: string; units_sold: number } | null; most_profitable?: { name: string; profit: number } | null; by_item: SalesByItem[]; }
+export interface CloseBrief { session_id: number; revenue: number; total_cost: number; commission_total?: number; gross_profit: number; expected_cash?: number; cash_variance?: number | null; most_sold?: { name: string; units_sold: number } | null; most_profitable?: { name: string; profit: number } | null; by_item: SalesByItem[]; }
 export interface RestockOrder { id: number; session_id: number; provider_id?: number | null; payment_amount?: number | null; payment_account?: string | null; items: { product_id: number; name: string; quantity: number; new_units: number }[]; }
 export interface Provider { id: number; name: string; created_at: string; }
 export interface ProviderBillItem { product_id: number; product_name: string; qty_sold: number; unit_cost: number; subtotal: number; }

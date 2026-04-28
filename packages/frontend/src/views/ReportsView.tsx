@@ -227,6 +227,25 @@ export default function ReportsView() {
                 )}
                 <div className="stat"><div className="stat__label">Profit</div><div className="stat__value">${closeBrief.gross_profit.toFixed(2)}</div></div>
               </div>
+              {closeBrief.expected_cash != null && (
+                <div className="card" data-testid="cash-reconciliation">
+                  <div className="card__title">Cash Reconciliation</div>
+                  <div className="stats" style={{ marginTop: 8 }}>
+                    <div className="stat">
+                      <div className="stat__label">Expected</div>
+                      <div className="stat__value">${closeBrief.expected_cash.toFixed(2)}</div>
+                    </div>
+                    {closeBrief.cash_variance != null && (
+                      <div className="stat">
+                        <div className="stat__label">{closeBrief.cash_variance === 0 ? 'Balanced' : closeBrief.cash_variance > 0 ? 'Over' : 'Short'}</div>
+                        <div className="stat__value" style={{ color: closeBrief.cash_variance === 0 ? 'var(--success)' : closeBrief.cash_variance > 0 ? 'var(--success)' : 'var(--danger)' }}>
+                          {closeBrief.cash_variance === 0 ? '—' : `${closeBrief.cash_variance > 0 ? '+' : ''}$${closeBrief.cash_variance.toFixed(2)}`}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
               {closeBrief.most_sold && <div className="card"><div className="card__title">Most Sold</div><div data-testid="most-sold">{closeBrief.most_sold.name} ({closeBrief.most_sold.units_sold} units)</div></div>}
               {closeBrief.most_profitable && <div className="card"><div className="card__title">Most Profitable</div><div data-testid="most-profitable">{closeBrief.most_profitable.name} (${closeBrief.most_profitable.profit.toFixed(2)})</div></div>}
               <div className="card"><div className="card__title">By Item</div>
@@ -379,6 +398,33 @@ export default function ReportsView() {
                           )}
                           <div className="stat"><div className="stat__label">Profit</div><div className="stat__value">${gross_profit.toFixed(2)}</div></div>
                         </div>
+
+                        {/* Cash reconciliation */}
+                        {sessionReport.expected_cash != null && (
+                          <div className="card" data-testid="session-cash-reconciliation">
+                            <div className="card__title">Cash Reconciliation</div>
+                            <div className="stats" style={{ marginTop: 8 }}>
+                              <div className="stat">
+                                <div className="stat__label">Expected</div>
+                                <div className="stat__value">${sessionReport.expected_cash.toFixed(2)}</div>
+                              </div>
+                              {s.closing_cash != null && (
+                                <div className="stat">
+                                  <div className="stat__label">Counted</div>
+                                  <div className="stat__value">${s.closing_cash.toFixed(2)}</div>
+                                </div>
+                              )}
+                              {sessionReport.cash_variance != null && (
+                                <div className="stat">
+                                  <div className="stat__label">{sessionReport.cash_variance === 0 ? 'Balanced' : sessionReport.cash_variance > 0 ? 'Over' : 'Short'}</div>
+                                  <div className="stat__value" style={{ color: sessionReport.cash_variance === 0 ? 'var(--success)' : sessionReport.cash_variance > 0 ? 'var(--success)' : 'var(--danger)' }}>
+                                    {sessionReport.cash_variance === 0 ? '—' : `${sessionReport.cash_variance > 0 ? '+' : ''}$${sessionReport.cash_variance.toFixed(2)}`}
+                                  </div>
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        )}
 
                         {/* Inventory comparison */}
                         {(openSnap || closeSnap) && inventoryRows.length > 0 && (
