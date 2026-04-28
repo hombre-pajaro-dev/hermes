@@ -28,8 +28,12 @@ const PRODUCT_SELECT = `
       FROM product_supplies ps
       JOIN supplies s ON s.id = ps.supply_id
       WHERE ps.product_id = p.id
-    ), '[]'::json) AS supply_ingredients
+    ), '[]'::json) AS supply_ingredients,
+    ppr.provider_id,
+    prv.name AS provider_name
   FROM products p
+  LEFT JOIN product_providers ppr ON ppr.product_id = p.id
+  LEFT JOIN providers prv ON prv.id = ppr.provider_id
 `;
 
 router.get('/', async (req, res) => {
@@ -187,6 +191,30 @@ router.patch('/:id/track-inventory', async (req, res) => {
   await db.query('UPDATE products SET track_inventory = $1 WHERE id = $2', [track_inventory, req.params.id]);
   const { rows: [updated] } = await db.query(`${PRODUCT_SELECT} WHERE p.id = $1`, [req.params.id]);
   if (!updated) return res.status(404).json({ error: 'Product not found' });
+  res.json(updated);
+});
+
+router.patch('/:id/provider', async (req, res) => {
+  const { provider_id } = req.body as { provider_id: number | null };
+  const db = await getDb();
+  const { rows: [product] } = await db.query('SELECT id FROM products WHERE id = $1', [req.params.id]);
+  if (!product) return res.status(404).json({ error: 'Product not found' });
+  if (provider_id == null) {
+    await db.query('DELETE FROM product_providers WHERE product_id = $1', [req.params.id]);
+  } else {
+    const { rows: [prov] } = await db.query('SELECT id FROM providers WHERE id = $1', [provider_id]);
+    if (!prov) return res.status(404).json({ error: 'Provider not found' });
+    await db.query(
+      'INSERT INTO product_providers (product_id, provider_id) VALUES ($1, $2) ON CONFLICT (product_id, provider_id) DO NOTHING',
+      [req.params.id, provider_id],
+    );
+    // Remove any previous link to a different provider
+    await db.query(
+      'DELETE FROM product_providers WHERE product_id = $1 AND provider_id != $2',
+      [req.params.id, provider_id],
+    );
+  }
+  const { rows: [updated] } = await db.query(`${PRODUCT_SELECT} WHERE p.id = $1`, [req.params.id]);
   res.json(updated);
 });
 

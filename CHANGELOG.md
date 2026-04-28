@@ -9,6 +9,17 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+
+#### Provider Payments
+- Admins can record payments to providers directly from the Ledger → Payments tab (admin-only)
+- **Ad-hoc payment:** provider picker, amount, account (cash/card), optional description → `expense` ledger entry; description defaults to `"Provider payment: {name}"`; `POST /api/providers/:id/payment`
+- **Session bill:** for products with `track_inventory = false` linked to a provider, the system auto-calculates `qty_sold × unit_cost` per provider for the selected period; each provider card shows a product breakdown and a confirm button that records the payment as an `expense` ledger entry with description `"Session bill: {name}"`; `GET /api/providers/session-bill?from=&to=&tz=`
+- Products with `track_inventory = false` can now be linked to a provider via a **Link Provider** control on the Products view (admin only); `PATCH /api/products/:id/provider`
+- Schema: new `product_providers` junction table (`product_id`, `provider_id`) — 1:1 in practice but N:N-ready for future
+- Products API (`GET /api/products`) now includes `provider_id` and `provider_name` fields (null when not linked)
+- BDD: 5 new backend scenarios (ad-hoc payment, custom description, set provider, session bill, empty bill); 2 new frontend E2E scenarios (section visible, ad-hoc payment via UI)
+
 ---
 
 ## [1.0.0-beta.4] — 2026-04-25

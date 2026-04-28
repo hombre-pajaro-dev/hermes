@@ -324,6 +324,11 @@ This document lists all **features** and **scenarios** covered by the BDD test s
 
 **Default payees:** Pajaro, MonGee, Mon, Paloma, Lola (staff); Rent, Utilities, Capital Payments, Maintenance, Sound Equipment (expense); Savings (savings). Seeded on first run and on test reset.
 
+**Provider Payments:** Below the payee distribution, a **Provider Payments** card handles two cases:
+- **Ad-hoc payment** — select any provider, enter amount, pick account (cash/card), optional description; posts an `expense` ledger entry with description `"Provider payment: {name}"` (or custom). `POST /api/providers/:id/payment`.
+- **Session bill** — for products with `track_inventory = false` that are linked to a provider via `product_providers`, the system computes `qty_sold × unit_cost` per provider for the selected period. Each provider card shows the breakdown and a confirm button that records the payment. `GET /api/providers/session-bill?from=&to=&tz=`.
+- Untracked products are linked to providers via `PATCH /api/products/:id/provider` (admin only). Schema: `product_providers` junction table (`product_id`, `provider_id`). Products view shows a **Link Provider** / **Change Provider** control for untracked, non-supply products (admin only).
+
 | # | Scenario | Description |
 |---|----------|-------------|
 | 1 | List payees returns default payees | `GET /api/payees` returns the 11 default payees including Pajaro (staff), Rent (expense), Savings (savings). |
@@ -337,6 +342,13 @@ This document lists all **features** and **scenarios** covered by the BDD test s
 | 9 | Payment creates a payroll ledger entry (E2E) | Record a payment via API; Ledger page shows a `payroll` entry. |
 | 10 | Payment creates an expense ledger entry (E2E) | Record a payment via API; Ledger page shows an `expense` entry. |
 | 11 | Payment creates a savings transfer ledger entry (E2E) | Record a payment via API; Ledger page shows a `savings transfer` entry. |
+| 12 | Ad-hoc provider payment creates expense ledger entry | `POST /api/providers/:id/payment` with amount and account; `expense` ledger entry created with negative amount and description `"Provider payment: {name}"`. |
+| 13 | Ad-hoc provider payment with custom description uses custom description | Submit with explicit `description`; ledger entry uses the provided description. |
+| 14 | Set product provider links untracked product to provider | `PATCH /api/products/:id/provider` with `provider_id`; product response includes `provider_id`. |
+| 15 | Session bill returns untracked product sales per provider | Create provider, link untracked product, sell it; `GET /api/providers/session-bill` returns that provider with `qty_sold ≥ 2`. |
+| 16 | Session bill returns empty array when no provider-linked untracked sales | No provider-linked untracked products; session bill response is `[]`. |
+| 17 | Provider Payments section is visible in Payments tab (E2E) | Navigate Ledger → Payments; provider selector, amount input, and Load button are visible. |
+| 18 | Ad-hoc provider payment creates expense ledger entry (E2E) | Create provider via API; record ad-hoc payment via UI; Ledger Entries shows `expense` entry. |
 
 ---
 

@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { api } from '../api/client';
-import type { DailyTotal, LedgerEntry, LedgerEntryItem, Balance, Account, Payee } from '../api/client';
+import type { DailyTotal, LedgerEntry, LedgerEntryItem, Balance, Account, Payee, Provider, ProviderBill } from '../api/client';
 import { authClient } from '../lib/auth-client';
 
 const EXPANDABLE = new Set(['sale', 'tab_payment', 'restock']);
@@ -68,6 +68,20 @@ export default function LedgerView() {
   const [periodSummary, setPeriodSummary] = useState<DailyTotal | null>(null);
   const [summaryLoading, setSummaryLoading] = useState(false);
 
+  // ── Provider payments ─────────────────────────────────────────────────────────
+  const [providers, setProviders] = useState<Provider[]>([]);
+  const [adhocProviderId, setAdhocProviderId] = useState<number | ''>('');
+  const [adhocAmount, setAdhocAmount] = useState('');
+  const [adhocAccount, setAdhocAccount] = useState('cash');
+  const [adhocDesc, setAdhocDesc] = useState('');
+  const [adhocError, setAdhocError] = useState('');
+  const [adhocSuccess, setAdhocSuccess] = useState('');
+  const [sessionBill, setSessionBill] = useState<ProviderBill[]>([]);
+  const [billLoading, setBillLoading] = useState(false);
+  const [billError, setBillError] = useState('');
+  const [billPaying, setBillPaying] = useState<Record<number, boolean>>({});
+  const [billPaid, setBillPaid] = useState<Record<number, boolean>>({});
+
   useEffect(() => {
     api.getLedger().then(setEntries).catch(() => {});
     api.getBalances().then(setBalances).catch(() => {});
@@ -75,7 +89,10 @@ export default function LedgerView() {
   }, []);
 
   useEffect(() => {
-    if (isAdmin) loadPayees();
+    if (isAdmin) {
+      loadPayees();
+      api.getProviders().then(setProviders).catch(() => {});
+    }
   }, [isAdmin]);
 
   async function loadPayees() {
@@ -130,6 +147,40 @@ export default function LedgerView() {
       setNewPayeeForm({ name: '', type: 'staff', source_account: 'cash', default_weight: '1' });
       loadPayees();
     } catch (e: unknown) { setPaymentsError((e as Error).message); }
+  }
+
+  async function handleAdhocProviderPayment() {
+    setAdhocError(''); setAdhocSuccess('');
+    const num = Number(adhocAmount);
+    if (!adhocProviderId) { setAdhocError('Select a provider'); return; }
+    if (!adhocAmount || isNaN(num) || num <= 0) { setAdhocError('Enter a positive amount'); return; }
+    try {
+      await api.providerPayment(Number(adhocProviderId), num, adhocAccount, adhocDesc.trim() || undefined);
+      setAdhocSuccess('Payment recorded');
+      setAdhocAmount(''); setAdhocDesc('');
+      const [e, b] = await Promise.all([api.getLedger(), api.getBalances()]);
+      setEntries(e); setBalances(b);
+    } catch (e: unknown) { setAdhocError((e as Error).message); }
+  }
+
+  async function loadSessionBill() {
+    setBillError(''); setSessionBill([]); setBillPaid({});
+    if (!beginsAt || !endsAt) return;
+    setBillLoading(true);
+    try { setSessionBill(await api.getSessionBill(beginsAt, endsAt, localTz)); }
+    catch (e: unknown) { setBillError((e as Error).message); }
+    setBillLoading(false);
+  }
+
+  async function handlePaySessionBill(bill: ProviderBill) {
+    setBillPaying(prev => ({ ...prev, [bill.provider_id]: true }));
+    try {
+      await api.providerPayment(bill.provider_id, bill.total, adhocAccount, `Session bill: ${bill.provider_name}`);
+      setBillPaid(prev => ({ ...prev, [bill.provider_id]: true }));
+      const [e, b] = await Promise.all([api.getLedger(), api.getBalances()]);
+      setEntries(e); setBalances(b);
+    } catch (e: unknown) { setBillError((e as Error).message); }
+    setBillPaying(prev => ({ ...prev, [bill.provider_id]: false }));
   }
 
   async function fetchEntryItems(entryId: number) {
@@ -562,6 +613,148 @@ export default function LedgerView() {
             >
               Record Payments
             </button>
+          </div>
+
+          {/* Provider Payments */}
+          <div className="card" data-testid="provider-payment-section">
+            <div className="card__title">Provider Payments</div>
+
+            {/* Ad-hoc payment */}
+            <div style={{ marginBottom: 16 }}>
+              <div style={{ fontWeight: 600, fontSize: '0.9rem', marginBottom: 8 }}>Ad-hoc Payment</div>
+              {adhocError && <div className="error-banner" style={{ marginBottom: 8 }}>{adhocError}</div>}
+              {adhocSuccess && <div className="success-banner" data-testid="provider-payment-success" style={{ marginBottom: 8 }}>{adhocSuccess}</div>}
+              <div className="field">
+                <label className="label">Provider</label>
+                <select
+                  data-testid="provider-payment-select"
+                  className="input"
+                  value={adhocProviderId}
+                  onChange={e => setAdhocProviderId(e.target.value ? Number(e.target.value) : '')}
+                >
+                  <option value="">— select provider —</option>
+                  {providers.map(p => (
+                    <option key={p.id} value={p.id}>{p.name}</option>
+                  ))}
+                </select>
+              </div>
+              <div className="field">
+                <label className="label">Amount ($)</label>
+                <input
+                  data-testid="provider-payment-amount"
+                  className="input"
+                  type="number"
+                  min="0.01"
+                  step="0.01"
+                  placeholder="0.00"
+                  value={adhocAmount}
+                  onChange={e => setAdhocAmount(e.target.value)}
+                />
+              </div>
+              <div className="field">
+                <label className="label">Account</label>
+                <select
+                  data-testid="provider-payment-account"
+                  className="input"
+                  value={adhocAccount}
+                  onChange={e => setAdhocAccount(e.target.value)}
+                >
+                  {accounts.filter(a => a.name === 'cash' || a.name === 'credit_card').map(a => (
+                    <option key={a.name} value={a.name}>{a.label}</option>
+                  ))}
+                </select>
+              </div>
+              <div className="field">
+                <label className="label">Description (optional)</label>
+                <input
+                  data-testid="provider-payment-desc"
+                  className="input"
+                  type="text"
+                  placeholder={adhocProviderId ? `Provider payment: ${providers.find(p => p.id === adhocProviderId)?.name ?? ''}` : 'Description'}
+                  value={adhocDesc}
+                  onChange={e => setAdhocDesc(e.target.value)}
+                />
+              </div>
+              <button
+                data-testid="provider-payment-submit"
+                className="btn btn--primary"
+                disabled={!adhocProviderId || !adhocAmount}
+                onClick={handleAdhocProviderPayment}
+              >
+                Record Payment
+              </button>
+            </div>
+
+            {/* Session bill */}
+            <div style={{ borderTop: '1px solid var(--border)', paddingTop: 16 }}>
+              <div style={{ fontWeight: 600, fontSize: '0.9rem', marginBottom: 8 }}>Session Bill</div>
+              <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: 8 }}>
+                Calculates what is owed to each provider for untracked products sold in the period.
+              </div>
+              {billError && <div className="error-banner" style={{ marginBottom: 8 }}>{billError}</div>}
+              <div style={{ display: 'flex', gap: 8, alignItems: 'flex-end', flexWrap: 'wrap', marginBottom: 8 }}>
+                <div className="field" style={{ flex: 1, minWidth: 120, marginBottom: 0 }}>
+                  <label className="label">From</label>
+                  <input className="input" type="date" value={beginsAt} onChange={e => setBeginsAt(e.target.value)} />
+                </div>
+                <div className="field" style={{ flex: 1, minWidth: 120, marginBottom: 0 }}>
+                  <label className="label">To</label>
+                  <input className="input" type="date" value={endsAt} onChange={e => setEndsAt(e.target.value)} />
+                </div>
+                <button
+                  data-testid="load-session-bill-btn"
+                  className="btn btn--ghost"
+                  style={{ flexShrink: 0 }}
+                  onClick={loadSessionBill}
+                  disabled={billLoading || !beginsAt || !endsAt}
+                >
+                  {billLoading ? '…' : 'Load'}
+                </button>
+              </div>
+              {sessionBill.length === 0 && !billLoading && (
+                <div className="empty" data-testid="session-bill-empty">No provider bills for this period</div>
+              )}
+              {sessionBill.map(bill => (
+                <div key={bill.provider_id} data-testid={`session-bill-${bill.provider_id}`} style={{ marginBottom: 12, border: '1px solid var(--border)', borderRadius: 8, padding: '10px 12px' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+                    <div style={{ fontWeight: 700 }}>{bill.provider_name}</div>
+                    <div style={{ fontWeight: 700, color: 'var(--danger)' }}>−${bill.total.toFixed(2)}</div>
+                  </div>
+                  <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.82rem', marginBottom: 8 }}>
+                    <thead>
+                      <tr style={{ color: 'var(--text-secondary)' }}>
+                        <th style={{ textAlign: 'left', fontWeight: 600, paddingBottom: 2 }}>Product</th>
+                        <th style={{ textAlign: 'center', fontWeight: 600, paddingBottom: 2 }}>Qty</th>
+                        <th style={{ textAlign: 'right', fontWeight: 600, paddingBottom: 2 }}>Cost</th>
+                        <th style={{ textAlign: 'right', fontWeight: 600, paddingBottom: 2 }}>Subtotal</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {bill.products.map(item => (
+                        <tr key={item.product_id}>
+                          <td style={{ padding: '1px 0' }}>{item.product_name}</td>
+                          <td style={{ padding: '1px 0', textAlign: 'center' }}>{item.qty_sold}</td>
+                          <td style={{ padding: '1px 0', textAlign: 'right' }}>${item.unit_cost.toFixed(2)}</td>
+                          <td style={{ padding: '1px 0', textAlign: 'right', fontWeight: 600 }}>${item.subtotal.toFixed(2)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                  {billPaid[bill.provider_id] ? (
+                    <div className="success-banner" data-testid={`bill-paid-${bill.provider_id}`}>Payment recorded</div>
+                  ) : (
+                    <button
+                      data-testid={`pay-session-bill-${bill.provider_id}`}
+                      className="btn btn--sm btn--danger"
+                      disabled={billPaying[bill.provider_id] || bill.total <= 0}
+                      onClick={() => handlePaySessionBill(bill)}
+                    >
+                      {billPaying[bill.provider_id] ? '…' : `Pay −$${bill.total.toFixed(2)}`}
+                    </button>
+                  )}
+                </div>
+              ))}
+            </div>
           </div>
 
           {/* Manage payees */}

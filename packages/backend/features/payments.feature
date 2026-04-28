@@ -52,3 +52,35 @@ Feature: Payments
     When I POST /api/payments/run with the payee amount 200 from "cash" and note "Week of Apr 14"
     Then the response status is 201
     And a ledger entry exists for "NoteStaff — Week of Apr 14" with amount -200 and type "payroll"
+
+  Scenario: Ad-hoc provider payment creates expense ledger entry
+    Given a provider named "AdHocProv" exists
+    When I POST a provider payment of 75.00 from "cash"
+    Then the response status is 201
+    And a ledger entry exists for "Provider payment: AdHocProv" with amount -75.00 and type "expense"
+
+  Scenario: Ad-hoc provider payment with custom description uses custom description
+    Given a provider named "CustomDescProv" exists
+    When I POST a provider payment of 40.00 from "credit_card" with description "Monthly fee"
+    Then the response status is 201
+    And a ledger entry exists for "Monthly fee" with amount -40.00 and type "expense"
+
+  Scenario: Set product provider links untracked product to provider
+    Given a provider named "LinkProv" exists
+    When I PATCH the product "Espresso" provider to "LinkProv"
+    Then the response status is 200
+    And the product "Espresso" has provider_id set
+
+  Scenario: Session bill returns untracked product sales per provider
+    Given a provider named "BillCo" exists
+    And the product "Espresso" is untracked and linked to provider "BillCo"
+    And I sell 2 units of "Espresso"
+    When I fetch the session bill for today
+    Then the response status is 200
+    And the session bill includes provider "BillCo"
+    And the session bill entry for "BillCo" has qty_sold at least 2
+
+  Scenario: Session bill returns empty array when no provider-linked untracked sales
+    When I fetch the session bill for today
+    Then the response status is 200
+    And the session bill is empty

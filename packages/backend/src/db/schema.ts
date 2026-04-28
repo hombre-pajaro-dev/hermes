@@ -348,4 +348,13 @@ export async function applySchema(db: Pool): Promise<void> {
   await db.query(`ALTER TABLE orders       ADD COLUMN IF NOT EXISTS created_by TEXT`);
   await db.query(`ALTER TABLE orders       ADD COLUMN IF NOT EXISTS paid_by    TEXT`);
   await db.query(`ALTER TABLE ledger_entries ADD COLUMN IF NOT EXISTS created_by TEXT`);
+
+  // Product → provider links (junction table; 1:1 in practice but N:N-ready)
+  await db.query(`
+    CREATE TABLE IF NOT EXISTS product_providers (
+      product_id  INTEGER NOT NULL REFERENCES products(id) ON DELETE CASCADE,
+      provider_id INTEGER NOT NULL REFERENCES providers(id) ON DELETE CASCADE,
+      PRIMARY KEY (product_id, provider_id)
+    )
+  `);
 }

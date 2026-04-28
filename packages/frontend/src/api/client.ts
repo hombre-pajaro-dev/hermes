@@ -84,6 +84,12 @@ export const api = {
   // Providers
   getProviders: () => req<Provider[]>('/providers'),
   createProvider: (name: string) => req<Provider>('/providers', { method: 'POST', body: JSON.stringify({ name }) }),
+  providerPayment: (id: number, amount: number, account: string, description?: string) =>
+    req<LedgerEntry>(`/providers/${id}/payment`, { method: 'POST', body: JSON.stringify({ amount, account, description }) }),
+  getSessionBill: (from: string, to: string, tz: string) =>
+    req<ProviderBill[]>(`/providers/session-bill?from=${from}&to=${to}&tz=${encodeURIComponent(tz)}`),
+  setProductProvider: (productId: number, provider_id: number | null) =>
+    req<Product>(`/products/${productId}/provider`, { method: 'PATCH', body: JSON.stringify({ provider_id }) }),
 
   // Inventory
   adjustInventory: (adjustments: { product_id: number; physical_count: number }[]) =>
@@ -127,7 +133,7 @@ export const api = {
 
 // Types
 export interface SupplyIngredient { supply_id: number; quantity_per_unit: number; supply_name: string; unit: string; }
-export interface Product { id: number; name: string; description: string; cost: number; price: number; units: number; image?: string | null; active: boolean; track_inventory: boolean; uses_supplies: boolean; supply_ingredients: SupplyIngredient[]; }
+export interface Product { id: number; name: string; description: string; cost: number; price: number; units: number; image?: string | null; active: boolean; track_inventory: boolean; uses_supplies: boolean; supply_ingredients: SupplyIngredient[]; provider_id?: number | null; provider_name?: string | null; }
 export interface Supply { id: number; name: string; unit: string; quantity: number; created_at: string; }
 export interface RegisterSession { id: number; status: string; opening_cash: number; closing_cash?: number; opened_at: string; closed_at?: string; }
 export interface RegisterSessionSummary { id: number; status: string; opening_cash: number; closing_cash: number | null; opened_at: string; closed_at: string | null; }
@@ -161,6 +167,8 @@ export interface InventoryAdjustmentItem { product_id: number; name: string; adj
 export interface CloseBrief { session_id: number; revenue: number; total_cost: number; gross_profit: number; most_sold?: { name: string; units_sold: number } | null; most_profitable?: { name: string; profit: number } | null; by_item: SalesByItem[]; }
 export interface RestockOrder { id: number; session_id: number; provider_id?: number | null; payment_amount?: number | null; payment_account?: string | null; items: { product_id: number; name: string; quantity: number; new_units: number }[]; }
 export interface Provider { id: number; name: string; created_at: string; }
+export interface ProviderBillItem { product_id: number; product_name: string; qty_sold: number; unit_cost: number; subtotal: number; }
+export interface ProviderBill { provider_id: number; provider_name: string; products: ProviderBillItem[]; total: number; }
 export interface AdjustResult { adjustments: { product_id: number; name: string; previous_units: number; physical_count: number; delta: number; new_units: number }[]; }
 export interface AuthorizedUser { id: number; email: string; role: 'staff' | 'admin'; created_at: string; }
 export interface HistoricPeriod { label: string; period_start: string; period_end: string; revenue: number; cost: number; profit: number; order_count: number; }

@@ -2,6 +2,81 @@ import { Given, When, Then } from '@cucumber/cucumber';
 import { expect } from 'chai';
 import { PosWorld } from '../support/world';
 
+// ── Provider payment steps ───────────────────────────────────────────────────
+
+When('I POST a provider payment of {float} from {string}', async function (this: PosWorld, amount: number, account: string) {
+  const id = (this.context as { providerId?: number }).providerId;
+  this.response = await this.agent.post(`/api/providers/${id}/payment`).send({ amount, account });
+});
+
+When('I POST a provider payment of {float} from {string} with description {string}',
+  async function (this: PosWorld, amount: number, account: string, description: string) {
+    const id = (this.context as { providerId?: number }).providerId;
+    this.response = await this.agent.post(`/api/providers/${id}/payment`).send({ amount, account, description });
+  }
+);
+
+When('I PATCH the product {string} provider to {string}', async function (this: PosWorld, productName: string, providerName: string) {
+  const productRes = await this.agent.get(`/api/products?name=${encodeURIComponent(productName)}`);
+  const product = productRes.body as { id: number };
+  const providersRes = await this.agent.get('/api/providers');
+  const providers = providersRes.body as { id: number; name: string }[];
+  const provider = providers.find(p => p.name === providerName);
+  expect(provider, `Provider "${providerName}" not found`).to.exist;
+  this.response = await this.agent.patch(`/api/products/${product.id}/provider`).send({ provider_id: provider!.id });
+});
+
+Then('the product {string} has provider_id set', async function (this: PosWorld, productName: string) {
+  const res = await this.agent.get(`/api/products?name=${encodeURIComponent(productName)}`);
+  const product = res.body as { provider_id: number | null };
+  expect(product.provider_id, 'Expected provider_id to be set').to.be.a('number');
+});
+
+Given('the product {string} is untracked and linked to provider {string}',
+  async function (this: PosWorld, productName: string, providerName: string) {
+    const productRes = await this.agent.get(`/api/products?name=${encodeURIComponent(productName)}`);
+    const product = productRes.body as { id: number };
+    await this.agent.patch(`/api/products/${product.id}/track-inventory`).send({ track_inventory: false });
+    const providersRes = await this.agent.get('/api/providers');
+    const providers = providersRes.body as { id: number; name: string }[];
+    const provider = providers.find(p => p.name === providerName);
+    expect(provider, `Provider "${providerName}" not found`).to.exist;
+    await this.agent.patch(`/api/products/${product.id}/provider`).send({ provider_id: provider!.id });
+    (this.context as { untrackedProductId?: number }).untrackedProductId = product.id;
+  }
+);
+
+Given('I sell {int} units of {string}', async function (this: PosWorld, qty: number, productName: string) {
+  const productRes = await this.agent.get(`/api/products?name=${encodeURIComponent(productName)}`);
+  const product = productRes.body as { id: number };
+  const orderRes = await this.agent.post('/api/checkout/orders').send({ items: [{ product_id: product.id, quantity: qty }] });
+  const order = orderRes.body as { id: number };
+  await this.agent.post(`/api/checkout/orders/${order.id}/pay`).send({ payment_method: 'cash', amount_received: 9999 });
+});
+
+When('I fetch the session bill for today', async function (this: PosWorld) {
+  const today = new Date().toISOString().split('T')[0];
+  this.response = await this.agent.get(`/api/providers/session-bill?from=${today}&to=${today}&tz=UTC`);
+});
+
+Then('the session bill includes provider {string}', function (this: PosWorld, providerName: string) {
+  const bills = this.response.body as { provider_name: string }[];
+  expect(bills.some(b => b.provider_name === providerName), `Expected session bill to include "${providerName}"`).to.be.true;
+});
+
+Then('the session bill entry for {string} has qty_sold at least {int}', function (this: PosWorld, providerName: string, minQty: number) {
+  const bills = this.response.body as { provider_name: string; products: { qty_sold: number }[] }[];
+  const bill = bills.find(b => b.provider_name === providerName);
+  expect(bill, `Bill for "${providerName}" not found`).to.exist;
+  const totalQty = bill!.products.reduce((s, p) => s + p.qty_sold, 0);
+  expect(totalQty).to.be.at.least(minQty);
+});
+
+Then('the session bill is empty', function (this: PosWorld) {
+  const bills = this.response.body as unknown[];
+  expect(bills).to.be.an('array').that.is.empty;
+});
+
 When(/^I GET \/api\/payees$/, async function (this: PosWorld) {
   this.response = await this.agent.get('/api/payees');
 });

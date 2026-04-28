@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { api } from '../api/client';
-import type { Product, Supply, Tab } from '../api/client';
+import type { Product, Supply, Tab, Provider } from '../api/client';
 import ImagePicker from '../components/ImagePicker';
 import { authClient } from '../lib/auth-client';
 
@@ -18,8 +18,11 @@ export default function ProductsView() {
 
   const [products, setProducts] = useState<Product[]>([]);
   const [supplies, setSupplies] = useState<Supply[]>([]);
+  const [providers, setProviders] = useState<Provider[]>([]);
   const [lockedIds, setLockedIds] = useState<Set<number>>(new Set());
   const [tabReserved, setTabReserved] = useState<Record<number, number>>({});
+  const [editingProviderIds, setEditingProviderIds] = useState<Set<number>>(new Set());
+  const [providerDrafts, setProviderDrafts] = useState<Record<number, number | null>>({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [showForm, setShowForm] = useState(false);
@@ -53,9 +56,11 @@ export default function ProductsView() {
 
   async function load() {
     try {
-      const [ps, tabs, ss] = await Promise.all([api.getProducts(), api.getTabs(), api.getSupplies()]);
+      const [ps, tabs, ss, provs] = await Promise.all([api.getProducts(), api.getTabs(), api.getSupplies(), api.getProviders()]);
+      setProviders(provs);
       setProducts(ps);
       setSupplies(ss);
+
       const openTabs = (tabs as Tab[]).filter(t => t.status === 'open');
       const locked = new Set<number>();
       const reserved: Record<number, number> = {};
@@ -178,6 +183,73 @@ export default function ProductsView() {
       cancelSupplyEdit(id);
       load();
     } catch (e: unknown) { setError((e as Error).message); }
+  }
+
+  function openProviderEdit(p: Product) {
+    setProviderDrafts(prev => ({ ...prev, [p.id]: p.provider_id ?? null }));
+    setEditingProviderIds(prev => new Set([...prev, p.id]));
+  }
+
+  function cancelProviderEdit(id: number) {
+    setEditingProviderIds(prev => { const s = new Set(prev); s.delete(id); return s; });
+    setProviderDrafts(prev => { const n = { ...prev }; delete n[id]; return n; });
+  }
+
+  async function saveProviderEdit(id: number) {
+    setError('');
+    try {
+      await api.setProductProvider(id, providerDrafts[id] ?? null);
+      cancelProviderEdit(id);
+      load();
+    } catch (e: unknown) { setError((e as Error).message); }
+  }
+
+  function renderProviderSection(p: Product) {
+    if (!isAdmin || p.uses_supplies) return null;
+    if (p.track_inventory !== false) return null;
+
+    const isEditing = editingProviderIds.has(p.id);
+
+    if (!isEditing) {
+      return (
+        <div style={{ marginTop: 6 }}>
+          {p.provider_name && (
+            <div style={{ fontSize: '0.78rem', color: 'var(--text-secondary)' }}>
+              Provider: <strong>{p.provider_name}</strong>
+            </div>
+          )}
+          <button
+            data-testid={`edit-provider-${p.id}`}
+            className="btn btn--sm btn--ghost"
+            style={{ fontSize: '0.72rem', marginTop: 4 }}
+            onClick={() => openProviderEdit(p)}
+          >
+            {p.provider_name ? 'Change Provider' : 'Link Provider'}
+          </button>
+        </div>
+      );
+    }
+
+    return (
+      <div style={{ marginTop: 6, padding: '8px', background: 'var(--surface-raised, #f5f5f5)', borderRadius: 8 }}>
+        <div style={{ fontSize: '0.8rem', fontWeight: 600, marginBottom: 6 }}>Provider</div>
+        <select
+          data-testid={`provider-select-${p.id}`}
+          className="input"
+          value={providerDrafts[p.id] ?? ''}
+          onChange={e => setProviderDrafts(prev => ({ ...prev, [p.id]: e.target.value ? Number(e.target.value) : null }))}
+        >
+          <option value="">— no provider —</option>
+          {providers.map(prov => (
+            <option key={prov.id} value={prov.id}>{prov.name}</option>
+          ))}
+        </select>
+        <div style={{ display: 'flex', gap: 6, marginTop: 8 }}>
+          <button className="btn btn--sm btn--ghost" style={{ flex: 1 }} onClick={() => cancelProviderEdit(p.id)}>Cancel</button>
+          <button data-testid={`save-provider-${p.id}`} className="btn btn--sm btn--success" style={{ flex: 1 }} onClick={() => saveProviderEdit(p.id)}>Save</button>
+        </div>
+      </div>
+    );
   }
 
   function addSupplyIngredientDraft(drafts: SupplyIngredientDraft[], setter: (d: SupplyIngredientDraft[]) => void) {
@@ -502,6 +574,7 @@ export default function ProductsView() {
                   </div>
                 )}
                 {renderSupplySection(p)}
+                {renderProviderSection(p)}
                 {isAdmin && (
                   <>
                     <button
@@ -592,6 +665,7 @@ export default function ProductsView() {
                   </div>
                 </div>
                 {renderSupplySection(p)}
+                {renderProviderSection(p)}
               </div>
             );
           })}
