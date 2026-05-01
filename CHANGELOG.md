@@ -9,6 +9,16 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Changed
+
+#### Checkout — responsive layout and inline cash payment
+- **Tablet (≥1024px):** Fixed 60/40 split — product picker left, cart panel right, always visible. Left panel dims and disables pointer events while cash input is open to prevent accidental adds during handoff.
+- **Phone (<1024px):** Product picker fills screen. A sticky bar at the bottom (appears on first item add, shows item count + total) opens a full-screen cart panel. Cart closes with the ← Back button.
+- **Inline cash payment (Checkout + Tabs):** "Pay with Cash" now expands a cash-received input and live change display inline in the cart footer — no page navigation. Replaced the `step`/`payStep` full-screen swap with `cashExpanded` boolean.
+- **BDD test viewport** changed from Pixel 5 (393px) to 1024×768 so all existing test IDs remain directly accessible in the split layout.
+- `data-testid="checkout-cart-bar"` — new sticky bar button on phone.
+- Removed: `data-testid="cash-payment-view"` (checkout full-screen step) and `data-testid="tab-cash-payment-view"` (tabs full-screen step); cash section is now inline.
+
 ### Added
 
 #### Register Open/Close Variance Model

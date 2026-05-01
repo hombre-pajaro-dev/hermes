@@ -8,7 +8,7 @@ export default defineConfig({
     baseURL: 'http://localhost:5173',
     headless: true,
   },
-  projects: [{ name: 'chromium', use: { ...devices['Pixel 5'] } }], // mobile viewport
+  projects: [{ name: 'chromium', use: { viewport: { width: 1024, height: 768 } } }], // tablet split layout
   webServer: {
     command: 'pnpm dev',
     url: 'http://localhost:5173',

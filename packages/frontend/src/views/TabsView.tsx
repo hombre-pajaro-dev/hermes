@@ -43,7 +43,7 @@ export default function TabsView() {
   const [selectedTab, setSelectedTab] = useState<(Tab & { items?: TabItem[] }) | null>(null);
   const [tabName, setTabName] = useState('');
   const [atCost, setAtCost] = useState(false);
-  const [payStep, setPayStep] = useState<'form' | 'cash'>('form');
+  const [cashExpanded, setCashExpanded] = useState(false);
   const [cashReceived, setCashReceived] = useState('');
   const [error, setError] = useState('');
   const [view, setView] = useState<'list' | 'new' | 'detail'>('list');
@@ -91,7 +91,7 @@ export default function TabsView() {
 
   async function openTab(t: Tab) {
     setSelectedTab(t as Tab & { items?: TabItem[] });
-    setError(''); setCashReceived(''); setPayStep('form');
+    setError(''); setCashReceived(''); setCashExpanded(false);
     setManualDiscountOverride(undefined);
     setView('detail');
     api.getProducts().then(setProducts).catch(() => {});
@@ -309,7 +309,7 @@ export default function TabsView() {
       {error && <div className="error-banner" data-testid="error-banner">{error}</div>}
 
       <div className="tabs-nav">
-        <button className={`tabs-nav__item${view === 'list' ? ' active' : ''}`} onClick={() => { setView('list'); setPayStep('form'); }}>Tabs</button>
+        <button className={`tabs-nav__item${view === 'list' ? ' active' : ''}`} onClick={() => { setView('list'); setCashExpanded(false); }}>Tabs</button>
         <button className={`tabs-nav__item${view === 'new' ? ' active' : ''}`} onClick={() => setView('new')}>+ New Tab</button>
       </div>
 
@@ -421,104 +421,8 @@ export default function TabsView() {
         </div>
       )}
 
-      {/* Cash payment step — rendered instead of detail when paying with cash */}
-      {view === 'detail' && selectedTab && payStep === 'cash' && (
-        <div>
-          <button className="btn btn--ghost" style={{ marginBottom: 12 }}
-            onClick={() => { setPayStep('form'); setError(''); setCashReceived(''); }}>
-            ← Back to Tab
-          </button>
-
-          <div className="card" data-testid="tab-cash-payment-view">
-            <div className="card__title">Cash Payment — {selectedTab.name}</div>
-
-            {selectedTab.at_cost ? (
-              <div style={{ background: '#fef08a', color: '#713f12', borderRadius: 8, padding: '8px 12px', marginBottom: 12, fontSize: '0.85rem', fontWeight: 600, border: '1px solid #ca8a04' }}>
-                ⚠️ STAFF COST PRICE
-              </div>
-            ) : null}
-
-            {(selectedTab.items ?? []).map(item => {
-              const product = products.find(p => p.id === item.product_id);
-              return (
-                <div className="list-item" key={item.id} style={{ gap: 10 }}>
-                  <ProductThumb image={product?.image} name={product?.name} size={36} />
-                  <div className="list-item__main">
-                    <div className="list-item__name">{product?.name ?? `Product #${item.product_id}`}</div>
-                    <div className="list-item__sub">${item.unit_price.toFixed(2)} × {item.quantity}</div>
-                  </div>
-                  <div style={{ minWidth: 60, textAlign: 'right' }}>${item.subtotal.toFixed(2)}</div>
-                </div>
-              );
-            })}
-
-            {tabEffectiveSavings > 0 && tabActiveDiscount && (
-              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.9rem', color: 'var(--success)', fontWeight: 600, margin: '4px 0' }}>
-                <span>🏷 {tabActiveDiscount.discount.name}</span>
-                <span>−${tabEffectiveSavings.toFixed(2)}</span>
-              </div>
-            )}
-
-            <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 700, fontSize: '1.1rem', margin: '12px 0 16px' }}>
-              <span>Total Due</span>
-              <span>${tabEffectiveTotal.toFixed(2)}</span>
-            </div>
-
-            <div className="field">
-              <label className="label">Amount Received ($)</label>
-              <input
-                data-testid="cash-received-input"
-                className="input"
-                type="number"
-                min="0"
-                step="0.01"
-                value={cashReceived}
-                onChange={e => setCashReceived(e.target.value)}
-                autoFocus
-              />
-            </div>
-
-            {liveChange !== null && (
-              <div
-                data-testid="live-change-amount"
-                style={{
-                  fontSize: '1.6rem',
-                  fontWeight: 700,
-                  textAlign: 'center',
-                  padding: '14px 0',
-                  color: liveChange >= 0 ? 'var(--success)' : 'var(--danger)',
-                }}
-              >
-                {liveChange >= 0
-                  ? `Change: $${liveChange.toFixed(2)}`
-                  : `Still needed: $${Math.abs(liveChange).toFixed(2)}`}
-              </div>
-            )}
-
-            <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
-              <button
-                className="btn btn--ghost"
-                style={{ width: 'auto', padding: '10px 16px' }}
-                onClick={() => { setPayStep('form'); setError(''); setCashReceived(''); }}
-              >
-                ← Back
-              </button>
-              <button
-                data-testid="confirm-payment-btn"
-                className="btn btn--success"
-                style={{ flex: 1 }}
-                onClick={handlePayCash}
-                disabled={!cashReceived || Number(cashReceived) < tabEffectiveTotal}
-              >
-                Confirm Payment
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
       {/* Tab detail view */}
-      {view === 'detail' && selectedTab && payStep === 'form' && (
+      {view === 'detail' && selectedTab && (
         <div>
           <button className="btn btn--ghost" style={{ marginBottom: 12 }} onClick={() => { setView('list'); setSelectedTab(null); }}>← All Tabs</button>
 
@@ -646,24 +550,71 @@ export default function TabsView() {
                       </div>
                     ) : null}
 
-                    <div style={{ display: 'flex', gap: 8 }}>
-                      <button
-                        data-testid="pay-card-btn"
-                        className="btn btn--primary"
-                        style={{ flex: 1 }}
-                        onClick={handlePayCard}
-                      >
-                        💳 Pay with Card
-                      </button>
-                      <button
-                        data-testid="proceed-to-cash-btn"
-                        className="btn btn--success"
-                        style={{ flex: 1 }}
-                        onClick={() => setPayStep('cash')}
-                      >
-                        💵 Pay with Cash
-                      </button>
-                    </div>
+                    {!cashExpanded ? (
+                      <div style={{ display: 'flex', gap: 8 }}>
+                        <button
+                          data-testid="pay-card-btn"
+                          className="btn btn--primary"
+                          style={{ flex: 1 }}
+                          onClick={handlePayCard}
+                        >
+                          💳 Pay with Card
+                        </button>
+                        <button
+                          data-testid="proceed-to-cash-btn"
+                          className="btn btn--success"
+                          style={{ flex: 1 }}
+                          onClick={() => setCashExpanded(true)}
+                        >
+                          💵 Pay with Cash
+                        </button>
+                      </div>
+                    ) : (
+                      <div data-testid="tab-cash-payment-view">
+                        <div className="field" style={{ marginBottom: 8 }}>
+                          <label className="label">Amount Received ($)</label>
+                          <input
+                            data-testid="cash-received-input"
+                            className="input"
+                            type="number"
+                            min="0"
+                            step="0.01"
+                            value={cashReceived}
+                            onChange={e => setCashReceived(e.target.value)}
+                            autoFocus
+                          />
+                        </div>
+                        {liveChange !== null && (
+                          <div
+                            data-testid="live-change-amount"
+                            style={{
+                              fontSize: '1.4rem', fontWeight: 700, textAlign: 'center', padding: '10px 0',
+                              color: liveChange >= 0 ? 'var(--success)' : 'var(--danger)',
+                            }}
+                          >
+                            {liveChange >= 0
+                              ? `Change: $${liveChange.toFixed(2)}`
+                              : `Still needed: $${Math.abs(liveChange).toFixed(2)}`}
+                          </div>
+                        )}
+                        <div style={{ display: 'flex', gap: 8, marginTop: 4 }}>
+                          <button
+                            className="btn btn--ghost"
+                            style={{ flex: 1 }}
+                            onClick={() => { setCashExpanded(false); setCashReceived(''); setError(''); }}
+                          >Cancel</button>
+                          <button
+                            data-testid="confirm-payment-btn"
+                            className="btn btn--success"
+                            style={{ flex: 1 }}
+                            onClick={handlePayCash}
+                            disabled={!cashReceived || Number(cashReceived) < tabEffectiveTotal}
+                          >
+                            Confirm Payment
+                          </button>
+                        </div>
+                      </div>
+                    )}
                   </>
                 )}
               </div>

@@ -8,6 +8,10 @@ This document lists all **features** and **scenarios** covered by the BDD test s
 
 **Feature:** As an employee, I want to create a checkout order and accept payment (cash or card) so that the customer can pay for selected items.
 
+**Responsive layout:** On tablet (≥1024px) a fixed 60/40 split shows the product picker on the left and the cart panel on the right at all times. On phone (<1024px) the product picker is full-screen; a sticky bar at the bottom (visible when cart has items) opens a full-screen cart panel. The left product panel dims and disables pointer-events while cash input is expanded (tablet only).
+
+**Inline cash payment:** Tapping "Pay with Cash" expands a cash-received input and live change display inline in the cart footer — no page navigation. Tapping "Cancel" collapses it back to the payment buttons.
+
 **UI — Add Items panel:** Shared `ProductPicker` component with search input, grid / list toggle (persisted under `checkout-view`), **● Active** filter (on by default, shared `product-active-filter`), **◈ In Stock** filter (on by default, shared `product-stock-filter`), and **↑ Most Sold** sort toggle (on by default, shared `product-sort`). Filter pipeline: active → in-stock → most-sold → render.
 
 **Cart-aware availability:** The picker computes effective stock in real time from the current cart without any network calls. For supply-based products, all products that share a supply reflect each other's cart consumption immediately. For unit-based products, the picker shows `server units − cart quantity`. The **+** button in the order summary is also disabled when effective units reach zero.
