@@ -2,21 +2,25 @@ import { useEffect, useState } from 'react';
 import { api } from '../api/client';
 import type { SalesByItem, DailyTotal, DailyRange, CloseBrief, InventoryAdjustmentItem, HistoricReport, WeekdayReport, RegisterSessionSummary, SessionReport } from '../api/client';
 import ColumnChart from '../components/ColumnChart';
+import DateTimeRangeFilter from '../components/DateTimeRangeFilter';
 
 const localTz = Intl.DateTimeFormat().resolvedOptions().timeZone;
-const today = () => new Date().toLocaleDateString('en-CA', { timeZone: localTz });
+const todayDatetime = () => {
+  const d = new Date().toLocaleDateString('en-CA', { timeZone: localTz });
+  return { from: `${d}T00:00`, to: `${d}T23:59` };
+};
 
 export default function ReportsView() {
   const [tab, setTab] = useState<'sales' | 'range' | 'brief' | 'historic' | 'weekday' | 'session'>('sales');
-  const [salesFrom, setSalesFrom] = useState(today());
-  const [salesTo, setSalesTo] = useState(today());
+  const [salesFrom, setSalesFrom] = useState(todayDatetime().from);
+  const [salesTo, setSalesTo] = useState(todayDatetime().to);
   const [salesByItem, setSalesByItem] = useState<SalesByItem[]>([]);
   const [dailyTotal, setDailyTotal] = useState<DailyTotal | null>(null);
   const [adjItems, setAdjItems] = useState<InventoryAdjustmentItem[]>([]);
   const [dailyRange, setDailyRange] = useState<DailyRange[]>([]);
   const [closeBrief, setCloseBrief] = useState<CloseBrief | null>(null);
-  const [rangeFrom, setRangeFrom] = useState(today());
-  const [rangeTo, setRangeTo] = useState(today());
+  const [rangeFrom, setRangeFrom] = useState(todayDatetime().from);
+  const [rangeTo, setRangeTo] = useState(todayDatetime().to);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [historicGroupBy, setHistoricGroupBy] = useState<'week' | 'month' | 'day'>('week');
@@ -26,13 +30,13 @@ export default function ReportsView() {
   const [selectedSessionId, setSelectedSessionId] = useState<number | null>(null);
   const [sessionReport, setSessionReport] = useState<SessionReport | null>(null);
 
-  async function fetchSales() {
+  async function fetchSales(from = salesFrom, to = salesTo) {
     setLoading(true); setError('');
     try {
       const [items, totals, adjs] = await Promise.all([
-        api.getSalesByItem(salesFrom, salesTo, localTz),
-        api.getDailyTotal(salesFrom, salesTo, localTz),
-        api.getInventoryAdjustmentReport(salesFrom, salesTo, localTz),
+        api.getSalesByItem(from, to, localTz),
+        api.getDailyTotal(from, to, localTz),
+        api.getInventoryAdjustmentReport(from, to, localTz),
       ]);
       setSalesByItem(items);
       setDailyTotal(totals);
@@ -41,9 +45,9 @@ export default function ReportsView() {
     finally { setLoading(false); }
   }
 
-  async function fetchRange() {
+  async function fetchRange(from = rangeFrom, to = rangeTo) {
     setLoading(true); setError('');
-    try { setDailyRange(await api.getDailyRange(rangeFrom, rangeTo, localTz)); }
+    try { setDailyRange(await api.getDailyRange(from, to, localTz)); }
     catch (e: unknown) { setError((e as Error).message); }
     finally { setLoading(false); }
   }
@@ -88,7 +92,7 @@ export default function ReportsView() {
     finally { setLoading(false); }
   }
 
-  useEffect(() => { if (tab === 'sales') fetchSales(); }, [tab, salesFrom, salesTo]);
+  useEffect(() => { if (tab === 'sales') fetchSales(); }, [tab]);
   useEffect(() => { if (tab === 'range') fetchRange(); }, [tab]);
   useEffect(() => { if (tab === 'brief') fetchBrief(); }, [tab]);
   useEffect(() => { if (tab === 'historic') fetchHistoric(); }, [tab, historicGroupBy]);
@@ -110,10 +114,12 @@ export default function ReportsView() {
 
       {tab === 'sales' && (
         <div>
-          <div style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
-            <div style={{ flex: 1 }}><label className="label">From</label><input className="input" type="date" value={salesFrom} onChange={e => setSalesFrom(e.target.value)} /></div>
-            <div style={{ flex: 1 }}><label className="label">To</label><input className="input" type="date" value={salesTo} onChange={e => setSalesTo(e.target.value)} /></div>
-          </div>
+          <DateTimeRangeFilter
+            initialFrom={salesFrom}
+            initialTo={salesTo}
+            loading={loading}
+            onApply={(from, to) => { setSalesFrom(from); setSalesTo(to); fetchSales(from, to); }}
+          />
           {loading ? <div className="spinner">⏳</div> : (
             <>
               {dailyTotal && (
@@ -187,11 +193,12 @@ export default function ReportsView() {
 
       {tab === 'range' && (
         <div>
-          <div style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
-            <div style={{ flex: 1 }}><label className="label">From</label><input className="input" type="date" value={rangeFrom} onChange={e => setRangeFrom(e.target.value)} /></div>
-            <div style={{ flex: 1 }}><label className="label">To</label><input className="input" type="date" value={rangeTo} onChange={e => setRangeTo(e.target.value)} /></div>
-          </div>
-          <button className="btn btn--primary btn--sm" style={{ marginBottom: 12 }} onClick={fetchRange}>Fetch</button>
+          <DateTimeRangeFilter
+            initialFrom={rangeFrom}
+            initialTo={rangeTo}
+            loading={loading}
+            onApply={(from, to) => { setRangeFrom(from); setRangeTo(to); fetchRange(from, to); }}
+          />
           <div className="card" data-testid="daily-range">
             {dailyRange.map(d => (
               <div className="list-item" key={d.date} data-testid="range-day">

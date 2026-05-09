@@ -234,3 +234,19 @@ Backend enforcement notes:
 ## Deployment
 
 Deployed on Vercel. `api/index.ts` imports `createApp()` from the backend and exports it as a serverless function handler. `vercel.json` rewrites all traffic to that function. Frontend is deployed as a static site.
+
+---
+
+## Agent skills
+
+### Issue tracker
+
+Issues live in GitHub Issues (`hombre-pajaro-dev/hermes`). See `docs/agents/issue-tracker.md`.
+
+### Triage labels
+
+Default label vocabulary — `needs-triage`, `needs-info`, `ready-for-agent`, `ready-for-human`, `wontfix`. See `docs/agents/triage-labels.md`.
+
+### Domain docs
+
+Single-context — `CONTEXT.md` and `docs/adr/` at the repo root. See `docs/agents/domain.md`.

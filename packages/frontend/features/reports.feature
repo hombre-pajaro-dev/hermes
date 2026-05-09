@@ -20,8 +20,13 @@ Feature: Reports
   Scenario: View daily range report
     Given I am on the Reports page
     When I switch to the Range tab
-    And I click Fetch
+    And I click Apply on the date range filter
     Then I see the range report section
+
+  Scenario: By Item tab has an Apply button with datetime inputs
+    Given I am on the Reports page
+    Then I see the date range apply button
+    And I see datetime inputs on the By Item tab
 
   Scenario: View close brief
     Given I am on the Reports page

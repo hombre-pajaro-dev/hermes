@@ -40,7 +40,29 @@ When('I fetch the close brief', async function (this: PosWorld) {
 
 When('I fetch the daily range from today to today', async function (this: PosWorld) {
   const today = new Date().toISOString().slice(0, 10);
-  this.response = await this.agent.get(`/api/reports/daily-range?from=${today}&to=${today}&tz=UTC`);
+  this.response = await this.agent.get(`/api/reports/daily-range?from=${today}T00:00&to=${today}T23:59&tz=UTC`);
+});
+
+When('I fetch the daily range from today {string} to today {string}', async function (this: PosWorld, fromTime: string, toTime: string) {
+  const today = new Date().toISOString().slice(0, 10);
+  this.response = await this.agent.get(`/api/reports/daily-range?from=${today}${fromTime}&to=${today}${toTime}&tz=UTC`);
+});
+
+Then('the first day entry has zero revenue', function (this: PosWorld) {
+  const days = this.response.body as { revenue: number }[];
+  expect(days[0].revenue).to.equal(0);
+});
+
+When('I fetch the sales by item report from today {string} to today {string}', async function (this: PosWorld, fromTime: string, toTime: string) {
+  const today = new Date().toISOString().slice(0, 10);
+  const from = `${today}${fromTime}`;
+  const to = `${today}${toTime}`;
+  this.response = await this.agent.get(`/api/reports/sales-by-item?from=${from}&to=${to}&tz=UTC`);
+});
+
+Then('the response is an empty array', function (this: PosWorld) {
+  const body = this.response.body as unknown[];
+  expect(body).to.be.an('array').with.length(0);
 });
 
 When('I fetch the sales by item report for today with tz {string}', async function (this: PosWorld, tz: string) {
@@ -50,7 +72,7 @@ When('I fetch the sales by item report for today with tz {string}', async functi
 
 When('I fetch the daily total for range today to today', async function (this: PosWorld) {
   const today = new Date().toISOString().slice(0, 10);
-  this.response = await this.agent.get(`/api/reports/daily-total?from=${today}&to=${today}&tz=UTC`);
+  this.response = await this.agent.get(`/api/reports/daily-total?from=${today}T00:00&to=${today}T23:59&tz=UTC`);
 });
 
 Then('the daily total response has inventory_adjustment_total field', function (this: PosWorld) {
@@ -70,7 +92,7 @@ When('I submit an inventory adjustment via reports context', async function (thi
 
 When('I fetch the inventory adjustment report for today', async function (this: PosWorld) {
   const today = new Date().toISOString().slice(0, 10);
-  this.response = await this.agent.get(`/api/reports/inventory-adjustments?from=${today}&to=${today}&tz=UTC`);
+  this.response = await this.agent.get(`/api/reports/inventory-adjustments?from=${today}T00:00&to=${today}T23:59&tz=UTC`);
 });
 
 Then('the inventory adjustment report includes {string}', function (this: PosWorld, name: string) {

@@ -123,7 +123,11 @@ This document lists all **features** and **scenarios** covered by the BDD test s
 
 **UI — tabs:** By Item · Range · Brief · Historic · By Weekday · Sessions. The separate Daily tab has been removed; the daily summary (Orders, Sales, Cash, Card, Cost, Profit) now appears at the top of the By Item tab for the selected date range.
 
-**By Item tab:** From/To date pickers filter both the item breakdown and the summary stats. Changing either date re-fetches automatically. Both `GET /api/reports/sales-by-item` and `GET /api/reports/daily-total` are called in parallel with the same `from`/`to`/`tz` parameters.
+**By Item tab:** From/To datetime pickers (datetime-local inputs) filter both the item breakdown and the summary stats. Fetching is triggered by an Apply button — no auto-fetch on change. Both `GET /api/reports/sales-by-item` and `GET /api/reports/daily-total` are called in parallel with the same `from`/`to`/`tz` parameters. Defaults to today at 00:00 – 23:59.
+
+**Range tab:** From/To datetime pickers with an Apply button. Multi-day ranges apply the time bound only to the first and last day; days in between are shown in full (ADR-0002).
+
+**Shared `DateTimeRangeFilter` component:** Used by both By Item and Range tabs. Manages internal draft state; calls `onApply(from, to)` only on Apply click. Accepts `initialFrom`, `initialTo`, `onApply`, and optional `loading` prop.
 
 **Timezone support:** All date-filtered report endpoints accept an optional `tz` query parameter (IANA timezone name). The backend uses `AT TIME ZONE` to convert `paid_at` timestamps before date extraction. Default: `America/Monterrey`. The frontend passes the browser `Intl` timezone and computes "today" in local time.
 
@@ -147,6 +151,10 @@ This document lists all **features** and **scenarios** covered by the BDD test s
 | 12 | Inventory adjustment report shows per-product breakdown | After a shortage adjustment; `GET /api/reports/inventory-adjustments` returns the product with its `adjustment_count`, `total_delta`, and non-zero `total_cost_impact`. |
 | 13 | Sessions tab shows session selector | On the Reports page; clicking the Sessions tab reveals a session dropdown (`session-selector`). |
 | 14 | Sessions tab shows tab exclusion notice | Sessions tab displays a notice that tab sales are excluded because tabs span multiple sessions. |
+| 15 | Sales by item report respects time component of datetime range | Query with `T00:00`–`T00:01` returns empty; confirms time precision is applied (not date-only truncation). |
+| 16 | Daily range respects time bounds on first and last day | Query a single day with `T00:00`–`T00:01`; first day entry has zero revenue (ADR-0002). |
+| 17 | By Item tab has Apply button with datetime inputs | By Item tab renders `datetime-local` inputs and a `date-range-apply-btn`; no auto-fetch on change. |
+| 18 | Range tab Apply button triggers fetch | Clicking Apply on the Range tab loads the range report. |
 
 **Sessions tab:** Dropdown to select any register session. Shows session metadata (opened/closed timestamps, opening/closing cash), a tab-exclusion notice, sales stats (orders/revenue/cash/card/cost/profit from counter orders only), inventory activity table (opening → closing → sold → restocked → adjusted per product, only shown when snapshots exist), a sales-by-product breakdown, and a cash removals list. `GET /api/register/sessions` and `GET /api/register/sessions/:id/report`.
 

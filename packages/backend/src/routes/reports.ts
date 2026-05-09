@@ -6,9 +6,9 @@ const router = Router();
 router.get('/sales-by-item', async (req, res) => {
   const tz = (req.query.tz as string) || 'America/Monterrey';
   const todayLocal = new Date().toLocaleDateString('en-CA', { timeZone: tz });
-  const fallback = (req.query.date as string) || todayLocal;
-  const from = (req.query.from as string) || fallback;
-  const to = (req.query.to as string) || fallback;
+  const dateParam = req.query.date as string | undefined;
+  const from = (req.query.from as string) || (dateParam ? `${dateParam}T00:00` : `${todayLocal}T00:00`);
+  const to   = (req.query.to   as string) || (dateParam ? `${dateParam}T23:59` : `${todayLocal}T23:59`);
   const db = await getDb();
   const { rows } = await db.query<{ product_id: number; name: string; units_sold: number; revenue: number; cost: number }>(`
     SELECT p.id as product_id, p.name,
@@ -19,7 +19,7 @@ router.get('/sales-by-item', async (req, res) => {
     JOIN orders o ON o.id = oi.order_id
     JOIN products p ON p.id = oi.product_id
     WHERE o.status = 'paid'
-      AND (o.paid_at AT TIME ZONE $3)::date BETWEEN $1::date AND $2::date
+      AND (o.paid_at AT TIME ZONE $3) BETWEEN $1::timestamp AND $2::timestamp
     GROUP BY p.id, p.name
     UNION ALL
     SELECT p.id, p.name,
@@ -30,7 +30,7 @@ router.get('/sales-by-item', async (req, res) => {
     JOIN tabs t ON t.id = ti.tab_id
     JOIN products p ON p.id = ti.product_id
     WHERE t.status = 'paid'
-      AND (t.paid_at AT TIME ZONE $3)::date BETWEEN $1::date AND $2::date
+      AND (t.paid_at AT TIME ZONE $3) BETWEEN $1::timestamp AND $2::timestamp
     GROUP BY p.id, p.name
   `, [from, to, tz]);
 
@@ -51,9 +51,9 @@ router.get('/sales-by-item', async (req, res) => {
 router.get('/daily-total', async (req, res) => {
   const tz = (req.query.tz as string) || 'America/Monterrey';
   const todayLocal = new Date().toLocaleDateString('en-CA', { timeZone: tz });
-  const fallback = (req.query.date as string) || todayLocal;
-  const from = (req.query.from as string) || fallback;
-  const to = (req.query.to as string) || fallback;
+  const dateParam = req.query.date as string | undefined;
+  const from = (req.query.from as string) || (dateParam ? `${dateParam}T00:00` : `${todayLocal}T00:00`);
+  const to   = (req.query.to   as string) || (dateParam ? `${dateParam}T23:59` : `${todayLocal}T23:59`);
   const db = await getDb();
   const { rows: [totals] } = await db.query(`
     SELECT
@@ -63,34 +63,34 @@ router.get('/daily-total', async (req, res) => {
       COALESCE(SUM(CASE WHEN payment_method = 'card' THEN total ELSE 0 END), 0) as card_sales
     FROM (
       SELECT total, payment_method FROM orders
-        WHERE status = 'paid' AND (paid_at AT TIME ZONE $3)::date BETWEEN $1::date AND $2::date
+        WHERE status = 'paid' AND (paid_at AT TIME ZONE $3) BETWEEN $1::timestamp AND $2::timestamp
       UNION ALL
       SELECT total, payment_method FROM tabs
-        WHERE status = 'paid' AND (paid_at AT TIME ZONE $3)::date BETWEEN $1::date AND $2::date
+        WHERE status = 'paid' AND (paid_at AT TIME ZONE $3) BETWEEN $1::timestamp AND $2::timestamp
     ) combined
   `, [from, to, tz]);
   const { rows: [costRow] } = await db.query(`
     SELECT COALESCE(SUM(cost), 0) as total_cost FROM (
       SELECT SUM(oi.quantity * oi.unit_cost) as cost
         FROM order_items oi JOIN orders o ON o.id = oi.order_id
-        WHERE o.status = 'paid' AND (o.paid_at AT TIME ZONE $3)::date BETWEEN $1::date AND $2::date
+        WHERE o.status = 'paid' AND (o.paid_at AT TIME ZONE $3) BETWEEN $1::timestamp AND $2::timestamp
       UNION ALL
       SELECT SUM(ti.quantity * ti.unit_cost)
         FROM tab_items ti JOIN tabs t ON t.id = ti.tab_id
-        WHERE t.status = 'paid' AND (t.paid_at AT TIME ZONE $3)::date BETWEEN $1::date AND $2::date
+        WHERE t.status = 'paid' AND (t.paid_at AT TIME ZONE $3) BETWEEN $1::timestamp AND $2::timestamp
     ) costs
   `, [from, to, tz]);
   const { rows: [adjRow] } = await db.query(`
     SELECT COALESCE(SUM(amount), 0) as inventory_adjustment_total
     FROM ledger_entries
     WHERE account = 'inventory_adjustment'
-      AND (created_at AT TIME ZONE $3)::date BETWEEN $1::date AND $2::date
+      AND (created_at AT TIME ZONE $3) BETWEEN $1::timestamp AND $2::timestamp
   `, [from, to, tz]);
   const { rows: [commRow] } = await db.query(`
     SELECT COALESCE(SUM(amount), 0) as commission_total
     FROM ledger_entries
     WHERE entry_type = 'commission' AND account = 'commissions'
-      AND (created_at AT TIME ZONE $3)::date BETWEEN $1::date AND $2::date
+      AND (created_at AT TIME ZONE $3) BETWEEN $1::timestamp AND $2::timestamp
   `, [from, to, tz]);
   res.json({
     date: from === to ? from : `${from}/${to}`,
@@ -209,38 +209,53 @@ router.get('/top-products', async (_req, res) => {
 
 router.get('/daily-range', async (req, res) => {
   const tz = (req.query.tz as string) || 'America/Monterrey';
-  const from = (req.query.from as string) || new Date().toLocaleDateString('en-CA', { timeZone: tz });
-  const to = (req.query.to as string) || new Date().toLocaleDateString('en-CA', { timeZone: tz });
+  const todayLocal = new Date().toLocaleDateString('en-CA', { timeZone: tz });
+  const rawFrom = (req.query.from as string) || `${todayLocal}T00:00`;
+  const rawTo   = (req.query.to   as string) || `${todayLocal}T23:59`;
+
+  // Normalise: accept bare dates (YYYY-MM-DD) or datetimes (YYYY-MM-DDTHH:mm)
+  const fromDatetime = rawFrom.includes('T') ? rawFrom : `${rawFrom}T00:00`;
+  const toDatetime   = rawTo.includes('T')   ? rawTo   : `${rawTo}T23:59`;
+  const fromDate = fromDatetime.slice(0, 10);
+  const toDate   = toDatetime.slice(0, 10);
+
   const db = await getDb();
   const days: { date: string; revenue: number; cost: number; order_count: number; adjustment?: number }[] = [];
-  const current = new Date(`${from}T12:00:00`);
-  const end = new Date(`${to}T12:00:00`);
+
+  // Iterate day-by-day; apply time bounds only to first and last day (ADR-0002)
+  const current = new Date(`${fromDate}T12:00:00`);
+  const end     = new Date(`${toDate}T12:00:00`);
   while (current <= end) {
     const dateStr = current.toISOString().slice(0, 10);
+    const isFirst = dateStr === fromDate;
+    const isLast  = dateStr === toDate;
+    const dayFrom = isFirst ? fromDatetime : `${dateStr}T00:00`;
+    const dayTo   = isLast  ? toDatetime   : `${dateStr}T23:59`;
+
     const { rows: [row] } = await db.query(`
       SELECT COUNT(*)::int as order_count, COALESCE(SUM(total), 0) as revenue FROM (
-        SELECT total FROM orders WHERE status = 'paid' AND (paid_at AT TIME ZONE $2)::date = $1::date
+        SELECT total FROM orders WHERE status = 'paid' AND (paid_at AT TIME ZONE $2) BETWEEN $1::timestamp AND $3::timestamp
         UNION ALL
-        SELECT total FROM tabs   WHERE status = 'paid' AND (paid_at AT TIME ZONE $2)::date = $1::date
+        SELECT total FROM tabs   WHERE status = 'paid' AND (paid_at AT TIME ZONE $2) BETWEEN $1::timestamp AND $3::timestamp
       ) combined
-    `, [dateStr, tz]);
+    `, [dayFrom, tz, dayTo]);
     const { rows: [costRow] } = await db.query(`
       SELECT COALESCE(SUM(cost), 0) AS cost FROM (
         SELECT SUM(oi.quantity * oi.unit_cost) AS cost
           FROM order_items oi JOIN orders o ON o.id = oi.order_id
-          WHERE o.status = 'paid' AND (o.paid_at AT TIME ZONE $2)::date = $1::date
+          WHERE o.status = 'paid' AND (o.paid_at AT TIME ZONE $2) BETWEEN $1::timestamp AND $3::timestamp
         UNION ALL
         SELECT SUM(ti.quantity * ti.unit_cost)
           FROM tab_items ti JOIN tabs t ON t.id = ti.tab_id
-          WHERE t.status = 'paid' AND (t.paid_at AT TIME ZONE $2)::date = $1::date
+          WHERE t.status = 'paid' AND (t.paid_at AT TIME ZONE $2) BETWEEN $1::timestamp AND $3::timestamp
       ) costs
-    `, [dateStr, tz]);
+    `, [dayFrom, tz, dayTo]);
     const { rows: [adjRow] } = await db.query(`
       SELECT COALESCE(SUM(amount), 0) as adjustment
       FROM ledger_entries
       WHERE account = 'inventory_adjustment'
-        AND (created_at AT TIME ZONE $2)::date = $1::date
-    `, [dateStr, tz]);
+        AND (created_at AT TIME ZONE $2) BETWEEN $1::timestamp AND $3::timestamp
+    `, [dayFrom, tz, dayTo]);
     days.push({ date: dateStr, revenue: Number(row.revenue), cost: Number(costRow.cost), order_count: row.order_count, adjustment: Number(adjRow.adjustment) });
     current.setDate(current.getDate() + 1);
   }
@@ -250,9 +265,9 @@ router.get('/daily-range', async (req, res) => {
 router.get('/inventory-adjustments', async (req, res) => {
   const tz = (req.query.tz as string) || 'America/Monterrey';
   const todayLocal = new Date().toLocaleDateString('en-CA', { timeZone: tz });
-  const fallback = (req.query.date as string) || todayLocal;
-  const from = (req.query.from as string) || fallback;
-  const to = (req.query.to as string) || fallback;
+  const dateParam = req.query.date as string | undefined;
+  const from = (req.query.from as string) || (dateParam ? `${dateParam}T00:00` : `${todayLocal}T00:00`);
+  const to   = (req.query.to   as string) || (dateParam ? `${dateParam}T23:59` : `${todayLocal}T23:59`);
   const db = await getDb();
   const { rows } = await db.query<{
     product_id: number; name: string;
@@ -266,7 +281,7 @@ router.get('/inventory-adjustments', async (req, res) => {
     JOIN inventory_adjustments ia ON ia.id = le.ref_id
     JOIN products p ON p.id = ia.product_id
     WHERE le.account = 'inventory_adjustment'
-      AND (le.created_at AT TIME ZONE $3)::date BETWEEN $1::date AND $2::date
+      AND (le.created_at AT TIME ZONE $3) BETWEEN $1::timestamp AND $2::timestamp
     GROUP BY p.id, p.name
     ORDER BY ABS(SUM(le.amount)) DESC
   `, [from, to, tz]);

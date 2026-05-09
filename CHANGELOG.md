@@ -9,6 +9,17 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+
+#### Reports — datetime range filtering and shared DateTimeRangeFilter component
+- **By Item and Range tabs** now use `datetime-local` inputs instead of `date` inputs, allowing filtering by time of day (e.g. 08:00–14:00), not just by date.
+- **Apply button** added to By Item tab (Range already had one). Both tabs now fetch only on Apply click; By Item no longer auto-fetches on input change.
+- **`DateTimeRangeFilter` component** (`packages/frontend/src/components/DateTimeRangeFilter.tsx`) — shared component used by both tabs. Manages internal draft state; calls `onApply(from, to)` on Apply. Defaults to today at `00:00`–`23:59`.
+- **Backend SQL** for `/reports/sales-by-item`, `/reports/daily-total`, and `/reports/inventory-adjustments` changed from `::date BETWEEN` to timestamp comparison: `(paid_at AT TIME ZONE tz) BETWEEN from::timestamp AND to::timestamp`.
+- **Backend `/reports/daily-range`** rewritten with continuous-window semantics (ADR-0002): first day uses the `from` time as lower bound, last day uses the `to` time as upper bound, middle days are shown in full.
+- **ADR-0002** added: documents the continuous-window semantics for multi-day datetime ranges in the Range report.
+- **BDD:** 4 new backend scenarios (time precision for sales-by-item, time bounds for daily-range); 2 new frontend scenarios (Apply button + datetime inputs on By Item tab, Apply button on Range tab).
+
 ### Changed
 
 #### Checkout — responsive layout and inline cash payment

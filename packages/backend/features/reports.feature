@@ -38,9 +38,18 @@ Feature: Reports
     Then the response has at least one day entry
     And each day has date, revenue, cost, order_count fields
 
+  Scenario: Daily range respects time bounds on first and last day
+    When I fetch the daily range from today "T00:00" to today "T00:01"
+    Then the response has at least one day entry
+    And the first day entry has zero revenue
+
   Scenario: Filter reports by date
     When I fetch the sales by item report for "2020-01-01"
     Then the response is an array
+
+  Scenario: Sales by item report respects time component of datetime range
+    When I fetch the sales by item report from today "T00:00" to today "T00:01"
+    Then the response is an empty array
 
   Scenario: Sales by item report respects explicit timezone parameter
     When I fetch the sales by item report for today with tz "America/Monterrey"

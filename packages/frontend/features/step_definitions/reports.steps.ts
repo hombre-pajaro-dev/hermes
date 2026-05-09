@@ -17,9 +17,19 @@ When('I switch to the Brief tab', async function (this: PosWorld) {
   await this.page.waitForLoadState('networkidle');
 });
 
-When('I click Fetch', async function (this: PosWorld) {
-  await this.page.click('button:has-text("Fetch")');
+When('I click Apply on the date range filter', async function (this: PosWorld) {
+  await this.page.click('[data-testid="date-range-apply-btn"]');
   await this.page.waitForLoadState('networkidle');
+});
+
+Then('I see the date range apply button', async function (this: PosWorld) {
+  await this.page.waitForSelector('[data-testid="date-range-apply-btn"]', { timeout: 5000 });
+  expect(await this.page.locator('[data-testid="date-range-apply-btn"]').isVisible()).to.be.true;
+});
+
+Then('I see datetime inputs on the By Item tab', async function (this: PosWorld) {
+  const inputs = this.page.locator('input[type="datetime-local"]');
+  expect(await inputs.count()).to.be.at.least(2);
 });
 
 Then('I see the daily total section', async function (this: PosWorld) {
