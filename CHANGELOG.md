@@ -11,6 +11,10 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+#### Reports — date filters persist across tab navigation, reset next day
+- **By Item** and **Range** tab date inputs are saved to localStorage on every Apply click, keyed `reports-sales-from/to` and `reports-range-from/to`.
+- On mount each tab restores the saved values only if they were saved today (local timezone); otherwise falls back to today's default range. No stale dates carried over to the next business day.
+
 #### Ledger — card commission no longer appears as two separate entries
 - The `credit_card` commission ledger entry now uses `entry_type = 'commission_transfer'` instead of `'commission'`, distinguishing it from the expense record on the `commissions` account.
 - **LedgerView** groups the pair into a single "commission transfer" row with account shown as `credit_card → commissions`, eliminating the confusing double-entry display. Report queries are unaffected — they continue to filter `entry_type = 'commission' AND account = 'commissions'`.

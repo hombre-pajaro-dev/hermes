@@ -10,17 +10,37 @@ const todayDatetime = () => {
   return { from: `${d}T00:00`, to: `${d}T23:59` };
 };
 
+function todayStr() {
+  return new Date().toLocaleDateString('en-CA', { timeZone: localTz });
+}
+
+function loadDate(key: string, fallback: string): string {
+  try {
+    const raw = localStorage.getItem(key);
+    if (!raw) return fallback;
+    const { value, date } = JSON.parse(raw) as { value: string; date: string };
+    if (date === todayStr()) return value;
+  } catch { /* ignore */ }
+  return fallback;
+}
+
+function saveDate(key: string, value: string) {
+  try {
+    localStorage.setItem(key, JSON.stringify({ value, date: todayStr() }));
+  } catch { /* ignore */ }
+}
+
 export default function ReportsView() {
   const [tab, setTab] = useState<'sales' | 'range' | 'brief' | 'historic' | 'weekday' | 'session'>('sales');
-  const [salesFrom, setSalesFrom] = useState(todayDatetime().from);
-  const [salesTo, setSalesTo] = useState(todayDatetime().to);
+  const [salesFrom, setSalesFrom] = useState(() => loadDate('reports-sales-from', todayDatetime().from));
+  const [salesTo, setSalesTo] = useState(() => loadDate('reports-sales-to', todayDatetime().to));
   const [salesByItem, setSalesByItem] = useState<SalesByItem[]>([]);
   const [dailyTotal, setDailyTotal] = useState<DailyTotal | null>(null);
   const [adjItems, setAdjItems] = useState<InventoryAdjustmentItem[]>([]);
   const [dailyRange, setDailyRange] = useState<DailyRange[]>([]);
   const [closeBrief, setCloseBrief] = useState<CloseBrief | null>(null);
-  const [rangeFrom, setRangeFrom] = useState(todayDatetime().from);
-  const [rangeTo, setRangeTo] = useState(todayDatetime().to);
+  const [rangeFrom, setRangeFrom] = useState(() => loadDate('reports-range-from', todayDatetime().from));
+  const [rangeTo, setRangeTo] = useState(() => loadDate('reports-range-to', todayDatetime().to));
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [historicGroupBy, setHistoricGroupBy] = useState<'week' | 'month' | 'day'>('week');
@@ -118,7 +138,7 @@ export default function ReportsView() {
             initialFrom={salesFrom}
             initialTo={salesTo}
             loading={loading}
-            onApply={(from, to) => { setSalesFrom(from); setSalesTo(to); fetchSales(from, to); }}
+            onApply={(from, to) => { setSalesFrom(from); setSalesTo(to); saveDate('reports-sales-from', from); saveDate('reports-sales-to', to); fetchSales(from, to); }}
           />
           {loading ? <div className="spinner">⏳</div> : (
             <>
@@ -197,7 +217,7 @@ export default function ReportsView() {
             initialFrom={rangeFrom}
             initialTo={rangeTo}
             loading={loading}
-            onApply={(from, to) => { setRangeFrom(from); setRangeTo(to); fetchRange(from, to); }}
+            onApply={(from, to) => { setRangeFrom(from); setRangeTo(to); saveDate('reports-range-from', from); saveDate('reports-range-to', to); fetchRange(from, to); }}
           />
           <div className="card" data-testid="daily-range">
             {dailyRange.map(d => (
