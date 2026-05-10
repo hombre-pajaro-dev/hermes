@@ -201,12 +201,22 @@ Then('a commission ledger entry exists on account {string}',
   }
 );
 
+Then('a commission_transfer ledger entry exists on account {string}',
+  async function (this: PosWorld, account: string) {
+    const orderId = this.context.orderId as number;
+    const res = await this.agent.get('/api/ledger');
+    const entries = res.body as { entry_type: string; account: string; ref_id: number }[];
+    const found = entries.find(e => e.entry_type === 'commission_transfer' && e.account === account && e.ref_id === orderId);
+    expect(found, `Expected commission_transfer entry on account "${account}" for order ${orderId}`).to.exist;
+  }
+);
+
 Then('no commission ledger entry exists for the order',
   async function (this: PosWorld) {
     const orderId = this.context.orderId as number;
     const res = await this.agent.get('/api/ledger');
     const entries = res.body as { entry_type: string; ref_id: number }[];
-    const found = entries.find(e => e.entry_type === 'commission' && e.ref_id === orderId);
+    const found = entries.find(e => (e.entry_type === 'commission' || e.entry_type === 'commission_transfer') && e.ref_id === orderId);
     expect(found, 'Expected no commission entry for cash order').to.not.exist;
   }
 );

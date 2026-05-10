@@ -9,6 +9,14 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Fixed
+
+#### Ledger — card commission no longer appears as two separate entries
+- The `credit_card` commission ledger entry now uses `entry_type = 'commission_transfer'` instead of `'commission'`, distinguishing it from the expense record on the `commissions` account.
+- **LedgerView** groups the pair into a single "commission transfer" row with account shown as `credit_card → commissions`, eliminating the confusing double-entry display. Report queries are unaffected — they continue to filter `entry_type = 'commission' AND account = 'commissions'`.
+- **Migration** in `schema.ts` renames all existing `commission` rows on the `credit_card` account to `commission_transfer` on startup.
+- **BDD test** updated: the credit_card step now asserts `entry_type = 'commission_transfer'`; the cash-payment check covers both types.
+
 ### Added
 
 #### Reports — datetime range filtering and shared DateTimeRangeFilter component

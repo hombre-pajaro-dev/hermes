@@ -248,7 +248,7 @@ export default function LedgerView() {
     sale: '#16a34a', tab_payment: '#2563eb', register_open: '#7c3aed',
     register_close: '#dc2626', cashout: '#d97706', restock: '#0891b2',
     adjustment: '#db2777', payroll: '#ea580c', savings_transfer: '#0d9488', expense: '#9333ea',
-    account_adjustment: '#6b7280', commission: '#f59e0b', transfer: '#0ea5e9',
+    account_adjustment: '#6b7280', commission: '#f59e0b', commission_transfer: '#f59e0b', transfer: '#0ea5e9',
   };
 
   return (
@@ -263,7 +263,27 @@ export default function LedgerView() {
 
       {tab === 'entries' && (
         <div className="card" data-testid="ledger-entries">
-          {entries.length === 0 ? <div className="empty">No entries yet</div> : entries.map(e => {
+          {entries.length === 0 ? <div className="empty">No entries yet</div> : (() => {
+            // Group commission + commission_transfer pairs (same ref) into one row
+            const transferByRef = new Map<string, LedgerEntry>();
+            for (const e of entries) {
+              if (e.entry_type === 'commission_transfer' && e.ref_id != null && e.ref_type) {
+                transferByRef.set(`${e.ref_type}:${e.ref_id}`, e);
+              }
+            }
+            const pairedTransferIds = new Set<number>();
+            const commissionPairs = new Map<number, LedgerEntry>();
+            for (const e of entries) {
+              if (e.entry_type === 'commission' && e.ref_id != null && e.ref_type) {
+                const pair = transferByRef.get(`${e.ref_type}:${e.ref_id}`);
+                if (pair) { commissionPairs.set(e.id, pair); pairedTransferIds.add(pair.id); }
+              }
+            }
+            return entries.map(e => {
+            if (pairedTransferIds.has(e.id)) return null;
+            const transferPair = commissionPairs.get(e.id);
+            const displayType = transferPair ? 'commission transfer' : e.entry_type.replace(/_/g, ' ');
+            const displayAccount = transferPair ? 'credit_card → commissions' : e.account;
             const expandable = EXPANDABLE.has(e.entry_type);
             const expanded = expandedId === e.id;
             const items = itemsCache[e.id];
@@ -276,7 +296,7 @@ export default function LedgerView() {
                 >
                   <div className="list-item__main">
                     <div className="list-item__name" style={{ color: TYPE_COLORS[e.entry_type] ?? 'inherit', display: 'flex', alignItems: 'center', gap: 6 }}>
-                      {e.entry_type.replace(/_/g, ' ')}
+                      {displayType}
                       {e.entry_type === 'tab_payment' && e.tab_at_cost ? (
                         <span data-testid="at-cost-badge" title="Staff at-cost tab" style={{ fontSize: '0.65rem', background: '#7c3aed', color: '#fff', borderRadius: 4, padding: '1px 5px', fontWeight: 700, letterSpacing: '0.02em' }}>COST</span>
                       ) : null}
@@ -306,7 +326,7 @@ export default function LedgerView() {
                     <div style={{ fontWeight: 700, color: e.amount >= 0 ? 'var(--success)' : 'var(--danger)' }}>
                       {e.amount >= 0 ? '+' : ''}${e.amount.toFixed(2)}
                     </div>
-                    {e.account && <div className="list-item__sub">{e.account}</div>}
+                    {displayAccount && <div className="list-item__sub">{displayAccount}</div>}
                   </div>
                 </div>
                 {expanded && (
@@ -363,7 +383,8 @@ export default function LedgerView() {
                 )}
               </div>
             );
-          })}
+          });
+          })()}
         </div>
       )}
 

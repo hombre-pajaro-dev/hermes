@@ -88,7 +88,7 @@ Feature: Payments
   Scenario: Card payment auto-applies commission ledger entries
     Given a product "Espresso" costs 3.00 and sells for 5.00 with 10 units
     When I create and pay an order for 2x "Espresso" with card
-    Then a commission ledger entry exists on account "credit_card"
+    Then a commission_transfer ledger entry exists on account "credit_card"
     And a commission ledger entry exists on account "commissions"
 
   Scenario: Cash payment does not create commission entries

@@ -352,6 +352,13 @@ export async function applySchema(db: Pool): Promise<void> {
   await db.query(`ALTER TABLE orders       ADD COLUMN IF NOT EXISTS paid_by    TEXT`);
   await db.query(`ALTER TABLE ledger_entries ADD COLUMN IF NOT EXISTS created_by TEXT`);
 
+  // Rename credit_card commission entries to commission_transfer
+  await db.query(`
+    UPDATE ledger_entries
+    SET entry_type = 'commission_transfer'
+    WHERE entry_type = 'commission' AND account = 'credit_card'
+  `);
+
   // Product → provider links (junction table; 1:1 in practice but N:N-ready)
   await db.query(`
     CREATE TABLE IF NOT EXISTS product_providers (

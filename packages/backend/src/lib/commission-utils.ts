@@ -20,7 +20,7 @@ export async function applyCardCommission(
   const total = +(base * (1 + ivaRate)).toFixed(2);
   const desc = `Card commission (${(rate * 100).toFixed(2)}% +IVA) on ${refType} #${refId}`;
   await db.query(
-    "INSERT INTO ledger_entries (entry_type, account, amount, description, ref_id, ref_type, created_by) VALUES ('commission', 'credit_card', $1, $2, $3, $4, $5)",
+    "INSERT INTO ledger_entries (entry_type, account, amount, description, ref_id, ref_type, created_by) VALUES ('commission_transfer', 'credit_card', $1, $2, $3, $4, $5)",
     [-total, desc, refId, refType, actor],
   );
   await db.query(
