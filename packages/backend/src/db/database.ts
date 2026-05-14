@@ -31,7 +31,7 @@ export async function resetDb(): Promise<void> {
   `);
   await db.query(`
     INSERT INTO accounts (name, label) VALUES
-    ('cash', 'Cash Drawer'), ('credit_card', 'Credit Card'), ('payroll', 'Payroll'),
+    ('cash', 'Cash Drawer'), ('digital', 'Digital'), ('payroll', 'Payroll'),
     ('inventory_adjustment', 'Inventory Adjustment'), ('savings', 'Savings')
     ON CONFLICT DO NOTHING
   `);

@@ -19,3 +19,15 @@ When the Inline Cash Expand is open on tablet, the left product panel is dimmed 
 
 ### Tabs Cash Fix
 The Tabs view receives only the Inline Cash Expand treatment. The existing list + detail layout is preserved; no responsive split-panel redesign applies.
+
+### Payment Method
+One of three values stored on orders and tabs: `cash`, `card`, or `transfer`. Determines which ledger account receives the sale revenue and whether a card commission is applied.
+
+### Transfer (payment method)
+A customer pays via bank transfer. Revenue posts to the Digital Account. No commission is applied. UI: one-tap button (no amount-received input). Available to both staff and admin in Checkout and Tabs.
+
+### Digital Account
+The ledger account (`account = 'digital'`) that holds revenue from card and transfer payments — both land in the same physical bank account. Net of card commissions. Previously named `credit_card`.
+
+### Card Commission
+A fee automatically deducted when `payment_method = 'card'`. Computed as `total × rate × (1 + IVA rate)` and recorded as two ledger entries: one against the Digital Account (`commission_transfer`) and one against the `commissions` account. Not applied to transfer payments.

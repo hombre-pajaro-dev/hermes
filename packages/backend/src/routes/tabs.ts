@@ -221,7 +221,7 @@ router.post('/:id/pay', async (req, res) => {
     if (amount_received < effectiveTotal) return res.status(400).json({ error: `Insufficient payment: received ${amount_received}, total is ${effectiveTotal}` });
   }
 
-  const account = payment_method === 'card' ? 'credit_card' : 'cash';
+  const account = payment_method === 'card' || payment_method === 'transfer' ? 'digital' : 'cash';
   const changeDue = payment_method === 'cash' ? (amount_received! - effectiveTotal) : null;
   const actor = actorEmail(req);
 

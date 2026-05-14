@@ -127,7 +127,7 @@ export async function applySchema(db: Pool): Promise<void> {
   `);
   await db.query(`
     INSERT INTO accounts (name, label) VALUES
-    ('cash', 'Cash Drawer'), ('credit_card', 'Credit Card'), ('payroll', 'Payroll'),
+    ('cash', 'Cash Drawer'), ('digital', 'Digital'), ('payroll', 'Payroll'),
     ('inventory_adjustment', 'Inventory Adjustment'), ('savings', 'Savings'),
     ('commissions', 'Card Commissions')
     ON CONFLICT DO NOTHING
@@ -358,6 +358,13 @@ export async function applySchema(db: Pool): Promise<void> {
     SET entry_type = 'commission_transfer'
     WHERE entry_type = 'commission' AND account = 'credit_card'
   `);
+
+  // Rename credit_card account to digital (covers card + transfer payments)
+  await db.query(`INSERT INTO accounts (name, label) VALUES ('digital', 'Digital') ON CONFLICT DO NOTHING`);
+  await db.query(`DELETE FROM accounts WHERE name = 'credit_card'`);
+  await db.query(`UPDATE ledger_entries SET account = 'digital' WHERE account = 'credit_card'`);
+  await db.query(`UPDATE payees SET source_account = 'digital' WHERE source_account = 'credit_card'`);
+  await db.query(`UPDATE restock_orders SET payment_account = 'digital' WHERE payment_account = 'credit_card'`);
 
   // Product → provider links (junction table; 1:1 in practice but N:N-ready)
   await db.query(`

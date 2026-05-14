@@ -212,7 +212,7 @@ export default function RestockView() {
             onChange={e => setPaymentAccount(e.target.value)}
           >
             <option value="cash">Cash</option>
-            <option value="credit_card">Card</option>
+            <option value="digital">Digital</option>
           </select>
         </div>
       </div>

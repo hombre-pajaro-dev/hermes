@@ -122,7 +122,7 @@ async function seedOrders() {
       }
 
       // Ledger entry
-      const account = paymentMethod === 'card' ? 'credit_card' : 'cash';
+      const account = paymentMethod === 'card' || paymentMethod === 'transfer' ? 'digital' : 'cash';
       await pool.query(
         `INSERT INTO ledger_entries (entry_type, account, amount, description, ref_id, ref_type, created_at)
          VALUES ('sale', $1, $2, $3, $4, 'order', $5 AT TIME ZONE $6)`,

@@ -158,6 +158,35 @@ export default function CheckoutView() {
     finally { setLoading(false); }
   }
 
+  async function handlePayTransfer() {
+    setError(''); setLoading(true);
+    const snapshot = { lines: [...lines], subtotal, activeDiscount };
+    try {
+      const order = await api.createOrder(snapshot.lines.map(l => ({ product_id: l.product.id, quantity: l.quantity })));
+      await api.payOrder(order.id, 'transfer', undefined, snapshot.activeDiscount?.discount.id);
+      const discountLine = snapshot.activeDiscount && snapshot.activeDiscount.savings > 0
+        ? { name: snapshot.activeDiscount.discount.name, savings: snapshot.activeDiscount.savings }
+        : null;
+      setReceipt({
+        timestamp: new Date(),
+        lines: toReceiptLines(snapshot.lines),
+        subtotal: snapshot.subtotal,
+        discountLine,
+        total: Math.max(0, snapshot.subtotal - (discountLine?.savings ?? 0)),
+        changeDue: null,
+      });
+      resetOrder();
+      const [updated, updatedSupplies, top, refreshedDiscounts] = await Promise.all([
+        api.getProducts(), api.getSupplies(), api.getTopProducts(), api.getDiscounts(),
+      ]);
+      setProducts(updated);
+      setSupplies(updatedSupplies);
+      setSoldCounts(Object.fromEntries(top.map(r => [r.product_id, r.units_sold])));
+      setDiscounts(refreshedDiscounts);
+    } catch (e: unknown) { setError((e as Error).message); }
+    finally { setLoading(false); }
+  }
+
   async function handlePayCash() {
     setError(''); setLoading(true);
     const snapshot = { lines: [...lines], subtotal, activeDiscount };
@@ -369,6 +398,15 @@ export default function CheckoutView() {
                   disabled={loading || lines.length === 0}
                 >
                   {loading ? 'Processing…' : '💳 Pay with Card'}
+                </button>
+                <button
+                  data-testid="pay-transfer-btn"
+                  className="btn btn--primary"
+                  style={{ flex: 1 }}
+                  onClick={handlePayTransfer}
+                  disabled={loading || lines.length === 0}
+                >
+                  {loading ? 'Processing…' : '🏦 Pay with Transfer'}
                 </button>
                 <button
                   data-testid="proceed-to-cash-btn"

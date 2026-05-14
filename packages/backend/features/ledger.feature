@@ -12,7 +12,7 @@ Feature: General Ledger and Accounts
       | Espresso     | 1        |
     And I pay the order with card
     And I fetch the ledger
-    Then there is a "sale" ledger entry with account "credit_card"
+    Then there is a "sale" ledger entry with account "digital"
     And the sale entry has a non-zero amount
 
   Scenario: View account balances
@@ -22,7 +22,7 @@ Feature: General Ledger and Accounts
     And I pay the order with cash amount 10.00
     And I fetch the account balances
     Then the "cash" account balance is positive
-    And the "credit_card" account is present in balances
+    And the "digital" account is present in balances
 
   Scenario: Record a payroll payment from an account
     When I record payroll of 500.00 from "cash" with description "Weekly payroll"
@@ -45,7 +45,7 @@ Feature: General Ledger and Accounts
   Scenario: List accounts
     When I fetch the accounts list
     Then the accounts list includes "cash"
-    And the accounts list includes "credit_card"
+    And the accounts list includes "digital"
 
   Scenario: View items for a sale ledger entry
     When I create an order with items
@@ -100,15 +100,15 @@ Feature: General Ledger and Accounts
     Then there is an "account_adjustment" ledger entry with account "cash" and amount 100.00
 
   Scenario: Admin can remove money from an account via adjustment
-    When I post an account adjustment of -50.00 to "credit_card" with description "Card correction"
+    When I post an account adjustment of -50.00 to "digital" with description "Card correction"
     And I fetch the ledger
-    Then there is an "account_adjustment" ledger entry with account "credit_card" and amount -50.00
+    Then there is an "account_adjustment" ledger entry with account "digital" and amount -50.00
 
   Scenario: Transfer between accounts creates debit and credit entries
-    When I transfer 100.00 from account "cash" to account "credit_card"
+    When I transfer 100.00 from account "cash" to account "digital"
     And I fetch the ledger
     Then there is an "transfer" ledger entry with account "cash" and amount -100.00
-    And there is an "transfer" ledger entry with account "credit_card" and amount 100.00
+    And there is an "transfer" ledger entry with account "digital" and amount 100.00
 
   Scenario: Transfer to the same account is rejected
     When I transfer 50.00 from account "cash" to account "cash"

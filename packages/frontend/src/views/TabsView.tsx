@@ -182,6 +182,25 @@ export default function TabsView() {
     } catch (e: unknown) { setError((e as Error).message); }
   }
 
+  async function handlePayTransfer() {
+    if (!selectedTab) return;
+    setError('');
+    const snapshot = { items: selectedTab.items ?? [], subtotal: selectedTab.total, activeDiscount: tabActiveDiscount };
+    try {
+      await api.payTab(selectedTab.id, 'transfer', undefined, snapshot.activeDiscount?.discount.id);
+      const discountLine = snapshot.activeDiscount && snapshot.activeDiscount.savings > 0
+        ? { name: snapshot.activeDiscount.discount.name, savings: snapshot.activeDiscount.savings }
+        : null;
+      const total = Math.max(0, snapshot.subtotal - (discountLine?.savings ?? 0));
+      setReceipt({ timestamp: new Date(), lines: toReceiptLines(snapshot.items), subtotal: snapshot.subtotal, discountLine, total, changeDue: null });
+      setSelectedTab(null);
+      setManualDiscountOverride(undefined);
+      await loadTabs(true);
+      refreshSoldCounts();
+      api.getDiscounts().then(setDiscounts).catch(() => {});
+    } catch (e: unknown) { setError((e as Error).message); }
+  }
+
   async function handlePayCash() {
     if (!selectedTab) return;
     setError('');
@@ -559,6 +578,14 @@ export default function TabsView() {
                           onClick={handlePayCard}
                         >
                           💳 Pay with Card
+                        </button>
+                        <button
+                          data-testid="pay-transfer-btn"
+                          className="btn btn--primary"
+                          style={{ flex: 1 }}
+                          onClick={handlePayTransfer}
+                        >
+                          🏦 Pay with Transfer
                         </button>
                         <button
                           data-testid="proceed-to-cash-btn"

@@ -61,7 +61,7 @@ Feature: Payments
 
   Scenario: Ad-hoc provider payment with custom description uses custom description
     Given a provider named "CustomDescProv" exists
-    When I POST a provider payment of 40.00 from "credit_card" with description "Monthly fee"
+    When I POST a provider payment of 40.00 from "digital" with description "Monthly fee"
     Then the response status is 201
     And a ledger entry exists for "Monthly fee" with amount -40.00 and type "expense"
 
@@ -88,7 +88,7 @@ Feature: Payments
   Scenario: Card payment auto-applies commission ledger entries
     Given a product "Espresso" costs 3.00 and sells for 5.00 with 10 units
     When I create and pay an order for 2x "Espresso" with card
-    Then a commission_transfer ledger entry exists on account "credit_card"
+    Then a commission_transfer ledger entry exists on account "digital"
     And a commission ledger entry exists on account "commissions"
 
   Scenario: Cash payment does not create commission entries

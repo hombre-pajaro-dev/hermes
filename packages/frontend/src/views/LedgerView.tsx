@@ -283,7 +283,7 @@ export default function LedgerView() {
             if (pairedTransferIds.has(e.id)) return null;
             const transferPair = commissionPairs.get(e.id);
             const displayType = transferPair ? 'commission transfer' : e.entry_type.replace(/_/g, ' ');
-            const displayAccount = transferPair ? 'credit_card → commissions' : e.account;
+            const displayAccount = transferPair ? 'digital → commissions' : e.account;
             const expandable = EXPANDABLE.has(e.entry_type);
             const expanded = expandedId === e.id;
             const items = itemsCache[e.id];
@@ -393,7 +393,7 @@ export default function LedgerView() {
           <div className="stats" data-testid="balances">
             {balances.filter(b => b.account !== 'commissions').map(b => (
               <div className="stat" key={b.account} data-testid={`balance-${b.account}`}>
-                <div className="stat__label">{b.account === 'credit_card' ? 'Card (net)' : b.account}</div>
+                <div className="stat__label">{b.account === 'digital' ? 'Digital (net)' : b.account}</div>
                 <div className="stat__value" style={{ color: b.balance >= 0 ? 'var(--success)' : 'var(--danger)' }}>
                   ${b.balance.toFixed(2)}
                 </div>
@@ -401,14 +401,14 @@ export default function LedgerView() {
             ))}
           </div>
           {(() => {
-            const cardBal = balances.find(b => b.account === 'credit_card');
+            const cardBal = balances.find(b => b.account === 'digital');
             const commBal = balances.find(b => b.account === 'commissions');
             if (!cardBal || !commBal || commBal.balance === 0) return null;
             const gross = cardBal.balance + Math.abs(commBal.balance);
             const commissions = Math.abs(commBal.balance);
             return (
               <div className="card" data-testid="card-commission-breakdown">
-                <div className="card__title" style={{ color: '#f59e0b' }}>Credit Card — Commission Breakdown</div>
+                <div className="card__title" style={{ color: '#f59e0b' }}>Digital — Commission Breakdown</div>
                 <div className="stats" style={{ marginTop: 8 }}>
                   <div className="stat">
                     <div className="stat__label">Gross collected</div>
@@ -587,9 +587,9 @@ export default function LedgerView() {
           {/* Account balances */}
           {balances.length > 0 && (
             <div className="stats" style={{ marginBottom: 4 }}>
-              {balances.filter(b => b.account === 'cash' || b.account === 'credit_card').map(b => (
+              {balances.filter(b => b.account === 'cash' || b.account === 'digital').map(b => (
                 <div className="stat" key={b.account} data-testid={`payments-balance-${b.account}`}>
-                  <div className="stat__label">{b.account === 'credit_card' ? 'Card' : 'Cash'}</div>
+                  <div className="stat__label">{b.account === 'digital' ? 'Digital' : 'Cash'}</div>
                   <div className="stat__value" style={{ color: b.balance >= 0 ? 'var(--success)' : 'var(--danger)' }}>
                     ${b.balance.toFixed(2)}
                   </div>
@@ -718,7 +718,7 @@ export default function LedgerView() {
                         style={{ padding: '2px 6px', fontSize: '0.75rem', height: 'auto', width: 'auto' }}
                       >
                         <option value="cash">Cash</option>
-                        <option value="credit_card">Card</option>
+                        <option value="digital">Digital</option>
                       </select>
                     </div>
                   </div>
@@ -814,7 +814,7 @@ export default function LedgerView() {
                   value={adhocAccount}
                   onChange={e => setAdhocAccount(e.target.value)}
                 >
-                  {accounts.filter(a => a.name === 'cash' || a.name === 'credit_card').map(a => (
+                  {accounts.filter(a => a.name === 'cash' || a.name === 'digital').map(a => (
                     <option key={a.name} value={a.name}>{a.label}</option>
                   ))}
                 </select>
@@ -984,7 +984,7 @@ export default function LedgerView() {
                       style={{ width: 'auto' }}
                     >
                       <option value="cash">Cash</option>
-                      <option value="credit_card">Card</option>
+                      <option value="digital">Digital</option>
                     </select>
                     <input
                       className="input"
