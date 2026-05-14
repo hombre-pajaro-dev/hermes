@@ -9,6 +9,30 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+
+#### Payments — Transfer payment method
+- New **Pay with Transfer** button in Checkout and Tabs (one-tap, no amount-received input). Records payment as `transfer` method.
+- Transfer revenue posts to the **Digital** account — the same bank account as card payments — with no commission deducted.
+- Available to both staff and admin.
+
+#### Products — Staff Price per product
+- Each product now has a **Staff Price** — the price charged to staff on at-cost tabs.
+- Admins can edit staff price inline in the Products view (alongside price and cost).
+- A **markup %** label is shown next to each price and staff price field, showing how much above cost the price is: `(price − cost) / cost × 100`.
+- New products are seeded with staff price equal to cost (0% markup baseline).
+
+### Changed
+
+#### Ledger — "Credit Card" account renamed to "Digital"
+- The `credit_card` ledger account is now called **Digital**, covering both card and transfer revenue.
+- All UI labels updated: balance cards, dropdowns, and commission breakdown now show "Digital" instead of "Card".
+- Existing ledger data migrated automatically on startup.
+
+#### Products — At-cost tab uses staff price
+- At-cost (staff) tabs now price items at **staff price** instead of raw cost.
+- The price note in the tab panel changed from `(cost)` to `(staff)`.
+
 ### Fixed
 
 #### Reports — date filters persist across tab navigation, reset next day
