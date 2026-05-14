@@ -4,7 +4,7 @@ import type { Product, Supply, Tab, Provider } from '../api/client';
 import ImagePicker from '../components/ImagePicker';
 import { authClient } from '../lib/auth-client';
 
-type EditField = 'price' | 'cost';
+type EditField = 'price' | 'cost' | 'staff_price';
 type ViewMode = 'list' | 'grid';
 
 interface SupplyIngredientDraft {
@@ -35,6 +35,7 @@ export default function ProductsView() {
 
   const [editingPrice, setEditingPrice] = useState<Record<number, string>>({});
   const [editingCost, setEditingCost] = useState<Record<number, string>>({});
+  const [editingStaffPrice, setEditingStaffPrice] = useState<Record<number, string>>({});
 
   // Supply ingredient editing per product
   const [editingSupplyIds, setEditingSupplyIds] = useState<Set<number>>(new Set());
@@ -119,12 +120,14 @@ export default function ProductsView() {
 
   function startEdit(p: Product, field: EditField) {
     if (field === 'price') setEditingPrice(prev => ({ ...prev, [p.id]: String(p.price) }));
-    else setEditingCost(prev => ({ ...prev, [p.id]: String(p.cost) }));
+    else if (field === 'cost') setEditingCost(prev => ({ ...prev, [p.id]: String(p.cost) }));
+    else setEditingStaffPrice(prev => ({ ...prev, [p.id]: String(p.staff_price) }));
   }
 
   function cancelEdit(id: number, field: EditField) {
     if (field === 'price') setEditingPrice(prev => { const n = { ...prev }; delete n[id]; return n; });
-    else setEditingCost(prev => { const n = { ...prev }; delete n[id]; return n; });
+    else if (field === 'cost') setEditingCost(prev => { const n = { ...prev }; delete n[id]; return n; });
+    else setEditingStaffPrice(prev => { const n = { ...prev }; delete n[id]; return n; });
   }
 
   async function handleToggleActive(p: Product) {
@@ -145,12 +148,13 @@ export default function ProductsView() {
 
   async function saveField(p: Product, field: EditField) {
     setError('');
-    const raw = field === 'price' ? editingPrice[p.id] : editingCost[p.id];
+    const raw = field === 'price' ? editingPrice[p.id] : field === 'cost' ? editingCost[p.id] : editingStaffPrice[p.id];
     const newVal = Number(raw);
-    if (!newVal || newVal <= 0) { setError(`${field.charAt(0).toUpperCase() + field.slice(1)} must be greater than 0`); return; }
+    if (!newVal || newVal <= 0) { setError(`${field === 'staff_price' ? 'Staff price' : field.charAt(0).toUpperCase() + field.slice(1)} must be greater than 0`); return; }
     try {
       if (field === 'price') await api.updatePrice(p.id, newVal);
-      else await api.updateCost(p.id, newVal);
+      else if (field === 'cost') await api.updateCost(p.id, newVal);
+      else await api.updateStaffPrice(p.id, newVal);
       cancelEdit(p.id, field);
       load();
     } catch (e: unknown) { setError((e as Error).message); }
@@ -310,6 +314,13 @@ export default function ProductsView() {
     );
   }
 
+  function markupLabel(value: number, cost: number) {
+    if (cost <= 0) return null;
+    const pct = Math.round(((value - cost) / cost) * 100);
+    const color = pct > 0 ? 'var(--success)' : pct < 0 ? 'var(--danger)' : 'var(--text-secondary)';
+    return <span style={{ fontSize: '0.72rem', color, marginLeft: 4 }}>{pct >= 0 ? '+' : ''}{pct}%</span>;
+  }
+
   function renderEditableField(p: Product, field: EditField, value: number, locked: boolean) {
     if (!isAdmin) {
       return (
@@ -319,12 +330,14 @@ export default function ProductsView() {
       );
     }
 
-    const isEditing = field === 'price' ? p.id in editingPrice : p.id in editingCost;
-    const editVal = field === 'price' ? editingPrice[p.id] : editingCost[p.id];
+    const isEditing = field === 'price' ? p.id in editingPrice : field === 'cost' ? p.id in editingCost : p.id in editingStaffPrice;
+    const editVal = field === 'price' ? editingPrice[p.id] : field === 'cost' ? editingCost[p.id] : editingStaffPrice[p.id];
     const setEdit = (v: string) =>
       field === 'price'
         ? setEditingPrice(prev => ({ ...prev, [p.id]: v }))
-        : setEditingCost(prev => ({ ...prev, [p.id]: v }));
+        : field === 'cost'
+          ? setEditingCost(prev => ({ ...prev, [p.id]: v }))
+          : setEditingStaffPrice(prev => ({ ...prev, [p.id]: v }));
 
     if (isEditing) {
       return (
@@ -350,6 +363,8 @@ export default function ProductsView() {
         <span style={{ fontWeight: field === 'price' ? 700 : 400 }} data-testid={`product-${field}`}>
           ${value.toFixed(2)}
         </span>
+        {field === 'price' && markupLabel(p.price, p.cost)}
+        {field === 'staff_price' && markupLabel(p.staff_price, p.cost)}
         {locked ? (
           <span data-testid={`${field}-locked-${p.id}`} title={`In an open tab — cannot edit ${field}`} style={{ fontSize: '0.9rem' }}>🔒</span>
         ) : (
@@ -566,6 +581,14 @@ export default function ProductsView() {
                 <div className="product-card__field">
                   {renderEditableField(p, 'cost', p.cost, locked)}
                 </div>
+                {isAdmin && (
+                  <>
+                    <div className="product-card__meta">Staff Price</div>
+                    <div className="product-card__field">
+                      {renderEditableField(p, 'staff_price', p.staff_price, false)}
+                    </div>
+                  </>
+                )}
                 <div className="product-card__meta" data-testid="product-units">{p.track_inventory === false ? '∞' : p.units} units</div>
                 {tabReserved[p.id] > 0 && (
                   <div data-testid={`tab-reserved-${p.id}`}
@@ -629,6 +652,12 @@ export default function ProductsView() {
                       <span style={{ marginRight: 8 }}>Cost:</span>
                       {renderEditableField(p, 'cost', p.cost, locked)}
                     </div>
+                    {isAdmin && (
+                      <div className="list-item__sub" style={{ marginTop: 4 }}>
+                        <span style={{ marginRight: 8 }}>Staff:</span>
+                        {renderEditableField(p, 'staff_price', p.staff_price, false)}
+                      </div>
+                    )}
                   </div>
                   <div className="list-item__right" style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 4 }}>
                     <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginBottom: 2 }}>Price</div>

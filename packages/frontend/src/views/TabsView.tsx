@@ -653,9 +653,9 @@ export default function TabsView() {
                   onAdd={handleAddProduct}
                   addTestIdPrefix="tab-add"
                   stockTestIdPrefix="tab-product-stock"
-                  getPrice={p => selectedTab.at_cost ? p.cost : p.price}
+                  getPrice={p => selectedTab.at_cost ? p.staff_price : p.price}
                   getPriceNote={_p => selectedTab.at_cost
-                    ? <span style={{ marginLeft: 4, fontSize: '0.75rem', color: '#92400e' }}>(cost)</span>
+                    ? <span style={{ marginLeft: 4, fontSize: '0.75rem', color: '#92400e' }}>(staff)</span>
                     : null
                   }
                   viewMode={addViewMode}

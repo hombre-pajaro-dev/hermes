@@ -359,6 +359,10 @@ export async function applySchema(db: Pool): Promise<void> {
     WHERE entry_type = 'commission' AND account = 'credit_card'
   `);
 
+  // Staff price per product (seeded from cost; 0% markup baseline)
+  await db.query(`ALTER TABLE products ADD COLUMN IF NOT EXISTS staff_price DOUBLE PRECISION`);
+  await db.query(`UPDATE products SET staff_price = cost WHERE staff_price IS NULL`);
+
   // Rename credit_card account to digital (covers card + transfer payments)
   await db.query(`INSERT INTO accounts (name, label) VALUES ('digital', 'Digital') ON CONFLICT DO NOTHING`);
   await db.query(`DELETE FROM accounts WHERE name = 'credit_card'`);

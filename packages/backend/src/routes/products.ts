@@ -6,7 +6,7 @@ const router = Router();
 // Shared SELECT that computes units from supplies when applicable and includes supply_ingredients.
 const PRODUCT_SELECT = `
   SELECT
-    p.id, p.name, p.description, p.cost, p.price, p.image, p.active, p.track_inventory,
+    p.id, p.name, p.description, p.cost, p.price, p.staff_price, p.image, p.active, p.track_inventory,
     CASE
       WHEN EXISTS(SELECT 1 FROM product_supplies ps WHERE ps.product_id = p.id)
       THEN COALESCE((
@@ -67,8 +67,8 @@ router.post('/', async (req, res) => {
   try {
     await client.query('BEGIN');
     const { rows } = await client.query(
-      'INSERT INTO products (name, description, cost, price, units, image) VALUES ($1, $2, $3, $4, $5, $6) RETURNING id',
-      [name, description, cost, price, units, image],
+      'INSERT INTO products (name, description, cost, price, staff_price, units, image) VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING id',
+      [name, description, cost, price, cost, units, image],
     );
     const productId = rows[0].id;
     if (supply_ingredients && supply_ingredients.length > 0) {
@@ -174,6 +174,18 @@ router.patch('/:id/cost', async (req, res) => {
   res.json(updated);
 });
 
+router.patch('/:id/staff_price', async (req, res) => {
+  const { staff_price } = req.body;
+  if (staff_price == null) return res.status(400).json({ error: 'staff_price is required' });
+  if (typeof staff_price !== 'number' || staff_price <= 0) return res.status(400).json({ error: 'staff_price must be greater than 0' });
+  const db = await getDb();
+  const { rows: existing } = await db.query('SELECT * FROM products WHERE id = $1', [req.params.id]);
+  if (!existing[0]) return res.status(404).json({ error: 'Product not found' });
+  await db.query('UPDATE products SET staff_price = $1 WHERE id = $2', [staff_price, req.params.id]);
+  const { rows: [updated] } = await db.query(`${PRODUCT_SELECT} WHERE p.id = $1`, [req.params.id]);
+  res.json(updated);
+});
+
 router.patch('/:id/active', async (req, res) => {
   const { active } = req.body;
   if (typeof active !== 'boolean') return res.status(400).json({ error: 'active must be a boolean' });
@@ -228,6 +240,7 @@ router.put('/:id', async (req, res) => {
     'UPDATE products SET name=$1, description=$2, cost=$3, price=$4, units=$5 WHERE id=$6',
     [name ?? e.name, description ?? e.description, cost ?? e.cost, price ?? e.price, units ?? e.units, req.params.id],
   );
+
   const { rows: [updated] } = await db.query(`${PRODUCT_SELECT} WHERE p.id = $1`, [req.params.id]);
   res.json(updated);
 });

@@ -82,7 +82,7 @@ router.post('/:id/items', async (req, res) => {
     for (const item of items) {
       const { rows: [product] } = await client.query('SELECT * FROM products WHERE id = $1', [item.product_id]);
       if (!product) throw new Error(`Product ${item.product_id} not found`);
-      const unitPrice = tab.at_cost ? product.cost : product.price;
+      const unitPrice = tab.at_cost ? (product.staff_price ?? product.cost) : product.price;
       const subtotal = unitPrice * item.quantity;
       additionalTotal += subtotal;
       const { rows: [existing] } = await client.query('SELECT id FROM tab_items WHERE tab_id = $1 AND product_id = $2', [tab.id, item.product_id]);

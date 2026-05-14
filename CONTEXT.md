@@ -31,3 +31,12 @@ The ledger account (`account = 'digital'`) that holds revenue from card and tran
 
 ### Card Commission
 A fee automatically deducted when `payment_method = 'card'`. Computed as `total × rate × (1 + IVA rate)` and recorded as two ledger entries: one against the Digital Account (`commission_transfer`) and one against the `commissions` account. Not applied to transfer payments.
+
+### Staff Price
+The price charged to staff on at-cost tabs. Stored as `staff_price` (flat dollar amount) per product. Seeded to `cost` on migration (0% markup). Managed inline in ProductsView, admin-only. Displayed with a read-only markup label: `(staff_price - cost) / cost × 100`.
+
+### At-Cost Tab
+A tab opened with `at_cost = true`. Items are priced at `staff_price` instead of `price`. Label shown in UI: `(staff)`. Discounts are disabled on at-cost tabs.
+
+### Markup %
+Displayed on each product in ProductsView, admin-only. Computed as `(price - cost) / cost × 100`. Answers "how much above cost is the selling price?" Distinct from the staff price markup, which is `(staff_price - cost) / cost × 100`.
