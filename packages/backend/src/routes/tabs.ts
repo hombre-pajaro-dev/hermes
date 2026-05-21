@@ -214,7 +214,11 @@ router.post('/:id/pay', async (req, res) => {
     discountRow = d;
   }
 
-  const effectiveTotal = Math.max(0, tab.total - discountAmount);
+  const { rows: [{ computed_total }] } = await db.query(
+    'SELECT COALESCE(SUM(subtotal), 0) AS computed_total FROM tab_items WHERE tab_id = $1',
+    [tab.id]
+  );
+  const effectiveTotal = Math.max(0, Number(computed_total) - discountAmount);
 
   if (payment_method === 'cash') {
     if (amount_received == null) return res.status(400).json({ error: 'amount_received is required for cash payments' });
