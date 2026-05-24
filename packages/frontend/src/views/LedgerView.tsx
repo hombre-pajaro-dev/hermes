@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { api } from '../api/client';
-import type { DailyTotal, LedgerEntry, LedgerEntryItem, Balance, Account, Payee, Provider, ProviderBill } from '../api/client';
+import type { DailyTotal, LedgerEntry, LedgerEntryItem, Balance, Account, Payee, Provider, ProviderBill, RegisterSessionSummary } from '../api/client';
 import { authClient } from '../lib/auth-client';
 
 const EXPANDABLE = new Set(['sale', 'tab_payment', 'restock']);
@@ -64,6 +64,8 @@ export default function LedgerView() {
   const [manualAmounts, setManualAmounts] = useState<Record<number, string>>({});
   const [paymentAccounts, setPaymentAccounts] = useState<Record<number, string>>({});
   const [paymentNote, setPaymentNote] = useState('');
+  const [paymentSessionId, setPaymentSessionId] = useState<number | ''>('');
+  const [closedSessions, setClosedSessions] = useState<RegisterSessionSummary[]>([]);
   const [paymentsError, setPaymentsError] = useState('');
   const [paymentsSuccess, setPaymentsSuccess] = useState('');
   const [showManagePayees, setShowManagePayees] = useState(false);
@@ -101,6 +103,11 @@ export default function LedgerView() {
     if (isAdmin) {
       loadPayees();
       api.getProviders().then(setProviders).catch(() => {});
+      api.getRegisterSessions().then(sessions => {
+        const closed = sessions.filter(s => s.status === 'closed');
+        setClosedSessions(closed);
+        if (closed.length > 0) setPaymentSessionId(closed[0].id);
+      }).catch(() => {});
     }
   }, [isAdmin]);
 
@@ -136,7 +143,7 @@ export default function LedgerView() {
     })).filter(e => e.amount > 0);
     if (entries.length === 0) { setPaymentsError('No amounts to record'); return; }
     try {
-      await api.runPayments(entries, paymentNote || undefined);
+      await api.runPayments(entries, paymentNote || undefined, paymentSessionId || undefined);
       setPaymentsSuccess('Payments recorded');
       setPaymentTotal(''); setManualAmounts({}); setPaymentNote(''); setPaymentAccounts({});
       const [e, b] = await Promise.all([api.getLedger(), api.getBalances()]);
@@ -684,6 +691,25 @@ export default function LedgerView() {
                   value={paymentTotal}
                   onChange={e => setPaymentTotal(e.target.value)}
                 />
+              </div>
+            )}
+
+            {closedSessions.length > 0 && (
+              <div className="field">
+                <label className="label">Link to session</label>
+                <select
+                  data-testid="payment-session-selector"
+                  className="input"
+                  value={paymentSessionId}
+                  onChange={e => setPaymentSessionId(Number(e.target.value))}
+                >
+                  <option value="">— none —</option>
+                  {closedSessions.map(s => (
+                    <option key={s.id} value={s.id}>
+                      #{s.id} — {new Date(s.opened_at).toLocaleDateString()} {new Date(s.opened_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                    </option>
+                  ))}
+                </select>
               </div>
             )}
 

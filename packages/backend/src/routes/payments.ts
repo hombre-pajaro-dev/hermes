@@ -5,9 +5,10 @@ import { actorEmail } from '../lib/actor.js';
 const router = Router();
 
 router.post('/run', async (req, res) => {
-  const { entries, note } = req.body as {
+  const { entries, note, session_id } = req.body as {
     entries: { payee_id: number; amount: number; source_account: string }[];
     note?: string;
+    session_id?: number;
   };
   if (!Array.isArray(entries) || entries.length === 0) {
     return res.status(400).json({ error: 'entries array is required' });
@@ -39,15 +40,15 @@ router.post('/run', async (req, res) => {
     const description = note ? `${payee.name} — ${note}` : payee.name;
 
     const { rows } = await db.query(
-      'INSERT INTO ledger_entries (entry_type, account, amount, description, created_by) VALUES ($1, $2, $3, $4, $5) RETURNING *',
-      [entryType, account, -Math.abs(entry.amount), description, actor]
+      'INSERT INTO ledger_entries (entry_type, account, amount, description, created_by, session_id) VALUES ($1, $2, $3, $4, $5, $6) RETURNING *',
+      [entryType, account, -Math.abs(entry.amount), description, actor, session_id ?? null]
     );
     createdEntries.push(rows[0]);
 
     if (payee.type === 'savings') {
       const { rows: creditRows } = await db.query(
-        'INSERT INTO ledger_entries (entry_type, account, amount, description, created_by) VALUES ($1, $2, $3, $4, $5) RETURNING *',
-        [entryType, 'savings', Math.abs(entry.amount), description, actor]
+        'INSERT INTO ledger_entries (entry_type, account, amount, description, created_by, session_id) VALUES ($1, $2, $3, $4, $5, $6) RETURNING *',
+        [entryType, 'savings', Math.abs(entry.amount), description, actor, session_id ?? null]
       );
       createdEntries.push(creditRows[0]);
     }

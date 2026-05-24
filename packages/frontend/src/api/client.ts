@@ -34,7 +34,8 @@ export const api = {
   getSession: () => req<RegisterSession | null>('/register/session'),
   openRegister: (opening_cash: number) => req<RegisterSession>('/register/open', { method: 'POST', body: JSON.stringify({ opening_cash }) }),
   cashout: (amount: number, reason: string) => req<Cashout>('/register/cashout', { method: 'POST', body: JSON.stringify({ amount, reason }) }),
-  closeRegister: (closing_cash: number) => req<RegisterSession>('/register/close', { method: 'POST', body: JSON.stringify({ closing_cash }) }),
+  closeRegister: (closing_cash: number, physical_counts?: { product_id: number; units: number }[]) =>
+    req<RegisterSession>('/register/close', { method: 'POST', body: JSON.stringify({ closing_cash, physical_counts }) }),
   getCloseBrief: () => req<CloseBrief>('/register/close-brief'),
   getRegisterSessions: () => req<RegisterSessionSummary[]>('/register/sessions'),
   getSessionReport: (id: number) => req<SessionReport>(`/register/sessions/${id}/report`),
@@ -127,8 +128,8 @@ export const api = {
     req<Payee>('/payees', { method: 'POST', body: JSON.stringify(body) }),
   updatePayee: (id: number, body: Partial<Omit<Payee, 'id' | 'created_at'>>) =>
     req<Payee>(`/payees/${id}`, { method: 'PATCH', body: JSON.stringify(body) }),
-  runPayments: (entries: PaymentEntry[], note?: string) =>
-    req<PaymentRunResult>('/payments/run', { method: 'POST', body: JSON.stringify({ entries, note }) }),
+  runPayments: (entries: PaymentEntry[], note?: string, session_id?: number) =>
+    req<PaymentRunResult>('/payments/run', { method: 'POST', body: JSON.stringify({ entries, note, session_id }) }),
 
   // Discounts
   getDiscounts: () => req<Discount[]>('/discounts'),
@@ -148,6 +149,7 @@ export interface RegisterSessionSummary { id: number; status: string; opening_ca
 export interface InventorySnapshotEntry { id: number; name: string; units: number; }
 export interface SupplySnapshotEntry { id: number; name: string; unit: string; quantity: number; }
 export interface SessionInventorySnapshot { products: InventorySnapshotEntry[]; supplies: SupplySnapshotEntry[]; }
+export interface SessionPayment { id: number; entry_type: string; account: string; amount: number; description: string; created_at: string; }
 export interface SessionReport {
   session: RegisterSessionSummary & { inventory_snapshot_open: SessionInventorySnapshot | null; inventory_snapshot_close: SessionInventorySnapshot | null; };
   order_count: number; revenue: number; total_cost: number; commission_total?: number; gross_profit: number; cash_sales: number; card_sales: number; expected_cash?: number; cash_variance?: number | null;
@@ -155,6 +157,7 @@ export interface SessionReport {
   cashouts: { id: number; amount: number; reason: string; created_at: string }[];
   restocked: { product_id: number; name: string; units_restocked: number }[];
   adjustments: { product_id: number; name: string; delta: number }[];
+  payments: SessionPayment[];
 }
 export interface Cashout { id: number; session_id: number; amount: number; reason: string; created_at: string; }
 export interface OrderItem { product_id: number; quantity: number; }

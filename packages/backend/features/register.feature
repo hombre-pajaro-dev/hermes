@@ -97,6 +97,18 @@ Feature: Register (Open / Close / Cashout)
     Then the session report expected_cash is 200.00
     And the session report cash_variance is -25.00
 
+  Scenario: Closing register with physical counts creates inventory adjustments for discrepancies
+    Given the register is open with opening cash 200
+    When I close the register with closing cash 200.00 and physical count for "Espresso" of 90
+    And I fetch the session report for the last session
+    Then the session report has an adjustment for "Espresso"
+
+  Scenario: Closing register with physical counts matching system does not create adjustments
+    Given the register is open with opening cash 200
+    When I close the register with closing cash 200.00 and physical count matching system for "Espresso"
+    And I fetch the session report for the last session
+    Then the session report has no adjustments
+
   Scenario: Closing register includes cash from tabs opened in a previous session
     Given the register is open with opening cash 200
     And I open a new tab named "Cross-Session Tab"

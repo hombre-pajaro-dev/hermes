@@ -378,7 +378,7 @@ export default function ReportsView() {
                   {loading && <div className="spinner">⏳</div>}
 
                   {!loading && sessionReport && (() => {
-                    const { session: s, order_count, revenue, total_cost, gross_profit, cash_sales, card_sales, by_item, cashouts, restocked, adjustments } = sessionReport;
+                    const { session: s, order_count, revenue, total_cost, gross_profit, cash_sales, card_sales, by_item, cashouts, restocked, adjustments, payments } = sessionReport;
 
                     // Build inventory comparison table from snapshots
                     const openSnap = s.inventory_snapshot_open;
@@ -519,6 +519,28 @@ export default function ReportsView() {
                                 <div className="list-item__right" style={{ fontWeight: 700, color: 'var(--danger)' }}>−${c.amount.toFixed(2)}</div>
                               </div>
                             ))}
+                          </div>
+                        )}
+
+                        {/* Payments linked to this session */}
+                        {payments && payments.length > 0 && (
+                          <div className="card">
+                            <div className="card__title">Payments</div>
+                            {payments.map(p => {
+                              const typeLabel = p.entry_type === 'payroll' ? 'Staff' : p.entry_type === 'savings_transfer' ? 'Savings' : 'Expense';
+                              return (
+                                <div className="list-item" key={p.id}>
+                                  <div className="list-item__main">
+                                    <div className="list-item__name">{p.description}</div>
+                                    <div className="list-item__sub" style={{ display: 'flex', gap: 8 }}>
+                                      <span className="badge badge--pending" style={{ fontSize: '0.65rem' }}>{typeLabel}</span>
+                                      <span>{new Date(p.created_at).toLocaleString()}</span>
+                                    </div>
+                                  </div>
+                                  <div className="list-item__right" style={{ fontWeight: 700, color: 'var(--danger)' }}>−${Math.abs(p.amount).toFixed(2)}</div>
+                                </div>
+                              );
+                            })}
                           </div>
                         )}
                       </>

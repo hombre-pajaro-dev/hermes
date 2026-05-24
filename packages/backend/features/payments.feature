@@ -41,6 +41,13 @@ Feature: Payments
     Then the response status is 201
     And a ledger entry exists for "TestSavings" with amount -200 and type "savings_transfer"
 
+  Scenario: Run a payment with session_id appears in the session report
+    Given there is a payee "SessionStaff" of type "staff"
+    When I close the register with closing cash 200.00
+    And I POST /api/payments/run with the payee amount 100 from "cash" for the last closed session
+    And I fetch the session report for the last session
+    Then the session report payments include "SessionStaff" with amount -100
+
   Scenario: Run a savings payment also credits the savings account
     Given there is a payee "TestSavings2" of type "savings"
     When I POST /api/payments/run with the payee amount 200 from "digital"

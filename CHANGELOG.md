@@ -22,6 +22,19 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 - A **markup %** label is shown next to each price and staff price field, showing how much above cost the price is: `(price − cost) / cost × 100`.
 - New products are seeded with staff price equal to cost (0% markup baseline).
 
+### Added
+
+#### Register — Physical Count Close
+- The close register form now includes a **Physical Count** table showing all active, unit-tracked products. Each row defaults to the system's current unit count; the cashier only edits the ones that differ.
+- On submit, any product where the physical count differs from the system count automatically creates an **Inventory Adjustment** (stock corrected, ledger entry posted).
+- Discrepancies are visible in the session report's Inventory Activity section alongside system-expected counts.
+
+#### Register — Session Payments
+- Payments (payroll, expense, savings transfers) can now be **linked to a register session** by passing `session_id` when running `POST /payments/run`.
+- The session report (`GET /register/sessions/:id/report`) now includes a `payments` array listing all payment entries tagged to that session.
+- The Ledger → Payments tab shows a **Link to session** dropdown (pre-selecting the most recently closed session) so payments run after close are automatically attributed.
+- Session report displays a **Payments** card listing each entry with payee name, type badge, amount, and timestamp.
+
 ### Fixed
 
 #### Payments — savings transfer now credits the savings account

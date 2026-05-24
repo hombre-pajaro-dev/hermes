@@ -378,4 +378,7 @@ export async function applySchema(db: Pool): Promise<void> {
       PRIMARY KEY (product_id, provider_id)
     )
   `);
+
+  // Session payments: link ledger entries to a register session
+  await db.query(`ALTER TABLE ledger_entries ADD COLUMN IF NOT EXISTS session_id INTEGER REFERENCES register_sessions(id)`);
 }

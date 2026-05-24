@@ -1,6 +1,7 @@
 import { Router } from 'express';
-import { getDb } from '../db/database.js';
+import { getDb, pool } from '../db/database.js';
 import { requireAdmin } from '../middleware/require-admin.js';
+import { productUsesSupplies } from '../lib/supply-utils.js';
 
 const router = Router();
 
@@ -101,6 +102,14 @@ router.get('/sessions/:id/report', async (req, res) => {
   `, [sessionId]);
   const commissionTotal = Math.abs(Number(commRow.commission_total));
 
+  const { rows: payments } = await db.query<{ id: number; entry_type: string; account: string; amount: number; description: string; created_at: string }>(
+    `SELECT id, entry_type, account, amount, description, created_at
+     FROM ledger_entries
+     WHERE session_id = $1 AND entry_type IN ('payroll', 'expense', 'savings_transfer') AND amount < 0
+     ORDER BY created_at`,
+    [sessionId]
+  );
+
   // Cash reconciliation — tabs scoped by paid_at so cross-session tabs paid in cash are included.
   const { rows: [cashReconRow] } = await db.query(`
     SELECT
@@ -142,6 +151,7 @@ router.get('/sessions/:id/report', async (req, res) => {
     cashouts: cashouts.map(c => ({ id: c.id, amount: Number(c.amount), reason: c.reason, created_at: c.created_at })),
     restocked: restocked.map(r => ({ product_id: r.product_id, name: r.name, units_restocked: Number(r.units_restocked) })),
     adjustments: adjustments.map(a => ({ product_id: a.product_id, name: a.name, delta: Number(a.delta) })),
+    payments: payments.map(p => ({ id: p.id, entry_type: p.entry_type, account: p.account, amount: Number(p.amount), description: p.description, created_at: p.created_at })),
   });
 });
 
@@ -200,41 +210,76 @@ router.post('/cashout', requireAdmin, async (req, res) => {
 router.post('/close', requireAdmin, async (req, res) => {
   const session = await getOpenSession();
   if (!session) return res.status(403).json({ error: 'Register is not open' });
-  const { closing_cash } = req.body;
+  const { closing_cash, physical_counts } = req.body as {
+    closing_cash: number;
+    physical_counts?: { product_id: number; units: number }[];
+  };
   if (closing_cash == null) return res.status(400).json({ error: 'closing_cash is required' });
-  const db = await getDb();
 
-  // Compute expected cash: opening + cash sales (orders + tabs paid during this session) - cashouts
-  // Tabs are scoped by paid_at rather than session_id so cross-session tabs paid in cash are counted.
-  const { rows: [expectedRow] } = await db.query(`
-    SELECT
-      $2::numeric
-      + COALESCE((SELECT SUM(total) FROM orders WHERE session_id = $1 AND status = 'paid' AND payment_method = 'cash'), 0)
-      + COALESCE((SELECT SUM(total) FROM tabs   WHERE status = 'paid' AND payment_method = 'cash' AND paid_at >= $3 AND paid_at <= NOW()), 0)
-      - COALESCE((SELECT SUM(amount) FROM cashouts WHERE session_id = $1), 0)
-    AS expected_cash
-  `, [session.id, session.opening_cash, session.opened_at]);
-  const expectedCash = Number(expectedRow.expected_cash);
-  const variance = Number(closing_cash) - expectedCash;
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
 
-  const snapshot = await captureInventorySnapshot(db);
-  await db.query(
-    "UPDATE register_sessions SET status = 'closed', closing_cash = $1, closed_at = NOW(), inventory_snapshot_close = $2 WHERE id = $3",
-    [closing_cash, JSON.stringify(snapshot), session.id]
-  );
+    // Compute expected cash: opening + cash sales (orders + tabs paid during this session) - cashouts
+    // Tabs are scoped by paid_at rather than session_id so cross-session tabs paid in cash are counted.
+    const { rows: [expectedRow] } = await client.query(`
+      SELECT
+        $2::numeric
+        + COALESCE((SELECT SUM(total) FROM orders WHERE session_id = $1 AND status = 'paid' AND payment_method = 'cash'), 0)
+        + COALESCE((SELECT SUM(total) FROM tabs   WHERE status = 'paid' AND payment_method = 'cash' AND paid_at >= $3 AND paid_at <= NOW()), 0)
+        - COALESCE((SELECT SUM(amount) FROM cashouts WHERE session_id = $1), 0)
+      AS expected_cash
+    `, [session.id, session.opening_cash, session.opened_at]);
+    const expectedCash = Number(expectedRow.expected_cash);
+    const variance = Number(closing_cash) - expectedCash;
 
-  const varianceDesc = variance === 0
-    ? 'Register closed — balanced'
-    : variance > 0
-      ? `Register closed — cash over $${variance.toFixed(2)}`
-      : `Register closed — cash short $${Math.abs(variance).toFixed(2)}`;
+    const snapshot = await captureInventorySnapshot(client as unknown as Awaited<ReturnType<typeof getDb>>);
+    await client.query(
+      "UPDATE register_sessions SET status = 'closed', closing_cash = $1, closed_at = NOW(), inventory_snapshot_close = $2 WHERE id = $3",
+      [closing_cash, JSON.stringify(snapshot), session.id]
+    );
 
-  await db.query(
-    "INSERT INTO ledger_entries (entry_type, account, amount, description, ref_id, ref_type) VALUES ('register_close', 'cash', $1, $2, $3, 'session')",
-    [variance, varianceDesc, session.id]
-  );
-  const { rows } = await db.query('SELECT * FROM register_sessions WHERE id = $1', [session.id]);
-  res.json(rows[0]);
+    const varianceDesc = variance === 0
+      ? 'Register closed — balanced'
+      : variance > 0
+        ? `Register closed — cash over $${variance.toFixed(2)}`
+        : `Register closed — cash short $${Math.abs(variance).toFixed(2)}`;
+
+    await client.query(
+      "INSERT INTO ledger_entries (entry_type, account, amount, description, ref_id, ref_type) VALUES ('register_close', 'cash', $1, $2, $3, 'session')",
+      [variance, varianceDesc, session.id]
+    );
+
+    // Physical count adjustments — only for tracked, unit-based products where count differs
+    if (Array.isArray(physical_counts) && physical_counts.length > 0) {
+      for (const count of physical_counts) {
+        const { rows: [product] } = await client.query('SELECT * FROM products WHERE id = $1', [count.product_id]);
+        if (!product || product.track_inventory === false) continue;
+        const usesSupplies = await productUsesSupplies(client, count.product_id);
+        if (usesSupplies) continue;
+        const delta = count.units - product.units;
+        if (delta === 0) continue;
+        await client.query('UPDATE products SET units = $1 WHERE id = $2', [count.units, count.product_id]);
+        const { rows: [adjRow] } = await client.query(
+          "INSERT INTO inventory_adjustments (session_id, product_id, previous_units, physical_count, delta, created_at) VALUES ($1, $2, $3, $4, $5, NOW()) RETURNING *",
+          [session.id, count.product_id, product.units, count.units, delta]
+        );
+        await client.query(
+          "INSERT INTO ledger_entries (entry_type, account, amount, description, ref_id, ref_type) VALUES ('adjustment', 'inventory_adjustment', $1, $2, $3, 'adjustment')",
+          [delta * product.cost, `Physical count: ${product.name} (${delta > 0 ? '+' : ''}${delta} units)`, adjRow.id]
+        );
+      }
+    }
+
+    await client.query('COMMIT');
+    const { rows } = await client.query('SELECT * FROM register_sessions WHERE id = $1', [session.id]);
+    res.json(rows[0]);
+  } catch (err: unknown) {
+    await client.query('ROLLBACK');
+    res.status(500).json({ error: (err as Error).message });
+  } finally {
+    client.release();
+  }
 });
 
 router.get('/close-brief', async (req, res) => {

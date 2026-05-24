@@ -43,9 +43,20 @@ export default function AdminView() {
   const [closingCash, setClosingCash] = useState('');
   const [cashoutAmount, setCashoutAmount] = useState('');
   const [cashoutReason, setCashoutReason] = useState('');
+  const [closeProducts, setCloseProducts] = useState<Product[]>([]);
+  const [physicalCounts, setPhysicalCounts] = useState<Record<number, string>>({});
 
   async function loadRegister() {
-    try { setRegisterSession(await api.getSession()); }
+    try {
+      const s = await api.getSession();
+      setRegisterSession(s);
+      if (s) {
+        const products = await api.getProducts();
+        const active = products.filter(p => p.active && p.track_inventory && !p.uses_supplies);
+        setCloseProducts(active);
+        setPhysicalCounts(Object.fromEntries(active.map(p => [p.id, String(p.units)])));
+      }
+    }
     catch { setRegisterSession(null); }
     finally { setRegisterLoading(false); }
   }
@@ -72,8 +83,9 @@ export default function AdminView() {
   async function handleCloseRegister() {
     setRegisterError(''); setRegisterSuccess('');
     try {
-      await api.closeRegister(Number(closingCash));
-      setRegisterSuccess('Register closed'); setClosingCash(''); loadRegister();
+      const counts = closeProducts.map(p => ({ product_id: p.id, units: Number(physicalCounts[p.id] ?? p.units) }));
+      await api.closeRegister(Number(closingCash), counts);
+      setRegisterSuccess('Register closed'); setClosingCash(''); setPhysicalCounts({}); setCloseProducts([]); loadRegister();
     } catch (e: unknown) { setRegisterError((e as Error).message); }
   }
 
@@ -411,6 +423,41 @@ export default function AdminView() {
                   <input data-testid="closing-cash-input" className="input" type="number" min="0" step="0.01"
                     placeholder="0.00" value={closingCash} onChange={e => setClosingCash(e.target.value)} />
                 </div>
+                {closeProducts.length > 0 && (
+                  <div style={{ marginBottom: 12 }}>
+                    <div className="label" style={{ marginBottom: 6 }}>Physical Count</div>
+                    <table style={{ width: '100%', fontSize: '0.85rem', borderCollapse: 'collapse' }}>
+                      <thead>
+                        <tr style={{ borderBottom: '1px solid var(--border)', color: 'var(--text-secondary)' }}>
+                          <th style={{ textAlign: 'left', padding: '4px 8px 4px 0', fontWeight: 600 }}>Product</th>
+                          <th style={{ textAlign: 'right', padding: '4px 6px', fontWeight: 600 }}>System</th>
+                          <th style={{ textAlign: 'right', padding: '4px 6px', fontWeight: 600 }}>Counted</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {closeProducts.map(p => {
+                          const counted = Number(physicalCounts[p.id] ?? p.units);
+                          const diff = counted - p.units;
+                          return (
+                            <tr key={p.id} style={{ borderBottom: '1px solid var(--border)' }}>
+                              <td style={{ padding: '5px 8px 5px 0' }}>{p.name}</td>
+                              <td style={{ textAlign: 'right', padding: '5px 6px', color: 'var(--text-secondary)' }}>{p.units}</td>
+                              <td style={{ textAlign: 'right', padding: '5px 4px' }}>
+                                <input
+                                  data-testid={`physical-count-${p.name.toLowerCase().replace(/\s+/g, '-')}`}
+                                  type="number" min="0" step="1"
+                                  value={physicalCounts[p.id] ?? String(p.units)}
+                                  onChange={e => setPhysicalCounts(prev => ({ ...prev, [p.id]: e.target.value }))}
+                                  style={{ width: 64, textAlign: 'right', padding: '2px 6px', border: '1px solid var(--border)', borderRadius: 4, background: diff !== 0 ? 'var(--surface-secondary, #f3f4f6)' : 'transparent', color: diff < 0 ? 'var(--danger)' : diff > 0 ? 'var(--success)' : 'inherit' }}
+                                />
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
                 <button data-testid="close-register-btn" className="btn btn--danger"
                   onClick={handleCloseRegister} disabled={!closingCash}>
                   Close Register

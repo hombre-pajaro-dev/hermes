@@ -120,6 +120,25 @@ When(/^I POST \/api\/payments\/run with the payee amount ([\d.]+) from "([^"]+)"
   }
 );
 
+When(/^I POST \/api\/payments\/run with the payee amount ([\d.]+) from "([^"]+)" for the last closed session$/,
+  async function (this: PosWorld, amountStr: string, account: string) {
+    const id = (this.context as { payeeId?: number }).payeeId;
+    const sessRes = await this.agent.get('/api/register/sessions');
+    const sessions = sessRes.body as { id: number; status: string }[];
+    const lastClosed = sessions.find(s => s.status === 'closed');
+    this.response = await this.agent.post('/api/payments/run').send({
+      entries: [{ payee_id: id, amount: Number(amountStr), source_account: account }],
+      session_id: lastClosed?.id,
+    });
+  }
+);
+
+Then('the session report payments include {string} with amount {float}', function (this: PosWorld, description: string, amount: number) {
+  const body = this.response.body as { payments: { description: string; amount: number }[] };
+  const found = body.payments.find(p => p.description === description && Math.abs(p.amount - amount) < 0.01);
+  expect(found, `Expected payment "${description}" with amount ${amount} in session report`).to.exist;
+});
+
 When('I PATCH the payee default_weight to {float}', async function (this: PosWorld, weight: number) {
   const id = (this.context as { payeeId?: number }).payeeId;
   this.response = await this.agent.patch(`/api/payees/${id}`).send({ default_weight: weight });
