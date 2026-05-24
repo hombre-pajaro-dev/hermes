@@ -83,6 +83,7 @@ This document lists all **features** and **scenarios** covered by the BDD test s
 | 13 | Closing register records negative variance when cash is short | Open 200, close 175; `register_close` entry amount = −25. |
 | 14 | Closing register records positive variance when cash is over | Open 200, close 210; `register_close` entry amount = +10. |
 | 15 | Session report includes expected_cash and cash_variance | Open 200, close 175; session report `expected_cash` = 200 and `cash_variance` = −25. |
+| 16 | Closing register includes cash from tabs opened in a previous session | Tab opened in session 1 (Espresso $3); session 1 closed; session 2 opened with $200; tab paid in cash; close session 2 with $203; `expected_cash` = 203, `cash_variance` = 0. |
 
 ---
 

@@ -38,5 +38,8 @@ The price charged to staff on at-cost tabs. Stored as `staff_price` (flat dollar
 ### At-Cost Tab
 A tab opened with `at_cost = true`. Items are priced at `staff_price` instead of `price`. Label shown in UI: `(staff)`. Discounts are disabled on at-cost tabs.
 
+### Cross-Session Tab
+A tab whose `session_id` (the session it was *opened* in) differs from the session in which it was *paid*. Cross-session tabs are normal — customers may run a tab across multiple days. For cash reconciliation purposes, the cash from a cross-session tab payment belongs to the session it was *paid in*, not the session it was opened in. The register-close expected-cash formula scopes tab payments by `paid_at` timestamp, not by `session_id`.
+
 ### Markup %
 Displayed on each product in ProductsView, admin-only. Computed as `(price - cost) / cost × 100`. Answers "how much above cost is the selling price?" Distinct from the staff price markup, which is `(staff_price - cost) / cost × 100`.

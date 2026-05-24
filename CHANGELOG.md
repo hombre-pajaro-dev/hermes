@@ -22,6 +22,12 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 - A **markup %** label is shown next to each price and staff price field, showing how much above cost the price is: `(price − cost) / cost × 100`.
 - New products are seeded with staff price equal to cost (0% markup baseline).
 
+### Fixed
+
+#### Register — closing cash reconciliation includes cross-session tab payments
+- `POST /register/close` and `GET /register/sessions/:id/report` now scope tab cash payments by `paid_at` (the time the tab was actually paid) rather than by `session_id` (the session the tab was opened in).
+- Previously, a tab opened on day 1 and paid in cash on day 2 was excluded from the expected-cash formula, producing a phantom "cash over" entry on the ledger at close time.
+
 ### Changed
 
 #### Ledger — "Credit Card" account renamed to "Digital"

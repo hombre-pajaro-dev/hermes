@@ -96,3 +96,17 @@ Feature: Register (Open / Close / Cashout)
     And I fetch the session report for the last session
     Then the session report expected_cash is 200.00
     And the session report cash_variance is -25.00
+
+  Scenario: Closing register includes cash from tabs opened in a previous session
+    Given the register is open with opening cash 200
+    And I open a new tab named "Cross-Session Tab"
+    And I add items to the tab
+      | product_name | quantity |
+      | Espresso     | 1        |
+    When I close the register with closing cash 200.00
+    And I open the register with opening cash 200.00
+    And I pay the tab with cash amount 9999.00
+    And I close the register with closing cash 203.00
+    And I fetch the session report for the last session
+    Then the session report expected_cash is 203.00
+    And the session report cash_variance is 0.00

@@ -10,3 +10,5 @@ packages/frontend/dist/
 hermes.db-wal
 cucumber-report.html
 .claude/
+.agents/
+skills-lock.json
