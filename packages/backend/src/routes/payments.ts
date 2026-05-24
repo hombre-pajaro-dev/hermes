@@ -43,6 +43,14 @@ router.post('/run', async (req, res) => {
       [entryType, account, -Math.abs(entry.amount), description, actor]
     );
     createdEntries.push(rows[0]);
+
+    if (payee.type === 'savings') {
+      const { rows: creditRows } = await db.query(
+        'INSERT INTO ledger_entries (entry_type, account, amount, description, created_by) VALUES ($1, $2, $3, $4, $5) RETURNING *',
+        [entryType, 'savings', Math.abs(entry.amount), description, actor]
+      );
+      createdEntries.push(creditRows[0]);
+    }
   }
 
   res.status(201).json({ entries: createdEntries });

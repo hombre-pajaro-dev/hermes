@@ -41,6 +41,12 @@ Feature: Payments
     Then the response status is 201
     And a ledger entry exists for "TestSavings" with amount -200 and type "savings_transfer"
 
+  Scenario: Run a savings payment also credits the savings account
+    Given there is a payee "TestSavings2" of type "savings"
+    When I POST /api/payments/run with the payee amount 200 from "digital"
+    Then the response status is 201
+    And a ledger entry exists for "TestSavings2" with amount 200 and type "savings_transfer"
+
   Scenario: Update payee default weight
     Given there is a payee "WeightedStaff" of type "staff"
     When I PATCH the payee default_weight to 3

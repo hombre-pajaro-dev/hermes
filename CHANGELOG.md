@@ -24,6 +24,10 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+#### Payments — savings transfer now credits the savings account
+- `POST /payments/run` for a savings payee now inserts two ledger entries: a debit on the source account and a matching credit on the `savings` account.
+- Previously only the debit was recorded, leaving the savings account balance unchanged.
+
 #### Register — closing cash reconciliation includes cross-session tab payments
 - `POST /register/close` and `GET /register/sessions/:id/report` now scope tab cash payments by `paid_at` (the time the tab was actually paid) rather than by `session_id` (the session the tab was opened in).
 - Previously, a tab opened on day 1 and paid in cash on day 2 was excluded from the expected-cash formula, producing a phantom "cash over" entry on the ledger at close time.

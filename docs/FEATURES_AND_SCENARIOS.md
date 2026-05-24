@@ -356,7 +356,8 @@ This document lists all **features** and **scenarios** covered by the BDD test s
 | 3 | Deactivate a payee | `PATCH /api/payees/:id` with `active: false` marks the payee inactive; it is excluded from payment runs. |
 | 4 | Run a payment creates payroll ledger entry | `POST /api/payments/run` for a staff payee creates a `payroll` ledger entry with negative amount. |
 | 5 | Run a payment creates expense ledger entry | `POST /api/payments/run` for an expense payee creates an `expense` ledger entry with negative amount. |
-| 6 | Run a payment creates savings transfer ledger entry | `POST /api/payments/run` for a savings payee creates a `savings_transfer` ledger entry with negative amount. |
+| 6 | Run a payment creates savings transfer ledger entry | `POST /api/payments/run` for a savings payee creates a `savings_transfer` ledger entry with negative amount on the source account. |
+| 6b | Run a savings payment also credits the savings account | Same run creates a second `savings_transfer` entry with positive amount on the `savings` account. |
 | 7 | Update payee default weight | `PATCH /api/payees/:id` with `default_weight: 3` persists the weight; subsequent `GET /api/payees` returns the updated value. |
 | 8 | Run payments with a note appends note to ledger description | `POST /api/payments/run` with `note` field; ledger entry description is `"{payee} — {note}"`. |
 | 9 | Payment creates a payroll ledger entry (E2E) | Record a payment via API; Ledger page shows a `payroll` entry. |
