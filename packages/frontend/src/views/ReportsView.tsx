@@ -192,6 +192,7 @@ export default function ReportsView() {
   const [sessions, setSessions] = useState<RegisterSessionSummary[]>([]);
   const [selectedSessionId, setSelectedSessionId] = useState<number | null>(null);
   const [sessionReport, setSessionReport] = useState<SessionReport | null>(null);
+  const [reportRefreshKey, setReportRefreshKey] = useState(0);
 
   async function fetchSales(from = salesFrom, to = salesTo) {
     setLoading(true); setError('');
@@ -261,7 +262,7 @@ export default function ReportsView() {
   useEffect(() => { if (tab === 'historic') fetchHistoric(); }, [tab, historicGroupBy]);
   useEffect(() => { if (tab === 'weekday') fetchWeekday(); }, [tab]);
   useEffect(() => { if (tab === 'session') fetchSessions(); }, [tab]);
-  useEffect(() => { if (selectedSessionId !== null) fetchSessionReport(selectedSessionId); }, [selectedSessionId]);
+  useEffect(() => { if (selectedSessionId !== null) fetchSessionReport(selectedSessionId); }, [selectedSessionId, reportRefreshKey]);
 
   return (
     <div>
@@ -631,7 +632,7 @@ export default function ReportsView() {
                           <ReconciliationCard
                             sessionId={s.id}
                             report={sessionReport}
-                            onSaved={() => setSelectedSessionId(s.id)}
+                            onSaved={() => setReportRefreshKey(k => k + 1)}
                           />
                         )}
 
@@ -709,7 +710,7 @@ export default function ReportsView() {
                           <UnclaimedPaymentsCard
                             sessionId={s.id}
                             entries={sessionReport.unlinked_payments}
-                            onClaimed={() => setSelectedSessionId(s.id)}
+                            onClaimed={() => setReportRefreshKey(k => k + 1)}
                           />
                         )}
 
