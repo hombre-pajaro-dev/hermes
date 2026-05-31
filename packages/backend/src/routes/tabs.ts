@@ -36,9 +36,9 @@ router.get('/summary', async (_req, res) => {
 router.post('/', async (req, res) => {
   const db = await getDb();
   const { rows: sessionRows } = await db.query(
-    "SELECT id FROM register_sessions ORDER BY opened_at DESC LIMIT 1"
+    "SELECT id FROM register_sessions WHERE status = 'open' ORDER BY opened_at DESC LIMIT 1"
   );
-  if (!sessionRows[0]) return res.status(409).json({ error: 'No register session exists — open the register first' });
+  if (!sessionRows[0]) return res.status(409).json({ error: 'Register is not open — open the register first' });
   const sessionId = sessionRows[0].id as number;
   const { name = '', at_cost = false } = req.body;
   const actor = actorEmail(req);
@@ -170,16 +170,21 @@ router.patch('/:id/items/:itemId', async (req, res) => {
 
 router.post('/:id/void', requireAdmin, async (req, res) => {
   const db = await getDb();
+  const actor = actorEmail(req);
   const { rows } = await db.query('SELECT * FROM tabs WHERE id = $1', [req.params.id]);
-  const tab = rows[0] as { id: number; status: string } | undefined;
+  const tab = rows[0] as { id: number; status: string; total: number; session_id: number } | undefined;
   if (!tab) return res.status(404).json({ error: 'Tab not found' });
   if (tab.status !== 'open') return res.status(409).json({ error: 'Tab is not open' });
-  const { rows: items } = await db.query('SELECT id FROM tab_items WHERE tab_id = $1', [req.params.id]);
-  if (items.length > 0) return res.status(409).json({ error: 'Cannot void a tab that has items' });
   const { rows: [updated] } = await db.query(
     "UPDATE tabs SET status = 'voided', updated_at = NOW() WHERE id = $1 RETURNING *",
     [tab.id]
   );
+  if (tab.total > 0) {
+    await db.query(
+      "INSERT INTO ledger_entries (entry_type, account, amount, description, ref_id, ref_type, created_by, session_id) VALUES ('tab_writeoff', 'expense', $1, $2, $3, 'tab', $4, $5)",
+      [-tab.total, `Write-off: Tab #${tab.id}`, tab.id, actor, tab.session_id]
+    );
+  }
   res.json(updated);
 });
 

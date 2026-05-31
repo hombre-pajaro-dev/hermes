@@ -128,3 +128,17 @@ Then('the tab updated_at is not earlier than the recorded value', function (this
   expect(recorded, 'No recorded updated_at').to.be.a('string');
   expect(new Date(body.updated_at).getTime()).to.be.at.least(new Date(recorded!).getTime());
 });
+
+Then('the response contains an open tab named {string}', function (this: PosWorld, name: string) {
+  const body = this.response.body as { open_tabs?: { name: string }[] };
+  expect(body.open_tabs, 'Expected open_tabs in response').to.be.an('array');
+  expect(body.open_tabs!.some(t => t.name === name), `Expected open tab named "${name}"`).to.be.true;
+});
+
+Then('a write-off ledger entry exists for the tab', async function (this: PosWorld) {
+  const tabId = this.context.tabId as number;
+  const res = await this.agent.get('/api/ledger');
+  const entries = res.body as { entry_type: string; ref_id: number; ref_type: string }[];
+  const found = entries.find(e => e.entry_type === 'tab_writeoff' && e.ref_id === tabId && e.ref_type === 'tab');
+  expect(found, `Expected tab_writeoff ledger entry for tab ${tabId}`).to.exist;
+});

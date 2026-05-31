@@ -44,8 +44,14 @@ The act of entering actual shelf counts for all active products as part of the r
 ### Session Payment
 A payment run (payroll, expense, or savings transfer) explicitly linked to a register session via `session_id`. Appears in the session report as a list of individual entries. The session must be selected explicitly when running payments — the system does not infer it.
 
-### Cross-Session Tab
-A tab whose `session_id` (the session it was *opened* in) differs from the session in which it was *paid*. Cross-session tabs are normal — customers may run a tab across multiple days. For cash reconciliation purposes, the cash from a cross-session tab payment belongs to the session it was *paid in*, not the session it was opened in. The register-close expected-cash formula scopes tab payments by `paid_at` timestamp, not by `session_id`.
+### Session (Register Session)
+A variable-length trading period. A session may span hours, days, or a full week depending on business volume. It begins when the register is opened and ends when all open tabs are settled and the register is closed. A session is the unit of cash reconciliation: all sales and tab payments within a session are reconciled against the opening and closing cash counts.
+
+### Tab (Session-Scoped)
+A tab is exclusively owned by the session it was opened in. It can only be paid while that session is open. All tab payments belong to the session for reconciliation purposes (`session_id`, not `paid_at`). A session cannot be closed while it has open tabs.
+
+### Tab Write-Off
+The admin-only act of voiding a tab that has items on it — used when a customer cannot or will not pay. Records a write-off ledger entry so the lost amount is visible in the session report. Intended as a last resort; standard tab closure is payment by the customer.
 
 ### Markup %
 Displayed on each product in ProductsView, admin-only. Computed as `(price - cost) / cost × 100`. Answers "how much above cost is the selling price?" Distinct from the staff price markup, which is `(staff_price - cost) / cost × 100`.

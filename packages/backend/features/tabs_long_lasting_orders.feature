@@ -89,22 +89,31 @@ Feature: Tabs (Long-lasting orders)
     Then the response status is 200
     And the tab status is "voided"
 
-  Scenario: Cannot void a tab that has items
-    When I open a new tab named "Non-Empty Tab"
+  Scenario: Admin can write off tab with items
+    When I open a new tab named "Write Off Tab"
     And I add items to the tab
       | product_name | quantity |
       | Espresso     | 1        |
     And I void the tab
-    Then the response status is 409
-    And the response error mentions "has items"
+    Then the response status is 200
+    And the tab status is "voided"
+    And a write-off ledger entry exists for the tab
 
-  Scenario: Can close register with open tabs
-    When I open a new tab named "Table 9"
+  Scenario: Cannot close session when open tabs exist
+    When I open a new tab named "Blocking Tab"
     And I add items to the tab
       | product_name | quantity |
-      | Croissant    | 1        |
-    And I close the register with closing cash 200
-    Then the register status is "closed"
+      | Espresso     | 1        |
+    And I close the register with closing cash 200.00
+    Then the response status is 409
+    And the response error mentions "open tab"
+    And the response contains an open tab named "Blocking Tab"
+
+  Scenario: Cannot open tab when register is not open
+    When I close the register with closing cash 200.00
+    And I open a new tab named "NoSession Tab"
+    Then the response status is 409
+    And the response error mentions "not open"
 
   Scenario: Tab list includes items for each tab
     When I open a new tab named "Item List Tab"

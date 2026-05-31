@@ -111,16 +111,16 @@ router.get('/sessions/:id/report', async (req, res) => {
     [sessionId]
   );
 
-  // Cash reconciliation — tabs scoped by paid_at so cross-session tabs paid in cash are included.
+  // Cash reconciliation — tabs scoped by session_id (tabs are session-exclusive).
   const { rows: [cashReconRow] } = await db.query(`
     SELECT
       $2::numeric
       + COALESCE((SELECT SUM(total) FROM orders WHERE session_id = $1 AND status = 'paid' AND payment_method = 'cash'), 0)
-      + COALESCE((SELECT SUM(total) FROM tabs   WHERE status = 'paid' AND payment_method = 'cash' AND paid_at >= $3 AND paid_at <= COALESCE($4, NOW())), 0)
+      + COALESCE((SELECT SUM(total) FROM tabs   WHERE session_id = $1 AND status = 'paid' AND payment_method = 'cash'), 0)
       - COALESCE((SELECT SUM(amount) FROM cashouts WHERE session_id = $1), 0)
       + COALESCE((SELECT SUM(amount) FROM ledger_entries WHERE session_id = $1 AND entry_type IN ('payroll', 'expense', 'savings_transfer') AND account = 'cash' AND amount < 0), 0)
     AS expected_cash
-  `, [sessionId, session.opening_cash, session.opened_at, session.closed_at ?? null]);
+  `, [sessionId, session.opening_cash]);
   const expectedCash = Number(cashReconRow.expected_cash);
   const closingCash = session.closing_cash != null ? Number(session.closing_cash) : null;
   const cashVariance = closingCash != null ? closingCash - expectedCash : null;
@@ -129,11 +129,11 @@ router.get('/sessions/:id/report', async (req, res) => {
   const { rows: [digitalReconRow] } = await db.query(`
     SELECT
       COALESCE((SELECT SUM(total) FROM orders WHERE session_id = $1 AND status = 'paid' AND payment_method IN ('card', 'transfer')), 0)
-      + COALESCE((SELECT SUM(total) FROM tabs   WHERE status = 'paid' AND payment_method IN ('card', 'transfer') AND paid_at >= $2 AND paid_at <= COALESCE($3, NOW())), 0)
+      + COALESCE((SELECT SUM(total) FROM tabs   WHERE session_id = $1 AND status = 'paid' AND payment_method IN ('card', 'transfer')), 0)
       + COALESCE((SELECT SUM(amount) FROM ledger_entries WHERE entry_type = 'commission_transfer' AND account = 'digital' AND ref_type = 'order' AND ref_id IN (SELECT id FROM orders WHERE session_id = $1 AND status = 'paid')), 0)
       + COALESCE((SELECT SUM(amount) FROM ledger_entries WHERE session_id = $1 AND entry_type IN ('payroll', 'expense', 'savings_transfer') AND account = 'digital' AND amount < 0), 0)
     AS expected_digital
-  `, [sessionId, session.opened_at, session.closed_at ?? null]);
+  `, [sessionId]);
   const expectedDigital = Number(digitalReconRow.expected_digital);
 
   res.json({
@@ -231,20 +231,32 @@ router.post('/close', requireAdmin, async (req, res) => {
   };
   if (closing_cash == null) return res.status(400).json({ error: 'closing_cash is required' });
 
+  const db = await getDb();
+  const { rows: openTabs } = await db.query<{ id: number; name: string; total: number }>(
+    "SELECT id, name, total FROM tabs WHERE session_id = $1 AND status = 'open'",
+    [session.id]
+  );
+  if (openTabs.length > 0) {
+    return res.status(409).json({
+      error: `Cannot close session — ${openTabs.length} open tab(s) must be paid first`,
+      open_tabs: openTabs.map(t => ({ id: t.id, name: t.name, total: Number(t.total) })),
+    });
+  }
+
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
 
-    // Compute expected cash: opening + cash sales (orders + tabs paid during this session) - cashouts
-    // Tabs are scoped by paid_at rather than session_id so cross-session tabs paid in cash are counted.
+    // Compute expected cash: opening + cash sales (orders + tabs by session) - cashouts - cash payouts
     const { rows: [expectedRow] } = await client.query(`
       SELECT
         $2::numeric
         + COALESCE((SELECT SUM(total) FROM orders WHERE session_id = $1 AND status = 'paid' AND payment_method = 'cash'), 0)
-        + COALESCE((SELECT SUM(total) FROM tabs   WHERE status = 'paid' AND payment_method = 'cash' AND paid_at >= $3 AND paid_at <= NOW()), 0)
+        + COALESCE((SELECT SUM(total) FROM tabs   WHERE session_id = $1 AND status = 'paid' AND payment_method = 'cash'), 0)
         - COALESCE((SELECT SUM(amount) FROM cashouts WHERE session_id = $1), 0)
+        + COALESCE((SELECT SUM(amount) FROM ledger_entries WHERE session_id = $1 AND entry_type IN ('payroll', 'expense', 'savings_transfer') AND account = 'cash' AND amount < 0), 0)
       AS expected_cash
-    `, [session.id, session.opening_cash, session.opened_at]);
+    `, [session.id, session.opening_cash]);
     const expectedCash = Number(expectedRow.expected_cash);
     const variance = Number(closing_cash) - expectedCash;
 

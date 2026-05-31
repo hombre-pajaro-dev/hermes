@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { api } from '../api/client';
-import type { RegisterSession } from '../api/client';
+import type { RegisterSession, Tab } from '../api/client';
 import { authClient } from '../lib/auth-client';
 
 export default function RegisterView() {
@@ -8,6 +8,7 @@ export default function RegisterView() {
   const isAdmin = (session?.user as { role?: string } | undefined)?.role === 'admin';
 
   const [registerSession, setRegisterSession] = useState<RegisterSession | null>(null);
+  const [openTabs, setOpenTabs] = useState<Tab[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
@@ -17,9 +18,21 @@ export default function RegisterView() {
   const [cashoutReason, setCashoutReason] = useState('');
 
   async function load() {
-    try { setRegisterSession(await api.getSession()); }
-    catch { setRegisterSession(null); }
-    finally { setLoading(false); }
+    try {
+      const s = await api.getSession();
+      setRegisterSession(s);
+      if (s) {
+        const tabs = await api.getTabs();
+        setOpenTabs(tabs.filter(t => t.status === 'open'));
+      } else {
+        setOpenTabs([]);
+      }
+    } catch {
+      setRegisterSession(null);
+      setOpenTabs([]);
+    } finally {
+      setLoading(false);
+    }
   }
 
   useEffect(() => { load(); }, []);
@@ -70,6 +83,22 @@ export default function RegisterView() {
         )}
       </div>
 
+      {registerSession && openTabs.length > 0 && (
+        <div className="card" data-testid="open-tabs-warning" style={{ borderColor: 'var(--warning, #f59e0b)', borderWidth: 2 }}>
+          <div className="card__title" style={{ color: 'var(--warning, #f59e0b)' }}>
+            {openTabs.length} Open Tab{openTabs.length !== 1 ? 's' : ''} — Must Be Paid Before Closing
+          </div>
+          {openTabs.map(t => (
+            <div key={t.id} className="list-item" data-testid={`open-tab-warning-${t.id}`}>
+              <div className="list-item__main">
+                <div className="list-item__name">{t.name || `Tab #${t.id}`}</div>
+              </div>
+              <div className="list-item__right" style={{ fontWeight: 700 }}>${Number(t.total).toFixed(2)}</div>
+            </div>
+          ))}
+        </div>
+      )}
+
       {!registerSession && (
         <div className="card">
           <div className="card__title">Open Register</div>
@@ -107,13 +136,18 @@ export default function RegisterView() {
 
           <div className="card">
             <div className="card__title">Close Register</div>
+            {openTabs.length > 0 && (
+              <p style={{ fontSize: '0.85rem', color: 'var(--warning, #f59e0b)', marginBottom: 8 }}>
+                {openTabs.length} open tab{openTabs.length !== 1 ? 's' : ''} must be paid first.
+              </p>
+            )}
             <div className="field">
               <label className="label">Closing Cash ($)</label>
               <input data-testid="closing-cash-input" className="input" type="number" min="0" step="0.01"
                 placeholder="0.00" value={closingCash} onChange={e => setClosingCash(e.target.value)} />
             </div>
             <button data-testid="close-register-btn" className="btn btn--danger"
-              onClick={handleClose} disabled={!closingCash}>
+              onClick={handleClose} disabled={!closingCash || openTabs.length > 0}>
               Close Register
             </button>
           </div>

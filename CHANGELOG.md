@@ -9,6 +9,17 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Changed
+
+#### Tabs — Session-scoped (breaking design change)
+- Tabs are now exclusively owned by the session they were opened in. A tab can only be paid while its session is open.
+- **Session close is hard-blocked** if any open tabs exist. The backend returns 409 with the full list of blocking tabs (name + total). Previously any session could be closed regardless of open tabs.
+- Tab creation now requires an **open** session. Previously it linked to the most recent session even if closed (bug).
+- Voiding a tab with items is now allowed (admin only) as a write-off. Records a `tab_writeoff` ledger entry so the loss is visible in the session report.
+- Register view now shows a **proactive warning card** listing open tabs with totals. The Close Register button is disabled until all tabs are paid.
+- `expected_cash` and `expected_digital` formulas simplified to use `session_id` for tabs (no more `paid_at` time-window).
+- 3 new BDD scenarios covering the hard block, open-session enforcement, and write-off (118/118 passing).
+
 ### Fixed
 
 #### Session Report — Transfer sales and digital reconciliation
