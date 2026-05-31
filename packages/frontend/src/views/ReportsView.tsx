@@ -4,6 +4,54 @@ import type { SalesByItem, DailyTotal, DailyRange, CloseBrief, InventoryAdjustme
 import ColumnChart from '../components/ColumnChart';
 import DateTimeRangeFilter from '../components/DateTimeRangeFilter';
 
+function UnclaimedPaymentsCard({ sessionId, entries, onClaimed }: {
+  sessionId: number;
+  entries: { id: number; entry_type: string; amount: number; description: string; created_at: string }[];
+  onClaimed: () => void;
+}) {
+  const [claiming, setClaiming] = useState<number | null>(null);
+  const [error, setError] = useState('');
+
+  async function claim(entryId: number) {
+    setClaiming(entryId); setError('');
+    try {
+      await api.claimPayments(sessionId, [entryId]);
+      onClaimed();
+    } catch (e: unknown) { setError((e as Error).message); }
+    finally { setClaiming(null); }
+  }
+
+  const typeLabel = (t: string) => t === 'payroll' ? 'Staff' : t === 'savings_transfer' ? 'Savings' : 'Expense';
+
+  return (
+    <div className="card" style={{ borderColor: 'var(--warning, #f59e0b)', borderWidth: 2 }} data-testid="unclaimed-payments">
+      <div className="card__title" style={{ color: 'var(--warning, #f59e0b)' }}>Unclaimed Payments</div>
+      <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: 8 }}>
+        These payments were recorded during this session but not linked to it. Add them to include them in the report.
+      </p>
+      {error && <div className="error-banner" style={{ marginBottom: 8 }}>{error}</div>}
+      {entries.map(p => (
+        <div className="list-item" key={p.id}>
+          <div className="list-item__main">
+            <div className="list-item__name">{p.description}</div>
+            <div className="list-item__sub" style={{ display: 'flex', gap: 8 }}>
+              <span className="badge badge--pending" style={{ fontSize: '0.65rem' }}>{typeLabel(p.entry_type)}</span>
+              <span>{new Date(p.created_at).toLocaleString()}</span>
+            </div>
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <span style={{ fontWeight: 700, color: 'var(--danger)' }}>−${Math.abs(p.amount).toFixed(2)}</span>
+            <button className="btn btn--ghost" style={{ fontSize: '0.8rem', padding: '4px 10px' }}
+              onClick={() => claim(p.id)} disabled={claiming === p.id}>
+              {claiming === p.id ? '…' : 'Add'}
+            </button>
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 function ReconciliationCard({ sessionId, report, onSaved }: { sessionId: number; report: import('../api/client').SessionReport; onSaved: () => void }) {
   const [reconDigital, setReconDigital] = useState(
     report.actual_digital != null ? String(report.actual_digital) : ''
@@ -654,6 +702,15 @@ export default function ReportsView() {
                               </div>
                             ))}
                           </div>
+                        )}
+
+                        {/* Unclaimed payments — orphaned entries within this session's time window */}
+                        {sessionReport.unlinked_payments?.length > 0 && (
+                          <UnclaimedPaymentsCard
+                            sessionId={s.id}
+                            entries={sessionReport.unlinked_payments}
+                            onClaimed={() => setSelectedSessionId(s.id)}
+                          />
                         )}
 
                         {/* Payments linked to this session */}

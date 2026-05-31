@@ -152,6 +152,47 @@ Then('the session report payments include {string} with amount {float}', functio
   expect(found, `Expected payment "${description}" with amount ${amount} in session report`).to.exist;
 });
 
+When(/^I POST \/api\/payments\/run with the payee amount ([\d.]+) from "([^"]+)" without session$/,
+  async function (this: PosWorld, amountStr: string, account: string) {
+    const payeeId = (this.context as { payeeId?: number }).payeeId;
+    const db = await this.getDb();
+    const { rows: [payee] } = await db.query('SELECT * FROM payees WHERE id = $1', [payeeId]);
+    const entryType = payee.type === 'staff' ? 'payroll' : payee.type === 'savings' ? 'savings_transfer' : 'expense';
+    // Insert directly with session_id = NULL to simulate a pre-auto-link orphaned entry
+    await db.query(
+      'INSERT INTO ledger_entries (entry_type, account, amount, description, created_by, session_id) VALUES ($1, $2, $3, $4, $5, NULL)',
+      [entryType, account, -Math.abs(Number(amountStr)), payee.name, 'test']
+    );
+  }
+);
+
+Then('the session report unlinked_payments includes {string}', function (this: PosWorld, description: string) {
+  const body = this.response.body as { unlinked_payments: { description: string }[] };
+  expect(body.unlinked_payments, 'unlinked_payments missing from session report').to.be.an('array');
+  expect(body.unlinked_payments.some(p => p.description === description),
+    `Expected unlinked_payments to include "${description}"`).to.be.true;
+});
+
+Then('the session report unlinked_payments is empty', function (this: PosWorld) {
+  const body = this.response.body as { unlinked_payments: unknown[] };
+  expect(body.unlinked_payments, 'unlinked_payments missing from session report').to.be.an('array');
+  expect(body.unlinked_payments).to.have.lengthOf(0);
+});
+
+When('I claim the unlinked payment {string} to the last session',
+  async function (this: PosWorld, description: string) {
+    const sessRes = await this.agent.get('/api/register/sessions');
+    const sessions = sessRes.body as { id: number; status: string }[];
+    const last = sessions.find(s => s.status === 'closed') ?? sessions[0];
+    const reportRes = await this.agent.get(`/api/register/sessions/${last.id}/report`);
+    const report = reportRes.body as { unlinked_payments: { id: number; description: string }[] };
+    const entry = report.unlinked_payments.find(p => p.description === description);
+    expect(entry, `Unlinked payment "${description}" not found`).to.exist;
+    this.response = await this.agent.post(`/api/register/sessions/${last.id}/claim-payments`)
+      .send({ entry_ids: [entry!.id] });
+  }
+);
+
 When('I PATCH the payee default_weight to {float}', async function (this: PosWorld, weight: number) {
   const id = (this.context as { payeeId?: number }).payeeId;
   this.response = await this.agent.patch(`/api/payees/${id}`).send({ default_weight: weight });

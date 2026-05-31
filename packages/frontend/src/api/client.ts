@@ -41,6 +41,8 @@ export const api = {
   getSessionReport: (id: number) => req<SessionReport>(`/register/sessions/${id}/report`),
   reconcileSession: (id: number, data: { physical_counts?: { product_id: number; units: number }[]; actual_digital?: number }) =>
     req<{ ok: boolean }>(`/register/sessions/${id}/reconcile`, { method: 'PATCH', body: JSON.stringify(data) }),
+  claimPayments: (sessionId: number, entry_ids: number[]) =>
+    req<{ claimed: number }>(`/register/sessions/${sessionId}/claim-payments`, { method: 'POST', body: JSON.stringify({ entry_ids }) }),
 
   // Checkout
   createOrder: (items: OrderItem[]) => req<Order>('/checkout/orders', { method: 'POST', body: JSON.stringify({ items }) }),
@@ -156,6 +158,7 @@ export interface SessionReport {
   session: RegisterSessionSummary & { inventory_snapshot_open: SessionInventorySnapshot | null; inventory_snapshot_close: SessionInventorySnapshot | null; };
   order_count: number; revenue: number; total_cost: number; commission_total?: number; gross_profit: number; cash_sales: number; card_sales: number; transfer_sales: number; expected_cash?: number; cash_variance?: number | null; expected_digital?: number; actual_digital?: number | null; digital_variance?: number | null;
   active_products: { product_id: number; name: string; price: number; system_count: number | null; physical_count: number | null; delta: number | null; value: number | null }[];
+  unlinked_payments: { id: number; entry_type: string; account: string; amount: number; description: string; created_at: string }[];
   pnl: { revenue: number; tab_revenue: number; tab_cash: number; tab_card: number; tab_transfer: number; cogs: number; commissions: number; gross_profit: number; payroll: number; expenses: number; writeoffs: number; inventory_adjustment: number; net: number };
   by_item: { product_id: number; name: string; units_sold: number; revenue: number; cost: number; profit: number }[];
   cashouts: { id: number; amount: number; reason: string; created_at: string }[];

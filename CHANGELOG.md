@@ -11,6 +11,12 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+#### Session Report — Unclaimed Payments (retroactive session linking)
+- Session report for closed sessions now surfaces any payroll/expense/savings entries that were recorded during the session's time window but have no session link (orphaned entries from before the auto-link fix).
+- Each unclaimed entry shows with an **Add** button. Clicking it calls `POST /register/sessions/:id/claim-payments` and refreshes the report — the entry moves from the unclaimed list into the regular Payments section.
+- New backend endpoint `POST /register/sessions/:id/claim-payments` (admin only) sets `session_id` on ledger entries that are currently unlinked.
+- 2 new BDD scenarios + `getDb()` helper added to PosWorld for test-only DB setup (126/126 passing).
+
 #### Session Report — P&L Summary and PDF export
 - New **P&L Summary** card at the bottom of each session report showing all financial flows in a single table: order revenue, tab revenue, COGS, card commissions, gross profit, payroll, expenses, write-offs, inventory adjustment value, and **Net Session Result** (positive = profit, negative = loss).
 - Tab revenue and tab COGS were previously excluded from the session report's revenue/profit figures — the P&L now includes the complete picture.

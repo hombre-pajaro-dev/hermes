@@ -120,3 +120,19 @@ Feature: Payments
     When I PATCH /api/admin/commissions with rate 0.05
     Then the response status is 200
     And the commission rate is 0.05
+
+  Scenario: Unlinked payment within session time window appears as claimable in session report
+    Given there is a payee "OrphanStaff" of type "staff"
+    When I POST /api/payments/run with the payee amount 80 from "cash" without session
+    And I close the register with closing cash 200.00
+    And I fetch the session report for the last session
+    Then the session report unlinked_payments includes "OrphanStaff"
+
+  Scenario: Claiming an unlinked payment links it to the session
+    Given there is a payee "ClaimStaff" of type "staff"
+    When I POST /api/payments/run with the payee amount 60 from "cash" without session
+    And I close the register with closing cash 200.00
+    And I claim the unlinked payment "ClaimStaff" to the last session
+    And I fetch the session report for the last session
+    Then the session report payments include "ClaimStaff" with amount -60
+    And the session report unlinked_payments is empty

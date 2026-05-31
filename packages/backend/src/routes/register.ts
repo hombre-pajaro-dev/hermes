@@ -139,6 +139,19 @@ router.get('/sessions/:id/report', async (req, res) => {
   `, [sessionId]);
   const commissionTotal = Math.abs(Number(commRow.commission_total));
 
+  // Unlinked payments: payroll/expense/savings with no session, created within this session's time window
+  const { rows: unlinkedPayments } = await db.query<{ id: number; entry_type: string; account: string; amount: number; description: string; created_at: string }>(
+    `SELECT id, entry_type, account, amount, description, created_at
+     FROM ledger_entries
+     WHERE session_id IS NULL
+       AND entry_type IN ('payroll', 'expense', 'savings_transfer')
+       AND amount < 0
+       AND created_at >= $1
+       AND created_at <= COALESCE($2, NOW())
+     ORDER BY created_at`,
+    [session.opened_at, session.closed_at ?? null]
+  );
+
   const { rows: payments } = await db.query<{ id: number; entry_type: string; account: string; amount: number; description: string; created_at: string }>(
     `SELECT id, entry_type, account, amount, description, created_at
      FROM ledger_entries
@@ -245,6 +258,7 @@ router.get('/sessions/:id/report', async (req, res) => {
     adjustments: adjustments.map(a => ({ product_id: a.product_id, name: a.name, delta: Number(a.delta) })),
     payments: payments.map(p => ({ id: p.id, entry_type: p.entry_type, account: p.account, amount: Number(p.amount), description: p.description, created_at: p.created_at })),
     active_products: activeProducts,
+    unlinked_payments: unlinkedPayments.map(p => ({ id: p.id, entry_type: p.entry_type, account: p.account, amount: Number(p.amount), description: p.description, created_at: p.created_at })),
     pnl: {
       revenue: pnlRevenue,
       tab_revenue: Number(tabTotalsRow.tab_revenue),
@@ -317,6 +331,30 @@ router.patch('/sessions/:id/reconcile', requireAdmin, async (req, res) => {
   }
 
   res.json({ ok: true });
+});
+
+router.post('/sessions/:id/claim-payments', requireAdmin, async (req, res) => {
+  const db = await getDb();
+  const sessionId = Number(req.params.id);
+  const { rows: [session] } = await db.query('SELECT * FROM register_sessions WHERE id = $1', [sessionId]);
+  if (!session) return res.status(404).json({ error: 'Session not found' });
+
+  const { entry_ids } = req.body as { entry_ids: number[] };
+  if (!Array.isArray(entry_ids) || entry_ids.length === 0) {
+    return res.status(400).json({ error: 'entry_ids array is required' });
+  }
+
+  const placeholders = entry_ids.map((_, i) => `$${i + 2}`).join(', ');
+  const { rowCount } = await db.query(
+    `UPDATE ledger_entries
+     SET session_id = $1
+     WHERE id IN (${placeholders})
+       AND session_id IS NULL
+       AND entry_type IN ('payroll', 'expense', 'savings_transfer')`,
+    [sessionId, ...entry_ids]
+  );
+
+  res.json({ claimed: rowCount ?? 0 });
 });
 
 router.post('/open', async (req, res) => {
