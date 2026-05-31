@@ -9,6 +9,17 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+
+#### Session Reconciliation — post-close physical count and digital balance entry
+- New `PATCH /register/sessions/:id/reconcile` endpoint (admin only) accepts physical product counts and an actual digital balance after the session is closed.
+- Session report returns `active_products` — the subset of unit-tracked products sold, tabbed, or restocked during the session — each with system expected count, physical count (if entered), unit delta, and financial value of the discrepancy (delta × price).
+- Session report returns `actual_digital`, `digital_variance` (actual − expected) once a digital balance is entered.
+- Digital Reconciliation card in the session report now shows actual vs expected with a variance label when reconciled.
+- New inline **Reconciliation** card in the session report (closed sessions only): editable physical count per active product with live delta and value preview, plus an Actual Digital Balance field. Save button calls the reconcile endpoint and refreshes the report.
+- Physical counts are fully updatable — re-submitting a count for a product replaces the previous entry.
+- 4 new BDD scenarios (122/122 passing).
+
 ### Changed
 
 #### Tabs — Session-scoped (breaking design change)

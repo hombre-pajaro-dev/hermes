@@ -172,3 +172,46 @@ Then('the session report expected_digital is positive', function (this: PosWorld
   expect(body.expected_digital, 'expected_digital missing from session report').to.be.a('number');
   expect(body.expected_digital).to.be.greaterThan(0);
 });
+
+When('I submit post-close reconciliation with physical count for {string} of {int}',
+  async function (this: PosWorld, productName: string, units: number) {
+    const sessRes = await this.agent.get('/api/register/sessions');
+    const sessions = sessRes.body as { id: number; status: string }[];
+    const last = sessions.find(s => s.status === 'closed') ?? sessions[0];
+    const prodRes = await this.agent.get(`/api/products?name=${encodeURIComponent(productName)}`);
+    const product = prodRes.body as { id: number };
+    this.response = await this.agent.patch(`/api/register/sessions/${last.id}/reconcile`)
+      .send({ physical_counts: [{ product_id: product.id, units }] });
+  }
+);
+
+When('I submit post-close reconciliation with actual digital {float}',
+  async function (this: PosWorld, amount: number) {
+    const sessRes = await this.agent.get('/api/register/sessions');
+    const sessions = sessRes.body as { id: number; status: string }[];
+    const last = sessions.find(s => s.status === 'closed') ?? sessions[0];
+    this.response = await this.agent.patch(`/api/register/sessions/${last.id}/reconcile`)
+      .send({ actual_digital: amount });
+  }
+);
+
+Then('the session report actual_digital is {float}', function (this: PosWorld, expected: number) {
+  const body = this.response.body as { actual_digital: number };
+  expect(body.actual_digital, 'actual_digital missing from session report').to.be.a('number');
+  expect(body.actual_digital).to.be.closeTo(expected, 0.01);
+});
+
+Then('the session report has exactly {int} adjustment(s) for {string}',
+  function (this: PosWorld, count: number, productName: string) {
+    const body = this.response.body as { adjustments: { name: string }[] };
+    const matching = body.adjustments.filter(a => a.name === productName);
+    expect(matching.length, `Expected exactly ${count} adjustment(s) for "${productName}"`).to.equal(count);
+  }
+);
+
+Then('the session report active_products includes {string}', function (this: PosWorld, productName: string) {
+  const body = this.response.body as { active_products: { name: string }[] };
+  expect(body.active_products, 'active_products missing from session report').to.be.an('array');
+  expect(body.active_products.some(p => p.name === productName),
+    `Expected active_products to include "${productName}"`).to.be.true;
+});

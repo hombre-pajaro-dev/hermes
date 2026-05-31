@@ -94,6 +94,42 @@ router.get('/sessions/:id/report', async (req, res) => {
     GROUP BY p.id, p.name
   `, [sessionId]);
 
+  // Active products: sold, tabbed, or restocked during the session (unit-tracked, no supplies)
+  const { rows: activeProductRows } = await db.query<{ id: number; name: string; price: number; physical_count: number | null; delta: number | null }>(`
+    SELECT DISTINCT p.id, p.name, p.price,
+      (SELECT ia.physical_count FROM inventory_adjustments ia WHERE ia.session_id = $1 AND ia.product_id = p.id ORDER BY ia.created_at DESC LIMIT 1) as physical_count,
+      (SELECT ia.delta        FROM inventory_adjustments ia WHERE ia.session_id = $1 AND ia.product_id = p.id ORDER BY ia.created_at DESC LIMIT 1) as delta
+    FROM products p
+    WHERE p.track_inventory = true
+      AND p.id NOT IN (SELECT product_id FROM product_supplies)
+      AND p.id IN (
+        SELECT DISTINCT oi.product_id FROM order_items oi JOIN orders o ON o.id = oi.order_id WHERE o.session_id = $1
+        UNION
+        SELECT DISTINCT ti.product_id FROM tab_items ti JOIN tabs t ON t.id = ti.tab_id WHERE t.session_id = $1
+        UNION
+        SELECT DISTINCT ri.product_id FROM restock_items ri JOIN restock_orders ro ON ro.id = ri.restock_order_id WHERE ro.session_id = $1
+      )
+    ORDER BY p.name
+  `, [sessionId]);
+
+  // Build active_products with system_count from closing snapshot
+  const snapshot = session.inventory_snapshot_close as { products: { id: number; units: number }[] } | null;
+  const snapshotMap = new Map((snapshot?.products ?? []).map(p => [p.id, p.units]));
+  const activeProducts = activeProductRows.map(p => {
+    const systemCount = snapshotMap.get(p.id) ?? null;
+    const delta = p.delta != null ? Number(p.delta) : null;
+    const value = delta != null && p.price != null ? delta * Number(p.price) : null;
+    return {
+      product_id: p.id,
+      name: p.name,
+      price: Number(p.price),
+      system_count: systemCount,
+      physical_count: p.physical_count != null ? Number(p.physical_count) : null,
+      delta,
+      value,
+    };
+  });
+
   const { rows: [commRow] } = await db.query(`
     SELECT COALESCE(SUM(amount), 0) as commission_total
     FROM ledger_entries
@@ -157,6 +193,8 @@ router.get('/sessions/:id/report', async (req, res) => {
     transfer_sales: Number(totals.transfer_sales),
     expected_cash: expectedCash,
     expected_digital: expectedDigital,
+    actual_digital: session.actual_digital != null ? Number(session.actual_digital) : null,
+    digital_variance: session.actual_digital != null ? Number(session.actual_digital) - expectedDigital : null,
     cash_variance: cashVariance,
     by_item: byItem.map(r => ({
       product_id: r.product_id, name: r.name,
@@ -167,7 +205,64 @@ router.get('/sessions/:id/report', async (req, res) => {
     restocked: restocked.map(r => ({ product_id: r.product_id, name: r.name, units_restocked: Number(r.units_restocked) })),
     adjustments: adjustments.map(a => ({ product_id: a.product_id, name: a.name, delta: Number(a.delta) })),
     payments: payments.map(p => ({ id: p.id, entry_type: p.entry_type, account: p.account, amount: Number(p.amount), description: p.description, created_at: p.created_at })),
+    active_products: activeProducts,
   });
+});
+
+router.patch('/sessions/:id/reconcile', requireAdmin, async (req, res) => {
+  const db = await getDb();
+  const sessionId = Number(req.params.id);
+  const { rows: [session] } = await db.query('SELECT * FROM register_sessions WHERE id = $1', [sessionId]);
+  if (!session) return res.status(404).json({ error: 'Session not found' });
+  if (session.status !== 'closed') return res.status(409).json({ error: 'Can only reconcile a closed session' });
+
+  const { physical_counts, actual_digital } = req.body as {
+    physical_counts?: { product_id: number; units: number }[];
+    actual_digital?: number;
+  };
+
+  const snapshot = session.inventory_snapshot_close as { products: { id: number; units: number }[] } | null;
+  const snapshotMap = new Map((snapshot?.products ?? []).map(p => [p.id, p.units]));
+
+  if (Array.isArray(physical_counts)) {
+    for (const count of physical_counts) {
+      const { rows: [product] } = await db.query('SELECT * FROM products WHERE id = $1', [count.product_id]);
+      if (!product || product.track_inventory === false) continue;
+      const usesSupplies = await productUsesSupplies(db, count.product_id);
+      if (usesSupplies) continue;
+
+      // Remove existing adjustment for this (session, product) and revert its unit change
+      const { rows: existing } = await db.query(
+        'SELECT * FROM inventory_adjustments WHERE session_id = $1 AND product_id = $2 ORDER BY created_at DESC LIMIT 1',
+        [sessionId, count.product_id]
+      );
+      if (existing[0]) {
+        await db.query('DELETE FROM ledger_entries WHERE ref_id = $1 AND ref_type = $2', [existing[0].id, 'adjustment']);
+        await db.query('UPDATE products SET units = units - $1 WHERE id = $2', [existing[0].delta, count.product_id]);
+        await db.query('DELETE FROM inventory_adjustments WHERE id = $1', [existing[0].id]);
+      }
+
+      const systemCount = snapshotMap.get(count.product_id) ?? product.units;
+      const delta = count.units - systemCount;
+      if (delta === 0) continue;
+
+      await db.query('UPDATE products SET units = $1 WHERE id = $2', [count.units, count.product_id]);
+      const { rows: [adjRow] } = await db.query(
+        'INSERT INTO inventory_adjustments (session_id, product_id, previous_units, physical_count, delta, created_at) VALUES ($1, $2, $3, $4, $5, NOW()) RETURNING *',
+        [sessionId, count.product_id, systemCount, count.units, delta]
+      );
+      await db.query(
+        "INSERT INTO ledger_entries (entry_type, account, amount, description, ref_id, ref_type) VALUES ('adjustment', 'inventory_adjustment', $1, $2, $3, 'adjustment')",
+        [delta * product.cost, `Reconciliation: ${product.name} (${delta > 0 ? '+' : ''}${delta} units)`, adjRow.id]
+      );
+    }
+  }
+
+  if (actual_digital != null) {
+    await db.query('UPDATE register_sessions SET actual_digital = $1 WHERE id = $2', [actual_digital, sessionId]);
+  }
+
+  res.json({ ok: true });
 });
 
 router.post('/open', async (req, res) => {

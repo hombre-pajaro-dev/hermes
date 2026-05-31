@@ -157,3 +157,40 @@ Feature: Register (Open / Close / Cashout)
     And I fetch the session report for the last session
     Then the session report expected_cash is 203.00
     And the session report cash_variance is 0.00
+
+  Scenario: Post-close reconciliation with physical count creates inventory adjustment
+    Given the register is open with opening cash 200
+    And I have sold items
+      | product_name | quantity | payment |
+      | Espresso     | 2        | cash    |
+    When I close the register with closing cash 206.00
+    And I submit post-close reconciliation with physical count for "Espresso" of 95
+    And I fetch the session report for the last session
+    Then the session report has an adjustment for "Espresso"
+
+  Scenario: Post-close reconciliation stores actual digital balance
+    Given the register is open with opening cash 200
+    When I close the register with closing cash 200.00
+    And I submit post-close reconciliation with actual digital 150.00
+    And I fetch the session report for the last session
+    Then the session report actual_digital is 150.00
+
+  Scenario: Post-close physical count is updatable — only one adjustment per product remains
+    Given the register is open with opening cash 200
+    And I have sold items
+      | product_name | quantity | payment |
+      | Espresso     | 2        | cash    |
+    When I close the register with closing cash 206.00
+    And I submit post-close reconciliation with physical count for "Espresso" of 95
+    And I submit post-close reconciliation with physical count for "Espresso" of 97
+    And I fetch the session report for the last session
+    Then the session report has exactly 1 adjustment for "Espresso"
+
+  Scenario: Session report returns products active during session for reconciliation
+    Given the register is open with opening cash 200
+    And I have sold items
+      | product_name | quantity | payment |
+      | Espresso     | 2        | cash    |
+    When I close the register with closing cash 206.00
+    And I fetch the session report for the last session
+    Then the session report active_products includes "Espresso"

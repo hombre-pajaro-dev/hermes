@@ -462,12 +462,127 @@ export default function ReportsView() {
                             <div className="card__title">Digital Reconciliation</div>
                             <div className="stats" style={{ marginTop: 8 }}>
                               <div className="stat">
-                                <div className="stat__label">Expected Digital</div>
+                                <div className="stat__label">Expected</div>
                                 <div className="stat__value">${sessionReport.expected_digital.toFixed(2)}</div>
                               </div>
+                              {sessionReport.actual_digital != null && (
+                                <div className="stat">
+                                  <div className="stat__label">Actual</div>
+                                  <div className="stat__value">${sessionReport.actual_digital.toFixed(2)}</div>
+                                </div>
+                              )}
+                              {sessionReport.digital_variance != null && (
+                                <div className="stat">
+                                  <div className="stat__label">{sessionReport.digital_variance === 0 ? 'Balanced' : sessionReport.digital_variance > 0 ? 'Over' : 'Short'}</div>
+                                  <div className="stat__value" style={{ color: sessionReport.digital_variance === 0 ? 'var(--success)' : sessionReport.digital_variance > 0 ? 'var(--success)' : 'var(--danger)' }}>
+                                    {sessionReport.digital_variance === 0 ? '—' : `${sessionReport.digital_variance > 0 ? '+' : ''}$${sessionReport.digital_variance.toFixed(2)}`}
+                                  </div>
+                                </div>
+                              )}
                             </div>
                           </div>
                         )}
+
+                        {/* Post-close reconciliation */}
+                        {s.status === 'closed' && (() => {
+                          const [reconDigital, setReconDigital] = useState(
+                            sessionReport.actual_digital != null ? String(sessionReport.actual_digital) : ''
+                          );
+                          const [reconCounts, setReconCounts] = useState<Record<number, string>>(() => {
+                            const init: Record<number, string> = {};
+                            for (const p of sessionReport.active_products ?? []) {
+                              if (p.physical_count != null) init[p.product_id] = String(p.physical_count);
+                            }
+                            return init;
+                          });
+                          const [reconSaving, setReconSaving] = useState(false);
+                          const [reconError, setReconError] = useState('');
+                          const [reconSuccess, setReconSuccess] = useState('');
+                          const activeProds = sessionReport.active_products ?? [];
+
+                          async function saveReconciliation() {
+                            setReconSaving(true); setReconError(''); setReconSuccess('');
+                            try {
+                              const physical_counts = Object.entries(reconCounts)
+                                .filter(([, v]) => v !== '')
+                                .map(([id, v]) => ({ product_id: Number(id), units: Number(v) }));
+                              const actual_digital = reconDigital !== '' ? Number(reconDigital) : undefined;
+                              await api.reconcileSession(s.id, { physical_counts, actual_digital });
+                              setReconSuccess('Reconciliation saved');
+                              setSelectedSessionId(s.id);
+                            } catch (e: unknown) { setReconError((e as Error).message); }
+                            finally { setReconSaving(false); }
+                          }
+
+                          return (
+                            <div className="card" data-testid="session-reconciliation">
+                              <div className="card__title">Reconciliation</div>
+                              {reconError && <div className="error-banner" style={{ marginBottom: 8 }}>{reconError}</div>}
+                              {reconSuccess && <div className="success-banner" style={{ marginBottom: 8 }}>{reconSuccess}</div>}
+
+                              <div className="field">
+                                <label className="label">Actual Digital Balance ($)</label>
+                                <input className="input" type="number" min="0" step="0.01" placeholder="0.00"
+                                  value={reconDigital} onChange={e => setReconDigital(e.target.value)} />
+                              </div>
+
+                              {activeProds.length > 0 && (
+                                <div style={{ marginTop: 12 }}>
+                                  <div style={{ fontSize: '0.8rem', fontWeight: 600, marginBottom: 6, color: 'var(--text-secondary)' }}>Physical Counts</div>
+                                  <div style={{ overflowX: 'auto' }}>
+                                    <table style={{ width: '100%', fontSize: '0.85rem', borderCollapse: 'collapse' }}>
+                                      <thead>
+                                        <tr style={{ borderBottom: '1px solid var(--border)' }}>
+                                          <th style={{ textAlign: 'left', padding: '4px 8px' }}>Product</th>
+                                          <th style={{ textAlign: 'right', padding: '4px 8px' }}>System</th>
+                                          <th style={{ textAlign: 'right', padding: '4px 8px' }}>Counted</th>
+                                          <th style={{ textAlign: 'right', padding: '4px 8px' }}>Δ Units</th>
+                                          <th style={{ textAlign: 'right', padding: '4px 8px' }}>Δ Value</th>
+                                        </tr>
+                                      </thead>
+                                      <tbody>
+                                        {activeProds.map(p => {
+                                          const raw = reconCounts[p.product_id] ?? '';
+                                          const counted = raw !== '' ? Number(raw) : null;
+                                          const sysCount = p.system_count;
+                                          const liveDelta = counted != null && sysCount != null ? counted - sysCount : p.delta;
+                                          const liveValue = liveDelta != null ? liveDelta * p.price : null;
+                                          return (
+                                            <tr key={p.product_id} style={{ borderBottom: '1px solid var(--border)' }}>
+                                              <td style={{ padding: '6px 8px' }}>{p.name}</td>
+                                              <td style={{ padding: '6px 8px', textAlign: 'right', color: 'var(--text-secondary)' }}>
+                                                {sysCount ?? '—'}
+                                              </td>
+                                              <td style={{ padding: '6px 8px', textAlign: 'right' }}>
+                                                <input type="number" min="0" step="1"
+                                                  style={{ width: 70, textAlign: 'right', padding: '2px 4px', border: '1px solid var(--border)', borderRadius: 4 }}
+                                                  placeholder={sysCount != null ? String(sysCount) : ''}
+                                                  value={raw}
+                                                  onChange={e => setReconCounts(prev => ({ ...prev, [p.product_id]: e.target.value }))}
+                                                />
+                                              </td>
+                                              <td style={{ padding: '6px 8px', textAlign: 'right', color: liveDelta == null ? 'var(--text-secondary)' : liveDelta < 0 ? 'var(--danger)' : liveDelta > 0 ? 'var(--success)' : undefined }}>
+                                                {liveDelta == null ? '—' : `${liveDelta > 0 ? '+' : ''}${liveDelta}`}
+                                              </td>
+                                              <td style={{ padding: '6px 8px', textAlign: 'right', color: liveValue == null ? 'var(--text-secondary)' : liveValue < 0 ? 'var(--danger)' : liveValue > 0 ? 'var(--success)' : undefined }}>
+                                                {liveValue == null ? '—' : `${liveValue > 0 ? '+' : ''}$${liveValue.toFixed(2)}`}
+                                              </td>
+                                            </tr>
+                                          );
+                                        })}
+                                      </tbody>
+                                    </table>
+                                  </div>
+                                </div>
+                              )}
+
+                              <button className="btn btn--primary" style={{ marginTop: 12 }}
+                                onClick={saveReconciliation} disabled={reconSaving}>
+                                {reconSaving ? 'Saving…' : 'Save Reconciliation'}
+                              </button>
+                            </div>
+                          );
+                        })()}
 
                         {/* Inventory comparison */}
                         {(openSnap || closeSnap) && inventoryRows.length > 0 && (
