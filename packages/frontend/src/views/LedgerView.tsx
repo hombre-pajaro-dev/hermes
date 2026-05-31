@@ -65,7 +65,7 @@ export default function LedgerView() {
   const [paymentAccounts, setPaymentAccounts] = useState<Record<number, string>>({});
   const [paymentNote, setPaymentNote] = useState('');
   const [paymentSessionId, setPaymentSessionId] = useState<number | ''>('');
-  const [closedSessions, setClosedSessions] = useState<RegisterSessionSummary[]>([]);
+  const [linkableSessions, setLinkableSessions] = useState<RegisterSessionSummary[]>([]);
   const [paymentsError, setPaymentsError] = useState('');
   const [paymentsSuccess, setPaymentsSuccess] = useState('');
   const [showManagePayees, setShowManagePayees] = useState(false);
@@ -104,9 +104,10 @@ export default function LedgerView() {
       loadPayees();
       api.getProviders().then(setProviders).catch(() => {});
       api.getRegisterSessions().then(sessions => {
-        const closed = sessions.filter(s => s.status === 'closed');
-        setClosedSessions(closed);
-        if (closed.length > 0) setPaymentSessionId(closed[0].id);
+        setLinkableSessions(sessions);
+        const open = sessions.find(s => s.status === 'open');
+        const first = open ?? sessions[0];
+        if (first) setPaymentSessionId(first.id);
       }).catch(() => {});
     }
   }, [isAdmin]);
@@ -694,7 +695,7 @@ export default function LedgerView() {
               </div>
             )}
 
-            {closedSessions.length > 0 && (
+            {linkableSessions.length > 0 && (
               <div className="field">
                 <label className="label">Link to session</label>
                 <select
@@ -704,9 +705,9 @@ export default function LedgerView() {
                   onChange={e => setPaymentSessionId(Number(e.target.value))}
                 >
                   <option value="">— none —</option>
-                  {closedSessions.map(s => (
+                  {linkableSessions.map(s => (
                     <option key={s.id} value={s.id}>
-                      #{s.id} — {new Date(s.opened_at).toLocaleDateString()} {new Date(s.opened_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                      #{s.id} — {new Date(s.opened_at).toLocaleDateString()} {new Date(s.opened_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}{s.status === 'open' ? ' (open)' : ''}
                     </option>
                   ))}
                 </select>

@@ -61,7 +61,8 @@ router.get('/sessions/:id/report', async (req, res) => {
     SELECT COUNT(*)::int as order_count,
            COALESCE(SUM(total), 0) as revenue,
            COALESCE(SUM(CASE WHEN payment_method = 'cash' THEN total ELSE 0 END), 0) as cash_sales,
-           COALESCE(SUM(CASE WHEN payment_method = 'card' THEN total ELSE 0 END), 0) as card_sales
+           COALESCE(SUM(CASE WHEN payment_method = 'card' THEN total ELSE 0 END), 0) as card_sales,
+           COALESCE(SUM(CASE WHEN payment_method = 'transfer' THEN total ELSE 0 END), 0) as transfer_sales
     FROM orders WHERE session_id = $1 AND status = 'paid'
   `, [sessionId]);
 
@@ -117,11 +118,23 @@ router.get('/sessions/:id/report', async (req, res) => {
       + COALESCE((SELECT SUM(total) FROM orders WHERE session_id = $1 AND status = 'paid' AND payment_method = 'cash'), 0)
       + COALESCE((SELECT SUM(total) FROM tabs   WHERE status = 'paid' AND payment_method = 'cash' AND paid_at >= $3 AND paid_at <= COALESCE($4, NOW())), 0)
       - COALESCE((SELECT SUM(amount) FROM cashouts WHERE session_id = $1), 0)
+      + COALESCE((SELECT SUM(amount) FROM ledger_entries WHERE session_id = $1 AND entry_type IN ('payroll', 'expense', 'savings_transfer') AND account = 'cash' AND amount < 0), 0)
     AS expected_cash
   `, [sessionId, session.opening_cash, session.opened_at, session.closed_at ?? null]);
   const expectedCash = Number(cashReconRow.expected_cash);
   const closingCash = session.closing_cash != null ? Number(session.closing_cash) : null;
   const cashVariance = closingCash != null ? closingCash - expectedCash : null;
+
+  // Digital reconciliation — card + transfer inflows minus commissions and digital payouts.
+  const { rows: [digitalReconRow] } = await db.query(`
+    SELECT
+      COALESCE((SELECT SUM(total) FROM orders WHERE session_id = $1 AND status = 'paid' AND payment_method IN ('card', 'transfer')), 0)
+      + COALESCE((SELECT SUM(total) FROM tabs   WHERE status = 'paid' AND payment_method IN ('card', 'transfer') AND paid_at >= $2 AND paid_at <= COALESCE($3, NOW())), 0)
+      + COALESCE((SELECT SUM(amount) FROM ledger_entries WHERE entry_type = 'commission_transfer' AND account = 'digital' AND ref_type = 'order' AND ref_id IN (SELECT id FROM orders WHERE session_id = $1 AND status = 'paid')), 0)
+      + COALESCE((SELECT SUM(amount) FROM ledger_entries WHERE session_id = $1 AND entry_type IN ('payroll', 'expense', 'savings_transfer') AND account = 'digital' AND amount < 0), 0)
+    AS expected_digital
+  `, [sessionId, session.opened_at, session.closed_at ?? null]);
+  const expectedDigital = Number(digitalReconRow.expected_digital);
 
   res.json({
     session: {
@@ -141,7 +154,9 @@ router.get('/sessions/:id/report', async (req, res) => {
     gross_profit: Number(totals.revenue) - Number(costRow.total_cost) - commissionTotal,
     cash_sales: Number(totals.cash_sales),
     card_sales: Number(totals.card_sales),
+    transfer_sales: Number(totals.transfer_sales),
     expected_cash: expectedCash,
+    expected_digital: expectedDigital,
     cash_variance: cashVariance,
     by_item: byItem.map(r => ({
       product_id: r.product_id, name: r.name,

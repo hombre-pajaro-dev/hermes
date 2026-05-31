@@ -152,7 +152,7 @@ export interface SessionInventorySnapshot { products: InventorySnapshotEntry[]; 
 export interface SessionPayment { id: number; entry_type: string; account: string; amount: number; description: string; created_at: string; }
 export interface SessionReport {
   session: RegisterSessionSummary & { inventory_snapshot_open: SessionInventorySnapshot | null; inventory_snapshot_close: SessionInventorySnapshot | null; };
-  order_count: number; revenue: number; total_cost: number; commission_total?: number; gross_profit: number; cash_sales: number; card_sales: number; expected_cash?: number; cash_variance?: number | null;
+  order_count: number; revenue: number; total_cost: number; commission_total?: number; gross_profit: number; cash_sales: number; card_sales: number; transfer_sales: number; expected_cash?: number; cash_variance?: number | null; expected_digital?: number;
   by_item: { product_id: number; name: string; units_sold: number; revenue: number; cost: number; profit: number }[];
   cashouts: { id: number; amount: number; reason: string; created_at: string }[];
   restocked: { product_id: number; name: string; units_restocked: number }[];

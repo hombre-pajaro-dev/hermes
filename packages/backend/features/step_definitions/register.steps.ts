@@ -160,3 +160,15 @@ Then('the session report cash_variance is {float}', function (this: PosWorld, ex
   const body = this.response.body as { cash_variance: number };
   expect(body.cash_variance).to.be.closeTo(expected, 0.001);
 });
+
+Then('the session report transfer_sales is at least {float}', function (this: PosWorld, min: number) {
+  const body = this.response.body as { transfer_sales: number };
+  expect(body.transfer_sales, 'transfer_sales missing from session report').to.be.a('number');
+  expect(body.transfer_sales).to.be.at.least(min);
+});
+
+Then('the session report expected_digital is positive', function (this: PosWorld) {
+  const body = this.response.body as { expected_digital: number };
+  expect(body.expected_digital, 'expected_digital missing from session report').to.be.a('number');
+  expect(body.expected_digital).to.be.greaterThan(0);
+});

@@ -162,6 +162,7 @@ router.get('/close-brief', async (req, res) => {
       + COALESCE((SELECT SUM(total) FROM orders WHERE session_id = $1 AND status = 'paid' AND payment_method = 'cash'), 0)
       + COALESCE((SELECT SUM(total) FROM tabs   WHERE session_id = $1 AND status = 'paid' AND payment_method = 'cash'), 0)
       - COALESCE((SELECT SUM(amount) FROM cashouts WHERE session_id = $1), 0)
+      + COALESCE((SELECT SUM(amount) FROM ledger_entries WHERE session_id = $1 AND entry_type IN ('payroll', 'expense', 'savings_transfer') AND account = 'cash' AND amount < 0), 0)
     AS expected_cash
   `, [sessionId, sessionRow?.opening_cash ?? 0]);
   const briefExpectedCash = Number(briefCashRow.expected_cash);

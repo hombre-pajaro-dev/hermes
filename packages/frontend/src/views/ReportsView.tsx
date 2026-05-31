@@ -419,6 +419,9 @@ export default function ReportsView() {
                           <div className="stat"><div className="stat__label">Revenue</div><div className="stat__value">${revenue.toFixed(2)}</div></div>
                           <div className="stat"><div className="stat__label">Cash</div><div className="stat__value">${cash_sales.toFixed(2)}</div></div>
                           <div className="stat"><div className="stat__label">Card</div><div className="stat__value">${card_sales.toFixed(2)}</div></div>
+                          {(sessionReport.transfer_sales ?? 0) > 0 && (
+                            <div className="stat"><div className="stat__label">Transfer</div><div className="stat__value">${(sessionReport.transfer_sales ?? 0).toFixed(2)}</div></div>
+                          )}
                           <div className="stat"><div className="stat__label">Cost</div><div className="stat__value">${total_cost.toFixed(2)}</div></div>
                           {(sessionReport.commission_total ?? 0) > 0 && (
                             <div className="stat"><div className="stat__label">Commissions</div><div className="stat__value" style={{ color: '#f59e0b' }}>−${(sessionReport.commission_total ?? 0).toFixed(2)}</div></div>
@@ -449,6 +452,19 @@ export default function ReportsView() {
                                   </div>
                                 </div>
                               )}
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Digital reconciliation */}
+                        {sessionReport.expected_digital != null && (
+                          <div className="card" data-testid="session-digital-reconciliation">
+                            <div className="card__title">Digital Reconciliation</div>
+                            <div className="stats" style={{ marginTop: 8 }}>
+                              <div className="stat">
+                                <div className="stat__label">Expected Digital</div>
+                                <div className="stat__value">${sessionReport.expected_digital.toFixed(2)}</div>
+                              </div>
                             </div>
                           </div>
                         )}

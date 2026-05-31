@@ -109,6 +109,43 @@ Feature: Register (Open / Close / Cashout)
     And I fetch the session report for the last session
     Then the session report has no adjustments
 
+  Scenario: Cash payroll linked to session reduces expected_cash
+    Given the register is open with opening cash 200
+    And there is a payee "ShiftStaff" of type "staff"
+    When I POST /api/payments/run with the payee amount 50 from "cash" for the current session
+    And I close the register with closing cash 150.00
+    And I fetch the session report for the last session
+    Then the session report expected_cash is 150.00
+    And the session report cash_variance is 0.00
+
+  Scenario: Digital payroll linked to session does not reduce expected_cash
+    Given the register is open with opening cash 200
+    And there is a payee "DigitalStaff" of type "staff"
+    When I POST /api/payments/run with the payee amount 50 from "digital" for the current session
+    And I close the register with closing cash 200.00
+    And I fetch the session report for the last session
+    Then the session report expected_cash is 200.00
+    And the session report cash_variance is 0.00
+
+  Scenario: Transfer sales are tracked separately in the session report
+    Given the register is open with opening cash 200
+    And I have sold items
+      | product_name | quantity | payment  |
+      | Espresso     | 2        | transfer |
+    When I fetch the session report for the current session
+    Then the session report transfer_sales is at least 1.00
+
+  Scenario: Session report has expected_digital tracking card and transfer inflows minus payouts
+    Given the register is open with opening cash 200
+    And I have sold items
+      | product_name | quantity | payment |
+      | Espresso     | 5        | card    |
+    And there is a payee "DigitalPayee" of type "staff"
+    When I POST /api/payments/run with the payee amount 3 from "digital" for the current session
+    And I close the register with closing cash 200.00
+    And I fetch the session report for the last session
+    Then the session report expected_digital is positive
+
   Scenario: Closing register includes cash from tabs opened in a previous session
     Given the register is open with opening cash 200
     And I open a new tab named "Cross-Session Tab"

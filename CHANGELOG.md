@@ -9,6 +9,18 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Fixed
+
+#### Session Report — Transfer sales and digital reconciliation
+- Session report now tracks `transfer_sales` separately (previously lumped with card under digital, but not shown).
+- New **Digital Reconciliation** card in the session report shows `expected_digital`: card + transfer inflows minus card commissions and digital-sourced payouts.
+
+#### Session Report — Cash reconciliation now accounts for session payments
+- `expected_cash` in the session report (and close-brief) now subtracts cash-sourced payroll, expense, and savings_transfer payments linked to the session. Previously, paying staff in cash during a session caused a false negative cash variance.
+
+#### Distribute Payments — Session selector now includes the open session
+- The "Link to session" dropdown in Distribute Payments now shows all sessions (open and closed), not just closed ones. Defaults to the currently open session when present, so payments made during an active shift are linked correctly.
+
 ### Added
 
 #### Payments — Transfer payment method

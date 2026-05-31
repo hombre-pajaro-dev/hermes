@@ -120,6 +120,19 @@ When(/^I POST \/api\/payments\/run with the payee amount ([\d.]+) from "([^"]+)"
   }
 );
 
+When(/^I POST \/api\/payments\/run with the payee amount ([\d.]+) from "([^"]+)" for the current session$/,
+  async function (this: PosWorld, amountStr: string, account: string) {
+    const id = (this.context as { payeeId?: number }).payeeId;
+    const sessRes = await this.agent.get('/api/register/sessions');
+    const sessions = sessRes.body as { id: number; status: string }[];
+    const openSession = sessions.find(s => s.status === 'open');
+    this.response = await this.agent.post('/api/payments/run').send({
+      entries: [{ payee_id: id, amount: Number(amountStr), source_account: account }],
+      session_id: openSession?.id,
+    });
+  }
+);
+
 When(/^I POST \/api\/payments\/run with the payee amount ([\d.]+) from "([^"]+)" for the last closed session$/,
   async function (this: PosWorld, amountStr: string, account: string) {
     const id = (this.context as { payeeId?: number }).payeeId;
