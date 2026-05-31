@@ -48,6 +48,13 @@ Feature: Payments
     And I fetch the session report for the last session
     Then the session report payments include "SessionStaff" with amount -100
 
+  Scenario: Payment run without explicit session_id auto-links to the open session
+    Given there is a payee "AutoLinkStaff" of type "staff"
+    When I POST /api/payments/run with the payee amount 75 from "cash"
+    And I close the register with closing cash 200.00
+    And I fetch the session report for the last session
+    Then the session report payments include "AutoLinkStaff" with amount -75
+
   Scenario: Run a savings payment also credits the savings account
     Given there is a payee "TestSavings2" of type "savings"
     When I POST /api/payments/run with the payee amount 200 from "digital"

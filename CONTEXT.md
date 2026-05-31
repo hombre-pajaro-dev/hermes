@@ -42,7 +42,7 @@ A tab opened with `at_cost = true`. Items are priced at `staff_price` instead of
 The act of entering actual shelf counts after a session is closed, as part of the post-close reconciliation step. Only products that were active during the session (sold, tabbed, or restocked) are shown for counting. Discrepancies create Inventory Adjustments visible in the session report and P&L. Counts are updatable — re-submitting replaces the previous entry. Physical counts are NOT collected at session close time.
 
 ### Session Payment
-A payment run (payroll, expense, or savings transfer) explicitly linked to a register session via `session_id`. Appears in the session report as a list of individual entries. The session must be selected explicitly when running payments — the system does not infer it.
+A payment run (payroll, expense, or savings transfer) linked to a register session. Appears in the session report and in the P&L. If no session is specified when running payments, the system automatically links the entry to the currently open session. The session selector in the Distribute Payments UI allows overriding this — useful for retroactively linking a payment to a specific closed session.
 
 ### Session (Register Session)
 A variable-length trading period. A session may span hours, days, or a full week depending on business volume. It begins when the register is opened and ends when all open tabs are settled and the register is closed. A session is the unit of cash reconciliation: all sales and tab payments within a session are reconciled against the opening and closing cash counts.
