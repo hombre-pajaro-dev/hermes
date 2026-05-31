@@ -156,6 +156,7 @@ export interface SessionReport {
   session: RegisterSessionSummary & { inventory_snapshot_open: SessionInventorySnapshot | null; inventory_snapshot_close: SessionInventorySnapshot | null; };
   order_count: number; revenue: number; total_cost: number; commission_total?: number; gross_profit: number; cash_sales: number; card_sales: number; transfer_sales: number; expected_cash?: number; cash_variance?: number | null; expected_digital?: number; actual_digital?: number | null; digital_variance?: number | null;
   active_products: { product_id: number; name: string; price: number; system_count: number | null; physical_count: number | null; delta: number | null; value: number | null }[];
+  pnl: { revenue: number; tab_revenue: number; tab_cash: number; tab_card: number; tab_transfer: number; cogs: number; commissions: number; gross_profit: number; payroll: number; expenses: number; writeoffs: number; inventory_adjustment: number; net: number };
   by_item: { product_id: number; name: string; units_sold: number; revenue: number; cost: number; profit: number }[];
   cashouts: { id: number; amount: number; reason: string; created_at: string }[];
   restocked: { product_id: number; name: string; units_restocked: number }[];

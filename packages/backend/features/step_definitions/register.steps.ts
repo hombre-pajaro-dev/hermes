@@ -209,6 +209,24 @@ Then('the session report has exactly {int} adjustment(s) for {string}',
   }
 );
 
+Then('the session report pnl net is positive', function (this: PosWorld) {
+  const body = this.response.body as { pnl: { net: number } };
+  expect(body.pnl, 'pnl missing from session report').to.exist;
+  expect(body.pnl.net).to.be.greaterThan(0);
+});
+
+Then('the session report pnl revenue is at least {float}', function (this: PosWorld, min: number) {
+  const body = this.response.body as { pnl: { revenue: number } };
+  expect(body.pnl, 'pnl missing from session report').to.exist;
+  expect(body.pnl.revenue).to.be.at.least(min);
+});
+
+Then('the session report pnl payroll is {float}', function (this: PosWorld, expected: number) {
+  const body = this.response.body as { pnl: { payroll: number } };
+  expect(body.pnl, 'pnl missing from session report').to.exist;
+  expect(body.pnl.payroll).to.be.closeTo(expected, 0.01);
+});
+
 Then('the session report active_products includes {string}', function (this: PosWorld, productName: string) {
   const body = this.response.body as { active_products: { name: string }[] };
   expect(body.active_products, 'active_products missing from session report').to.be.an('array');

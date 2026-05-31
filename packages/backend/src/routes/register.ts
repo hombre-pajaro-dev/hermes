@@ -172,6 +172,45 @@ router.get('/sessions/:id/report', async (req, res) => {
   `, [sessionId]);
   const expectedDigital = Number(digitalReconRow.expected_digital);
 
+  // P&L: full revenue including tabs, tab COGS, write-offs, inventory adjustment value
+  const { rows: [tabTotalsRow] } = await db.query(`
+    SELECT
+      COALESCE(SUM(t.total), 0) as tab_revenue,
+      COALESCE(SUM(CASE WHEN t.payment_method = 'cash'     THEN t.total ELSE 0 END), 0) as tab_cash,
+      COALESCE(SUM(CASE WHEN t.payment_method = 'card'     THEN t.total ELSE 0 END), 0) as tab_card,
+      COALESCE(SUM(CASE WHEN t.payment_method = 'transfer' THEN t.total ELSE 0 END), 0) as tab_transfer,
+      COALESCE(SUM(ti_cost.cost), 0) as tab_cost
+    FROM tabs t
+    LEFT JOIN (
+      SELECT tab_id, SUM(quantity * unit_cost) as cost FROM tab_items GROUP BY tab_id
+    ) ti_cost ON ti_cost.tab_id = t.id
+    WHERE t.session_id = $1 AND t.status = 'paid'
+  `, [sessionId]);
+
+  const { rows: [pnlRow] } = await db.query(`
+    SELECT
+      COALESCE(SUM(CASE WHEN entry_type = 'payroll'      AND amount < 0 THEN ABS(amount) ELSE 0 END), 0) as payroll,
+      COALESCE(SUM(CASE WHEN entry_type = 'expense'      AND amount < 0 THEN ABS(amount) ELSE 0 END), 0) as expenses,
+      COALESCE(SUM(CASE WHEN entry_type = 'tab_writeoff' AND amount < 0 THEN ABS(amount) ELSE 0 END), 0) as writeoffs
+    FROM ledger_entries WHERE session_id = $1
+  `, [sessionId]);
+
+  const { rows: [adjValueRow] } = await db.query(`
+    SELECT COALESCE(SUM(le.amount), 0) as adj_value
+    FROM ledger_entries le
+    WHERE le.entry_type = 'adjustment' AND le.ref_type = 'adjustment'
+      AND le.ref_id IN (SELECT id FROM inventory_adjustments WHERE session_id = $1)
+  `, [sessionId]);
+
+  const pnlRevenue    = Number(totals.revenue) + Number(tabTotalsRow.tab_revenue);
+  const pnlCogs       = Number(costRow.total_cost) + Number(tabTotalsRow.tab_cost);
+  const pnlGrossProfit = pnlRevenue - pnlCogs - commissionTotal;
+  const pnlPayroll    = Number(pnlRow.payroll);
+  const pnlExpenses   = Number(pnlRow.expenses);
+  const pnlWriteoffs  = Number(pnlRow.writeoffs);
+  const pnlInvAdj     = Number(adjValueRow.adj_value);
+  const pnlNet        = pnlGrossProfit - pnlPayroll - pnlExpenses - pnlWriteoffs + pnlInvAdj;
+
   res.json({
     session: {
       id: session.id,
@@ -206,6 +245,21 @@ router.get('/sessions/:id/report', async (req, res) => {
     adjustments: adjustments.map(a => ({ product_id: a.product_id, name: a.name, delta: Number(a.delta) })),
     payments: payments.map(p => ({ id: p.id, entry_type: p.entry_type, account: p.account, amount: Number(p.amount), description: p.description, created_at: p.created_at })),
     active_products: activeProducts,
+    pnl: {
+      revenue: pnlRevenue,
+      tab_revenue: Number(tabTotalsRow.tab_revenue),
+      tab_cash: Number(tabTotalsRow.tab_cash),
+      tab_card: Number(tabTotalsRow.tab_card),
+      tab_transfer: Number(tabTotalsRow.tab_transfer),
+      cogs: pnlCogs,
+      commissions: commissionTotal,
+      gross_profit: pnlGrossProfit,
+      payroll: pnlPayroll,
+      expenses: pnlExpenses,
+      writeoffs: pnlWriteoffs,
+      inventory_adjustment: pnlInvAdj,
+      net: pnlNet,
+    },
   });
 });
 

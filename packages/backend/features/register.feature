@@ -194,3 +194,35 @@ Feature: Register (Open / Close / Cashout)
     When I close the register with closing cash 206.00
     And I fetch the session report for the last session
     Then the session report active_products includes "Espresso"
+
+  Scenario: Session P&L net is positive when sales exceed costs
+    Given the register is open with opening cash 200
+    And I have sold items
+      | product_name | quantity | payment |
+      | Espresso     | 3        | cash    |
+    When I close the register with closing cash 209.50
+    And I fetch the session report for the last session
+    Then the session report pnl net is positive
+
+  Scenario: Session P&L includes tab revenue
+    Given the register is open with opening cash 200
+    And I open a new tab named "PnL Tab"
+    And I add items to the tab
+      | product_name | quantity |
+      | Espresso     | 2        |
+    When I pay the tab with cash amount 9999.00
+    And I close the register with closing cash 207.00
+    And I fetch the session report for the last session
+    Then the session report pnl revenue is at least 5.00
+
+  Scenario: Session P&L net decreases when payroll is recorded
+    Given the register is open with opening cash 200
+    And I have sold items
+      | product_name | quantity | payment |
+      | Espresso     | 3        | cash    |
+    And there is a payee "PnLStaff" of type "staff"
+    When I POST /api/payments/run with the payee amount 5 from "cash" for the current session
+    And I close the register with closing cash 204.50
+    And I fetch the session report for the last session
+    Then the session report pnl payroll is 5.00
+    And the session report pnl net is positive

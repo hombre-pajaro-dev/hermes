@@ -11,6 +11,12 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+#### Session Report — P&L Summary and PDF export
+- New **P&L Summary** card at the bottom of each session report showing all financial flows in a single table: order revenue, tab revenue, COGS, card commissions, gross profit, payroll, expenses, write-offs, inventory adjustment value, and **Net Session Result** (positive = profit, negative = loss).
+- Tab revenue and tab COGS were previously excluded from the session report's revenue/profit figures — the P&L now includes the complete picture.
+- **Print / Save as PDF** button at the bottom of each session report. Uses the browser's native print dialog with `@media print` styles that hide navigation and format the report for paper.
+- 3 new BDD scenarios (125/125 passing).
+
 #### Session Reconciliation — post-close physical count and digital balance entry
 - New `PATCH /register/sessions/:id/reconcile` endpoint (admin only) accepts physical product counts and an actual digital balance after the session is closed.
 - Session report returns `active_products` — the subset of unit-tracked products sold, tabbed, or restocked during the session — each with system expected count, physical count (if entered), unit delta, and financial value of the discrepancy (delta × price).

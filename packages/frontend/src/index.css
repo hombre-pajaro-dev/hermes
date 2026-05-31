@@ -308,3 +308,11 @@ body {
   .checkout-cart-back { display: none; }
   .checkout-sticky-bar { display: none !important; }
 }
+
+@media print {
+  header, nav, .tabs-nav, .no-print { display: none !important; }
+  body { background: #fff; color: #000; }
+  .card { box-shadow: none; border: 1px solid #ccc; break-inside: avoid; }
+  .stats { flex-wrap: wrap; }
+  a { color: inherit; text-decoration: none; }
+}

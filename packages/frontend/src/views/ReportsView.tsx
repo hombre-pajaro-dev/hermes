@@ -674,6 +674,50 @@ export default function ReportsView() {
                             })}
                           </div>
                         )}
+
+                        {/* P&L Summary */}
+                        {sessionReport.pnl && (() => {
+                          const pnl = sessionReport.pnl;
+                          const rows: { label: string; value: number; indent?: boolean; separator?: boolean; bold?: boolean }[] = [
+                            { label: 'Revenue (orders)', value: sessionReport.revenue },
+                            { label: 'Revenue (tabs)', value: pnl.tab_revenue, indent: true },
+                            { label: 'Total Revenue', value: pnl.revenue, bold: true },
+                            { label: 'Cost of Goods', value: -pnl.cogs, indent: true },
+                            { label: 'Card Commissions', value: -pnl.commissions, indent: true },
+                            { label: 'Gross Profit', value: pnl.gross_profit, bold: true },
+                          ];
+                          if (pnl.payroll > 0)            rows.push({ label: 'Payroll', value: -pnl.payroll, indent: true });
+                          if (pnl.expenses > 0)           rows.push({ label: 'Expenses', value: -pnl.expenses, indent: true });
+                          if (pnl.writeoffs > 0)          rows.push({ label: 'Write-offs', value: -pnl.writeoffs, indent: true });
+                          if (pnl.inventory_adjustment !== 0) rows.push({ label: 'Inventory Adjustment', value: pnl.inventory_adjustment, indent: true });
+                          rows.push({ label: 'Net Session Result', value: pnl.net, bold: true });
+                          return (
+                            <div className="card" data-testid="session-pnl" id="session-pnl">
+                              <div className="card__title">P&amp;L Summary</div>
+                              <table style={{ width: '100%', fontSize: '0.9rem', borderCollapse: 'collapse', marginTop: 8 }}>
+                                <tbody>
+                                  {rows.map((row, i) => (
+                                    <tr key={i} style={{ borderTop: row.bold ? '1px solid var(--border)' : undefined }}>
+                                      <td style={{ padding: '5px 0 5px', paddingLeft: row.indent ? 16 : 0, color: row.bold ? undefined : 'var(--text-secondary)', fontWeight: row.bold ? 700 : undefined }}>
+                                        {row.label}
+                                      </td>
+                                      <td style={{ textAlign: 'right', fontWeight: row.bold ? 700 : undefined, color: row.bold && row.value < 0 ? 'var(--danger)' : row.bold && row.value > 0 ? 'var(--success)' : row.value < 0 ? 'var(--danger)' : undefined }}>
+                                        {row.value >= 0 ? `$${row.value.toFixed(2)}` : `−$${Math.abs(row.value).toFixed(2)}`}
+                                      </td>
+                                    </tr>
+                                  ))}
+                                </tbody>
+                              </table>
+                            </div>
+                          );
+                        })()}
+
+                        {/* Print button */}
+                        <div className="no-print" style={{ marginTop: 8 }}>
+                          <button className="btn btn--ghost" onClick={() => window.print()}>
+                            Print / Save as PDF
+                          </button>
+                        </div>
                       </>
                     );
                   })()}
