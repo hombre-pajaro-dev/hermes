@@ -374,10 +374,7 @@ router.post('/cashout', requireAdmin, async (req, res) => {
 router.post('/close', requireAdmin, async (req, res) => {
   const session = await getOpenSession();
   if (!session) return res.status(403).json({ error: 'Register is not open' });
-  const { closing_cash, physical_counts } = req.body as {
-    closing_cash: number;
-    physical_counts?: { product_id: number; units: number }[];
-  };
+  const { closing_cash } = req.body as { closing_cash: number };
   if (closing_cash == null) return res.status(400).json({ error: 'closing_cash is required' });
 
   const db = await getDb();
@@ -426,26 +423,6 @@ router.post('/close', requireAdmin, async (req, res) => {
       [variance, varianceDesc, session.id]
     );
 
-    // Physical count adjustments — only for tracked, unit-based products where count differs
-    if (Array.isArray(physical_counts) && physical_counts.length > 0) {
-      for (const count of physical_counts) {
-        const { rows: [product] } = await client.query('SELECT * FROM products WHERE id = $1', [count.product_id]);
-        if (!product || product.track_inventory === false) continue;
-        const usesSupplies = await productUsesSupplies(client, count.product_id);
-        if (usesSupplies) continue;
-        const delta = count.units - product.units;
-        if (delta === 0) continue;
-        await client.query('UPDATE products SET units = $1 WHERE id = $2', [count.units, count.product_id]);
-        const { rows: [adjRow] } = await client.query(
-          "INSERT INTO inventory_adjustments (session_id, product_id, previous_units, physical_count, delta, created_at) VALUES ($1, $2, $3, $4, $5, NOW()) RETURNING *",
-          [session.id, count.product_id, product.units, count.units, delta]
-        );
-        await client.query(
-          "INSERT INTO ledger_entries (entry_type, account, amount, description, ref_id, ref_type) VALUES ('adjustment', 'inventory_adjustment', $1, $2, $3, 'adjustment')",
-          [delta * product.cost, `Physical count: ${product.name} (${delta > 0 ? '+' : ''}${delta} units)`, adjRow.id]
-        );
-      }
-    }
 
     await client.query('COMMIT');
     const { rows } = await client.query('SELECT * FROM register_sessions WHERE id = $1', [session.id]);

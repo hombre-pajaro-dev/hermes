@@ -19,23 +19,6 @@ When('I close the register with closing cash {float}', async function (this: Pos
   this.response = await this.agent.post('/api/register/close').send({ closing_cash: amount });
 });
 
-When('I close the register with closing cash {float} and physical count for {string} of {int}', async function (this: PosWorld, cash: number, productName: string, units: number) {
-  const prodRes = await this.agent.get(`/api/products?name=${encodeURIComponent(productName)}`);
-  const product = prodRes.body as { id: number };
-  this.response = await this.agent.post('/api/register/close').send({
-    closing_cash: cash,
-    physical_counts: [{ product_id: product.id, units }],
-  });
-});
-
-When('I close the register with closing cash {float} and physical count matching system for {string}', async function (this: PosWorld, cash: number, productName: string) {
-  const prodRes = await this.agent.get(`/api/products?name=${encodeURIComponent(productName)}`);
-  const product = prodRes.body as { id: number; units: number };
-  this.response = await this.agent.post('/api/register/close').send({
-    closing_cash: cash,
-    physical_counts: [{ product_id: product.id, units: product.units }],
-  });
-});
 
 Then('the session report has an adjustment for {string}', function (this: PosWorld, productName: string) {
   const body = this.response.body as { adjustments: { name: string }[] };

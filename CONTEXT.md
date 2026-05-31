@@ -38,8 +38,8 @@ The price charged to staff on at-cost tabs. Stored as `staff_price` (flat dollar
 ### At-Cost Tab
 A tab opened with `at_cost = true`. Items are priced at `staff_price` instead of `price`. Label shown in UI: `(staff)`. Discounts are disabled on at-cost tabs.
 
-### Physical Count Close
-The act of entering actual shelf counts for all active products as part of the register close action — done in the same form as entering closing cash. Products default to the system's current unit count; the cashier only corrects the ones that differ. Discrepancies automatically create Inventory Adjustments. The physical count is visible in the session report alongside the system count.
+### Physical Count (Post-Close)
+The act of entering actual shelf counts after a session is closed, as part of the post-close reconciliation step. Only products that were active during the session (sold, tabbed, or restocked) are shown for counting. Discrepancies create Inventory Adjustments visible in the session report and P&L. Counts are updatable — re-submitting replaces the previous entry. Physical counts are NOT collected at session close time.
 
 ### Session Payment
 A payment run (payroll, expense, or savings transfer) explicitly linked to a register session via `session_id`. Appears in the session report as a list of individual entries. The session must be selected explicitly when running payments — the system does not infer it.
