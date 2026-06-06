@@ -157,14 +157,14 @@ router.get('/close-brief', async (req, res) => {
   // Cash reconciliation
   const { rows: [sessionRow] } = await db.query('SELECT opening_cash, closing_cash FROM register_sessions WHERE id = $1', [sessionId]);
   const { rows: [briefCashRow] } = await db.query(`
-    SELECT
-      $2::numeric
-      + COALESCE((SELECT SUM(total) FROM orders WHERE session_id = $1 AND status = 'paid' AND payment_method = 'cash'), 0)
-      + COALESCE((SELECT SUM(total) FROM tabs   WHERE session_id = $1 AND status = 'paid' AND payment_method = 'cash'), 0)
-      - COALESCE((SELECT SUM(amount) FROM cashouts WHERE session_id = $1), 0)
-      + COALESCE((SELECT SUM(amount) FROM ledger_entries WHERE session_id = $1 AND entry_type IN ('payroll', 'expense', 'savings_transfer') AND account = 'cash' AND amount < 0), 0)
-    AS expected_cash
-  `, [sessionId, sessionRow?.opening_cash ?? 0]);
+    SELECT COALESCE(
+      (SELECT rs.closing_cash - le.amount
+       FROM register_sessions rs
+       JOIN ledger_entries le ON le.ref_id = rs.id AND le.ref_type = 'session' AND le.entry_type = 'register_close'
+       WHERE rs.id = $1),
+      (SELECT COALESCE(SUM(amount), 0) FROM ledger_entries WHERE account = 'cash')
+    ) AS expected_cash
+  `, [sessionId]);
   const briefExpectedCash = Number(briefCashRow.expected_cash);
   const briefClosingCash = sessionRow?.closing_cash != null ? Number(sessionRow.closing_cash) : null;
   const briefCashVariance = briefClosingCash != null ? briefClosingCash - briefExpectedCash : null;

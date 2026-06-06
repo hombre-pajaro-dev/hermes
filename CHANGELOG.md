@@ -9,6 +9,13 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Fixed
+
+#### Register close — expected cash now uses ledger cash balance
+- The previous expected-cash formula (`opening_cash + cash_orders + cash_tabs − cashouts − linked_payments`) missed any `account_adjustment` ledger entries against the cash account, as well as cash payment runs not explicitly linked to the session via `session_id`. This caused the variance shown at close to be wrong when manual ledger adjustments had been made during the session.
+- At close time, expected cash is now `SELECT SUM(amount) FROM ledger_entries WHERE account = 'cash'` — the running ledger cash balance, which captures every cash movement (sales, tab payments, cashouts, payment runs, and account adjustments).
+- The `register_close` ledger entry's stored variance is authoritative. Session report and close-brief now derive expected cash for closed sessions from it (`closing_cash − variance`) rather than re-computing from the session formula.
+
 ### Added
 
 #### Session Report — Unclaimed Payments (retroactive session linking)
