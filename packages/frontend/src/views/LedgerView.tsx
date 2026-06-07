@@ -96,6 +96,7 @@ export default function LedgerView() {
   const [billPaying, setBillPaying] = useState<Record<number, boolean>>({});
   const [billPaid, setBillPaid] = useState<Record<number, boolean>>({});
   const [qtyOverrides, setQtyOverrides] = useState<Record<string, number>>({});
+  const [billAccount, setBillAccount] = useState('cash');
 
   useEffect(() => {
     api.getLedger().then(setEntries).catch(() => {});
@@ -203,7 +204,7 @@ export default function LedgerView() {
   async function handlePaySessionBill(bill: ProviderBill, total: number) {
     setBillPaying(prev => ({ ...prev, [bill.provider_id]: true }));
     try {
-      await api.providerPayment(bill.provider_id, total, adhocAccount, `Session bill: ${bill.provider_name}`);
+      await api.providerPayment(bill.provider_id, total, billAccount, `Session bill: ${bill.provider_name}`);
       setBillPaid(prev => ({ ...prev, [bill.provider_id]: true }));
       const [e, b] = await Promise.all([api.getLedger(), api.getBalances()]);
       setEntries(e); setBalances(b);
@@ -932,6 +933,19 @@ export default function LedgerView() {
                 <div className="field" style={{ flex: 1, minWidth: 120, marginBottom: 0 }}>
                   <label className="label">To</label>
                   <input className="input" type="date" value={endsAt} onChange={e => setEndsAt(e.target.value)} />
+                </div>
+                <div className="field" style={{ flex: 1, minWidth: 100, marginBottom: 0 }}>
+                  <label className="label">Pay with</label>
+                  <select
+                    data-testid="session-bill-account"
+                    className="input"
+                    value={billAccount}
+                    onChange={e => setBillAccount(e.target.value)}
+                  >
+                    {accounts.filter(a => a.name === 'cash' || a.name === 'digital').map(a => (
+                      <option key={a.name} value={a.name}>{a.label}</option>
+                    ))}
+                  </select>
                 </div>
                 <button
                   data-testid="load-session-bill-btn"
