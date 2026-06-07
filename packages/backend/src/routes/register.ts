@@ -43,10 +43,9 @@ router.get('/sessions/:id/report', async (req, res) => {
   const { rows: [session] } = await db.query('SELECT * FROM register_sessions WHERE id = $1', [sessionId]);
   if (!session) return res.status(404).json({ error: 'Session not found' });
 
-  const { rows: byItem } = await db.query<{ product_id: number; name: string; units_sold: number; revenue: number; cost: number; profit: number }>(`
+  const { rows: byItemRaw } = await db.query<{ product_id: number; name: string; units_sold: number; revenue: number; cost: number; profit: number }>(`
     SELECT p.id as product_id, p.name,
-           SUM(oi.quantity) as units_sold,
-           SUM(oi.subtotal) as revenue,
+           SUM(oi.quantity) as units_sold, SUM(oi.subtotal) as revenue,
            SUM(oi.quantity * oi.unit_cost) as cost,
            SUM(oi.subtotal - oi.quantity * oi.unit_cost) as profit
     FROM order_items oi
@@ -54,8 +53,28 @@ router.get('/sessions/:id/report', async (req, res) => {
     JOIN products p ON p.id = oi.product_id
     WHERE o.session_id = $1 AND o.status = 'paid'
     GROUP BY p.id, p.name
-    ORDER BY SUM(oi.subtotal) DESC
+    UNION ALL
+    SELECT p.id, p.name, SUM(ti.quantity), SUM(ti.subtotal),
+           SUM(ti.quantity * ti.unit_cost), SUM(ti.subtotal - ti.quantity * ti.unit_cost)
+    FROM tab_items ti
+    JOIN tabs t ON t.id = ti.tab_id
+    JOIN products p ON p.id = ti.product_id
+    WHERE t.session_id = $1 AND t.status = 'paid'
+    GROUP BY p.id, p.name
   `, [sessionId]);
+  const byItemMap = new Map<number, { product_id: number; name: string; units_sold: number; revenue: number; cost: number; profit: number }>();
+  for (const row of byItemRaw) {
+    const ex = byItemMap.get(row.product_id);
+    if (ex) {
+      ex.units_sold += Number(row.units_sold);
+      ex.revenue    += Number(row.revenue);
+      ex.cost       += Number(row.cost);
+      ex.profit     += Number(row.profit);
+    } else {
+      byItemMap.set(row.product_id, { ...row, units_sold: Number(row.units_sold), revenue: Number(row.revenue), cost: Number(row.cost), profit: Number(row.profit) });
+    }
+  }
+  const byItem = Array.from(byItemMap.values()).sort((a, b) => b.revenue - a.revenue);
 
   const { rows: [totals] } = await db.query(`
     SELECT COUNT(*)::int as order_count,

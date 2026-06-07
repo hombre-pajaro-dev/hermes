@@ -19,6 +19,10 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+#### Session report by_item now includes tab sales
+- `by_item` in `GET /register/sessions/:id/report` previously only counted items from direct orders. Tab items were excluded, causing the "Sold" column in the Inventory Activity table and the "Sales by Product" card to undercount units and revenue for any product sold via a tab during the session.
+- The query now uses a UNION ALL across `order_items` and `tab_items` (both scoped to the session), merged by product. The result matches the complete sold counts visible in the global By Item report.
+
 #### Register close — expected cash now uses ledger cash balance
 - The previous expected-cash formula (`opening_cash + cash_orders + cash_tabs − cashouts − linked_payments`) missed any `account_adjustment` ledger entries against the cash account, as well as cash payment runs not explicitly linked to the session via `session_id`. This caused the variance shown at close to be wrong when manual ledger adjustments had been made during the session.
 - At close time, expected cash is now `SELECT SUM(amount) FROM ledger_entries WHERE account = 'cash'` — the running ledger cash balance, which captures every cash movement (sales, tab payments, cashouts, payment runs, and account adjustments).
