@@ -204,6 +204,30 @@ Feature: Register (Open / Close / Cashout)
     And I fetch the session report for the last session
     Then the session report pnl revenue is at least 5.00
 
+  Scenario: Admin can reopen the most recently closed session
+    Given the register is open with opening cash 200
+    When I close the register with closing cash 200.00
+    And I reopen the last closed session
+    Then the register status is "open"
+    And the ledger has no "register_close" entry
+
+  Scenario: Cannot reopen session when register is already open
+    Given the register is open with opening cash 200
+    When I close the register with closing cash 200.00
+    And I reopen the last closed session
+    And I try to reopen the current session
+    Then the response status is 409
+    And the response error mentions "already open"
+
+  Scenario: Cannot reopen a session that is not the most recently closed
+    Given the register is open with opening cash 200
+    When I close the register with closing cash 200.00
+    And the register is open with opening cash 100
+    And I close the register with closing cash 100.00
+    And I try to reopen the oldest closed session
+    Then the response status is 409
+    And the response error mentions "most recently"
+
   Scenario: Session P&L net decreases when payroll is recorded
     Given the register is open with opening cash 200
     And I have sold items

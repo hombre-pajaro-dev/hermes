@@ -9,6 +9,14 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+
+#### Reopen closed session (admin)
+- New `POST /register/sessions/:id/reopen` endpoint (admin only) to reopen the most recently closed register session.
+- Guards: rejects if another session is already open (409), if the target session is not the most recently closed (409), or if the session isn't found (404).
+- On success: deletes the `register_close` ledger entry for the session and clears `closing_cash`, `closed_at`, and `inventory_snapshot_close`, returning the session to `open` status.
+- 3 BDD scenarios added (129/129 passing).
+
 ### Fixed
 
 #### Register close — expected cash now uses ledger cash balance

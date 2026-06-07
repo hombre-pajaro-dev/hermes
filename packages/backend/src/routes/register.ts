@@ -409,6 +409,37 @@ router.post('/cashout', requireAdmin, async (req, res) => {
   res.status(201).json(cashout);
 });
 
+router.post('/sessions/:id/reopen', requireAdmin, async (req, res) => {
+  const db = await getDb();
+  const sessionId = Number(req.params.id);
+  const { rows: [session] } = await db.query('SELECT * FROM register_sessions WHERE id = $1', [sessionId]);
+  if (!session) return res.status(404).json({ error: 'Session not found' });
+
+  const openSession = await getOpenSession();
+  if (openSession) return res.status(409).json({ error: 'Cannot reopen — another session is already open' });
+
+  if (session.status !== 'closed') return res.status(409).json({ error: 'Session is not closed' });
+
+  const { rows: [mostRecent] } = await db.query(
+    "SELECT id FROM register_sessions ORDER BY id DESC LIMIT 1"
+  );
+  if (mostRecent.id !== sessionId) {
+    return res.status(409).json({ error: 'Only the most recently closed session can be reopened' });
+  }
+
+  await db.query(
+    "DELETE FROM ledger_entries WHERE entry_type = 'register_close' AND ref_type = 'session' AND ref_id = $1",
+    [sessionId]
+  );
+  await db.query(
+    "UPDATE register_sessions SET status = 'open', closing_cash = NULL, closed_at = NULL, inventory_snapshot_close = NULL WHERE id = $1",
+    [sessionId]
+  );
+
+  const { rows: [updated] } = await db.query('SELECT * FROM register_sessions WHERE id = $1', [sessionId]);
+  res.json(updated);
+});
+
 router.post('/close', requireAdmin, async (req, res) => {
   const session = await getOpenSession();
   if (!session) return res.status(403).json({ error: 'Register is not open' });

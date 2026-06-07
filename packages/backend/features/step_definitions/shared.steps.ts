@@ -34,6 +34,13 @@ Given('the register is closed', async function (this: PosWorld) {
 
 // ── Shared ledger step ────────────────────────────────────────────
 
+Then('the ledger has no {string} entry', async function (this: PosWorld, type: string) {
+  const res = await this.agent.get('/api/ledger');
+  const entries = res.body as { entry_type: string }[];
+  const found = entries.some(e => e.entry_type === type);
+  expect(found, `Expected ledger to have no '${type}' entry, but one was found`).to.be.false;
+});
+
 Then('the ledger has a {string} entry', async function (this: PosWorld, type: string) {
   const res = await this.agent.get('/api/ledger');
   const entries = res.body as { entry_type: string }[];

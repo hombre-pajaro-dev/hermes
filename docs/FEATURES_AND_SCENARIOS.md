@@ -87,6 +87,9 @@ This document lists all **features** and **scenarios** covered by the BDD test s
 | 17 | Closing register with physical counts creates inventory adjustments for discrepancies | Close with physical count of 90 for Espresso (system has 100); session report includes adjustment for Espresso. |
 | 18 | Closing register with physical counts matching system does not create adjustments | Close with physical count matching system units; session report adjustments array is empty. |
 | 19 | Run a payment with session_id appears in the session report | Run payment for closed session; `GET /register/sessions/:id/report` payments array includes that payee with correct amount. |
+| 20 | Admin can reopen the most recently closed session | Open, close, then `POST /register/sessions/:id/reopen`; session status returns to `open`; `register_close` ledger entry is deleted. |
+| 21 | Cannot reopen session when register is already open | After reopening, trying to reopen again returns 409 with "already open". |
+| 22 | Cannot reopen a session that is not the most recently closed | Two closed sessions exist; attempting to reopen the older one returns 409 with "most recently". |
 
 ---
 

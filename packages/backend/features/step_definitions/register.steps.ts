@@ -210,6 +210,34 @@ Then('the session report pnl payroll is {float}', function (this: PosWorld, expe
   expect(body.pnl.payroll).to.be.closeTo(expected, 0.01);
 });
 
+When('I reopen the last closed session', async function (this: PosWorld) {
+  const sessRes = await this.agent.get('/api/register/sessions');
+  const sessions = sessRes.body as { id: number; status: string }[];
+  const lastClosed = sessions.find(s => s.status === 'closed');
+  this.response = await this.agent.post(`/api/register/sessions/${lastClosed!.id}/reopen`);
+  if (this.response.status === 200) this.context.sessionId = lastClosed!.id;
+});
+
+When('I try to reopen the current session', async function (this: PosWorld) {
+  const sessionId = this.context.sessionId as number;
+  this.response = await this.agent.post(`/api/register/sessions/${sessionId}/reopen`);
+});
+
+When('I try to reopen the last closed session', async function (this: PosWorld) {
+  const sessRes = await this.agent.get('/api/register/sessions');
+  const sessions = sessRes.body as { id: number; status: string }[];
+  const lastClosed = sessions.find(s => s.status === 'closed');
+  this.response = await this.agent.post(`/api/register/sessions/${lastClosed!.id}/reopen`);
+});
+
+When('I try to reopen the oldest closed session', async function (this: PosWorld) {
+  const sessRes = await this.agent.get('/api/register/sessions');
+  const sessions = sessRes.body as { id: number; status: string }[];
+  const closedSessions = sessions.filter(s => s.status === 'closed');
+  const oldest = closedSessions[closedSessions.length - 1];
+  this.response = await this.agent.post(`/api/register/sessions/${oldest!.id}/reopen`);
+});
+
 Then('the session report active_products includes {string}', function (this: PosWorld, productName: string) {
   const body = this.response.body as { active_products: { name: string }[] };
   expect(body.active_products, 'active_products missing from session report').to.be.an('array');
