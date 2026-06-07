@@ -114,3 +114,24 @@ Feature: General Ledger and Accounts
     When I transfer 50.00 from account "cash" to account "cash"
     Then the response status is 400
     And the response error mentions "different"
+
+  Scenario: Admin can delete a manual ledger entry
+    When I post an account adjustment of 50.00 to "cash" with description "Test deposit"
+    And I fetch the ledger
+    And I delete the "account_adjustment" ledger entry
+    Then the response status is 200
+    And I fetch the ledger
+    And the ledger has no "account_adjustment" entry
+
+  Scenario: Deleting a non-manual entry type is rejected
+    When I create an order with items
+      | product_name | quantity |
+      | Espresso     | 1        |
+    And I pay the order with card
+    And I fetch the ledger
+    And I try to delete the "sale" ledger entry
+    Then the response status is 409
+
+  Scenario: Deleting a non-existent ledger entry returns 404
+    When I try to delete ledger entry 999999
+    Then the response status is 404

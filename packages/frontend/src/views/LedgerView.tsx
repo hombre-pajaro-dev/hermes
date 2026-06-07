@@ -40,6 +40,9 @@ export default function LedgerView() {
   const [expandedId, setExpandedId] = useState<number | null>(null);
   const [itemsCache, setItemsCache] = useState<Record<number, LedgerEntryItem[] | null>>({});
   const [loadingId, setLoadingId] = useState<number | null>(null);
+  const [deleteConfirmId, setDeleteConfirmId] = useState<number | null>(null);
+  const [deletingId, setDeletingId] = useState<number | null>(null);
+  const [deleteError, setDeleteError] = useState('');
 
   // ── Account adjustment ───────────────────────────────────────────────────────
   const [adjAccount, setAdjAccount] = useState('cash');
@@ -92,6 +95,7 @@ export default function LedgerView() {
   const [billError, setBillError] = useState('');
   const [billPaying, setBillPaying] = useState<Record<number, boolean>>({});
   const [billPaid, setBillPaid] = useState<Record<number, boolean>>({});
+  const [qtyOverrides, setQtyOverrides] = useState<Record<string, number>>({});
 
   useEffect(() => {
     api.getLedger().then(setEntries).catch(() => {});
@@ -180,8 +184,15 @@ export default function LedgerView() {
     } catch (e: unknown) { setAdhocError((e as Error).message); }
   }
 
+  function effectiveBillTotal(bill: ProviderBill): number {
+    return bill.products.reduce((sum, item) => {
+      const qty = qtyOverrides[`${bill.provider_id}-${item.product_id}`] ?? item.qty_sold;
+      return sum + qty * item.unit_cost;
+    }, 0);
+  }
+
   async function loadSessionBill() {
-    setBillError(''); setSessionBill([]); setBillPaid({});
+    setBillError(''); setSessionBill([]); setBillPaid({}); setQtyOverrides({});
     if (!beginsAt || !endsAt) return;
     setBillLoading(true);
     try { setSessionBill(await api.getSessionBill(beginsAt, endsAt, localTz)); }
@@ -189,10 +200,10 @@ export default function LedgerView() {
     setBillLoading(false);
   }
 
-  async function handlePaySessionBill(bill: ProviderBill) {
+  async function handlePaySessionBill(bill: ProviderBill, total: number) {
     setBillPaying(prev => ({ ...prev, [bill.provider_id]: true }));
     try {
-      await api.providerPayment(bill.provider_id, bill.total, adhocAccount, `Session bill: ${bill.provider_name}`);
+      await api.providerPayment(bill.provider_id, total, adhocAccount, `Session bill: ${bill.provider_name}`);
       setBillPaid(prev => ({ ...prev, [bill.provider_id]: true }));
       const [e, b] = await Promise.all([api.getLedger(), api.getBalances()]);
       setEntries(e); setBalances(b);
@@ -209,6 +220,21 @@ export default function LedgerView() {
       setItemsCache(prev => ({ ...prev, [entryId]: null }));
     }
     setLoadingId(null);
+  }
+
+  const DELETABLE_TYPES = new Set(['expense', 'payroll', 'account_adjustment']);
+
+  async function handleDeleteEntry(id: number) {
+    setDeletingId(id);
+    setDeleteError('');
+    try {
+      await api.deleteLedgerEntry(id);
+      setEntries(prev => prev.filter(e => e.id !== id));
+      const b = await api.getBalances();
+      setBalances(b);
+    } catch (e: unknown) { setDeleteError((e as Error).message); }
+    setDeletingId(null);
+    setDeleteConfirmId(null);
   }
 
   async function toggleEntry(entry: LedgerEntry) {
@@ -271,6 +297,7 @@ export default function LedgerView() {
 
       {tab === 'entries' && (
         <div className="card" data-testid="ledger-entries">
+          {deleteError && <div className="error-banner" style={{ marginBottom: 8 }}>{deleteError}</div>}
           {entries.length === 0 ? <div className="empty">No entries yet</div> : (() => {
             // Group commission + commission_transfer pairs (same ref) into one row
             const transferByRef = new Map<string, LedgerEntry>();
@@ -337,6 +364,29 @@ export default function LedgerView() {
                     {displayAccount && <div className="list-item__sub">{displayAccount}</div>}
                   </div>
                 </div>
+                {isAdmin && DELETABLE_TYPES.has(e.entry_type) && (
+                  <div style={{ padding: '4px 12px 8px', display: 'flex', gap: 8, alignItems: 'center' }}>
+                    {deleteConfirmId === e.id ? (
+                      <>
+                        <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>Delete this entry?</span>
+                        <button
+                          data-testid={`confirm-delete-entry-${e.id}`}
+                          className="btn btn--sm btn--danger"
+                          disabled={deletingId === e.id}
+                          onClick={() => handleDeleteEntry(e.id)}
+                        >{deletingId === e.id ? '…' : 'Delete'}</button>
+                        <button className="btn btn--sm btn--ghost" onClick={() => setDeleteConfirmId(null)}>Cancel</button>
+                      </>
+                    ) : (
+                      <button
+                        data-testid={`delete-entry-${e.id}`}
+                        className="btn btn--sm btn--ghost"
+                        style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}
+                        onClick={ev => { ev.stopPropagation(); setDeleteConfirmId(e.id); }}
+                      >Delete</button>
+                    )}
+                  </div>
+                )}
                 {expanded && (
                   <div data-testid={`ledger-entry-items-${e.id}`} style={{ background: 'var(--surface-2, #f8fafc)', borderTop: '1px solid var(--border)', padding: '8px 16px 12px' }}>
                     {loadingId === e.id ? (
@@ -896,46 +946,63 @@ export default function LedgerView() {
               {sessionBill.length === 0 && !billLoading && (
                 <div className="empty" data-testid="session-bill-empty">No provider bills for this period</div>
               )}
-              {sessionBill.map(bill => (
-                <div key={bill.provider_id} data-testid={`session-bill-${bill.provider_id}`} style={{ marginBottom: 12, border: '1px solid var(--border)', borderRadius: 8, padding: '10px 12px' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
-                    <div style={{ fontWeight: 700 }}>{bill.provider_name}</div>
-                    <div style={{ fontWeight: 700, color: 'var(--danger)' }}>−${bill.total.toFixed(2)}</div>
-                  </div>
-                  <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.82rem', marginBottom: 8 }}>
-                    <thead>
-                      <tr style={{ color: 'var(--text-secondary)' }}>
-                        <th style={{ textAlign: 'left', fontWeight: 600, paddingBottom: 2 }}>Product</th>
-                        <th style={{ textAlign: 'center', fontWeight: 600, paddingBottom: 2 }}>Qty</th>
-                        <th style={{ textAlign: 'right', fontWeight: 600, paddingBottom: 2 }}>Cost</th>
-                        <th style={{ textAlign: 'right', fontWeight: 600, paddingBottom: 2 }}>Subtotal</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {bill.products.map(item => (
-                        <tr key={item.product_id}>
-                          <td style={{ padding: '1px 0' }}>{item.product_name}</td>
-                          <td style={{ padding: '1px 0', textAlign: 'center' }}>{item.qty_sold}</td>
-                          <td style={{ padding: '1px 0', textAlign: 'right' }}>${item.unit_cost.toFixed(2)}</td>
-                          <td style={{ padding: '1px 0', textAlign: 'right', fontWeight: 600 }}>${item.subtotal.toFixed(2)}</td>
+              {sessionBill.map(bill => {
+                const total = effectiveBillTotal(bill);
+                return (
+                  <div key={bill.provider_id} data-testid={`session-bill-${bill.provider_id}`} style={{ marginBottom: 12, border: '1px solid var(--border)', borderRadius: 8, padding: '10px 12px' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+                      <div style={{ fontWeight: 700 }}>{bill.provider_name}</div>
+                      <div style={{ fontWeight: 700, color: 'var(--danger)' }}>−${total.toFixed(2)}</div>
+                    </div>
+                    <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.82rem', marginBottom: 8 }}>
+                      <thead>
+                        <tr style={{ color: 'var(--text-secondary)' }}>
+                          <th style={{ textAlign: 'left', fontWeight: 600, paddingBottom: 2 }}>Product</th>
+                          <th style={{ textAlign: 'center', fontWeight: 600, paddingBottom: 2 }}>Qty</th>
+                          <th style={{ textAlign: 'right', fontWeight: 600, paddingBottom: 2 }}>Cost</th>
+                          <th style={{ textAlign: 'right', fontWeight: 600, paddingBottom: 2 }}>Subtotal</th>
                         </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                  {billPaid[bill.provider_id] ? (
-                    <div className="success-banner" data-testid={`bill-paid-${bill.provider_id}`}>Payment recorded</div>
-                  ) : (
-                    <button
-                      data-testid={`pay-session-bill-${bill.provider_id}`}
-                      className="btn btn--sm btn--danger"
-                      disabled={billPaying[bill.provider_id] || bill.total <= 0}
-                      onClick={() => handlePaySessionBill(bill)}
-                    >
-                      {billPaying[bill.provider_id] ? '…' : `Pay −$${bill.total.toFixed(2)}`}
-                    </button>
-                  )}
-                </div>
-              ))}
+                      </thead>
+                      <tbody>
+                        {bill.products.map(item => {
+                          const overrideKey = `${bill.provider_id}-${item.product_id}`;
+                          const qty = qtyOverrides[overrideKey] ?? item.qty_sold;
+                          const rowSubtotal = qty * item.unit_cost;
+                          return (
+                            <tr key={item.product_id}>
+                              <td style={{ padding: '2px 0' }}>{item.product_name}</td>
+                              <td style={{ padding: '2px 0', textAlign: 'center' }}>
+                                <input
+                                  type="number"
+                                  min="0"
+                                  value={qty}
+                                  disabled={!!billPaid[bill.provider_id]}
+                                  onChange={e => setQtyOverrides(prev => ({ ...prev, [overrideKey]: Math.max(0, Number(e.target.value)) }))}
+                                  style={{ width: 52, textAlign: 'center', padding: '1px 4px', fontSize: '0.82rem', border: '1px solid var(--border)', borderRadius: 4, background: 'var(--bg)' }}
+                                />
+                              </td>
+                              <td style={{ padding: '2px 0', textAlign: 'right' }}>${item.unit_cost.toFixed(2)}</td>
+                              <td style={{ padding: '2px 0', textAlign: 'right', fontWeight: 600 }}>${rowSubtotal.toFixed(2)}</td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                    {billPaid[bill.provider_id] ? (
+                      <div className="success-banner" data-testid={`bill-paid-${bill.provider_id}`}>Payment recorded</div>
+                    ) : (
+                      <button
+                        data-testid={`pay-session-bill-${bill.provider_id}`}
+                        className="btn btn--sm btn--danger"
+                        disabled={billPaying[bill.provider_id] || total <= 0}
+                        onClick={() => handlePaySessionBill(bill, total)}
+                      >
+                        {billPaying[bill.provider_id] ? '…' : `Pay −$${total.toFixed(2)}`}
+                      </button>
+                    )}
+                  </div>
+                );
+              })}
             </div>
           </div>
 

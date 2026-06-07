@@ -153,6 +153,26 @@ When('I transfer {float} from account {string} to account {string}', async funct
   this.response = await this.agent.post('/api/ledger/transfer').send({ from_account: from, to_account: to, amount });
 });
 
+When('I delete the {string} ledger entry', async function (this: PosWorld, type: string) {
+  const res = await this.agent.get('/api/ledger');
+  const entries = res.body as { id: number; entry_type: string }[];
+  const entry = entries.find(e => e.entry_type === type);
+  expect(entry, `Expected a '${type}' entry in the ledger`).to.exist;
+  this.response = await this.agent.delete(`/api/ledger/entries/${entry!.id}`);
+});
+
+When('I try to delete the {string} ledger entry', async function (this: PosWorld, type: string) {
+  const res = await this.agent.get('/api/ledger');
+  const entries = res.body as { id: number; entry_type: string }[];
+  const entry = entries.find(e => e.entry_type === type);
+  expect(entry, `Expected a '${type}' entry in the ledger`).to.exist;
+  this.response = await this.agent.delete(`/api/ledger/entries/${entry!.id}`);
+});
+
+When('I try to delete ledger entry {int}', async function (this: PosWorld, id: number) {
+  this.response = await this.agent.delete(`/api/ledger/entries/${id}`);
+});
+
 Then('there is an {string} ledger entry with account {string} and amount {float}', function (this: PosWorld, type: string, account: string, amount: number) {
   const entries = this.response.body as { entry_type: string; account: string; amount: number }[];
   const found = entries.find(e => e.entry_type === type && e.account === account);

@@ -66,6 +66,7 @@ export const api = {
   // Ledger
   getLedger: () => req<LedgerEntry[]>('/ledger'),
   getLedgerItems: (id: number) => req<LedgerEntryItem[]>(`/ledger/entries/${id}/items`),
+  deleteLedgerEntry: (id: number) => req<LedgerEntry>(`/ledger/entries/${id}`, { method: 'DELETE' }),
   getAccounts: () => req<Account[]>('/ledger/accounts'),
   getBalances: () => req<Balance[]>('/ledger/balances'),
   recordPayroll: (amount: number, account: string, description: string) =>

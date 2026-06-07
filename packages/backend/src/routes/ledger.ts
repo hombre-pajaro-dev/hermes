@@ -117,6 +117,21 @@ router.post('/transfer', requireAdmin, async (req, res) => {
   res.status(201).json({ debit, credit });
 });
 
+const DELETABLE_TYPES = new Set(['expense', 'payroll', 'account_adjustment']);
+
+router.delete('/entries/:id', requireAdmin, async (req, res) => {
+  const db = await getDb();
+  const id = Number(req.params.id);
+  const { rows } = await db.query('SELECT * FROM ledger_entries WHERE id = $1', [id]);
+  const entry = rows[0] as { id: number; entry_type: string } | undefined;
+  if (!entry) return res.status(404).json({ error: 'Ledger entry not found' });
+  if (!DELETABLE_TYPES.has(entry.entry_type)) {
+    return res.status(409).json({ error: `Entry type '${entry.entry_type}' cannot be deleted` });
+  }
+  await db.query('DELETE FROM ledger_entries WHERE id = $1', [id]);
+  res.json(entry);
+});
+
 router.post('/adjustment', requireAdmin, async (req, res) => {
   const { account, amount, description = '' } = req.body;
   if (!account || amount === undefined || amount === null) {

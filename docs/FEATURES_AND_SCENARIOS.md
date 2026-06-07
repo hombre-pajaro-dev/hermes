@@ -121,6 +121,9 @@ This document lists all **features** and **scenarios** covered by the BDD test s
 | 14 | At-cost tab payment shows COST badge in ledger (E2E) | Paid at-cost tab in DB; Ledger Entries shows purple COST badge on the `tab payment` row. |
 | 15 | Transfer between accounts creates debit and credit entries | `POST /api/ledger/transfer` from `cash` to `credit_card`; two `transfer` entries created — debit (negative) on source, credit (positive) on destination. |
 | 16 | Transfer to the same account is rejected | `POST /api/ledger/transfer` with identical `from_account` and `to_account`; request rejected with 400. |
+| 17 | Admin can delete a manual ledger entry | `DELETE /api/ledger/entries/:id` on an `account_adjustment` entry; returns 200 with the deleted entry; entry no longer appears in ledger. |
+| 18 | Deleting a non-manual entry type is rejected | `DELETE /api/ledger/entries/:id` on a `sale` entry; returns 409. |
+| 19 | Deleting a non-existent ledger entry returns 404 | `DELETE /api/ledger/entries/999999`; returns 404. |
 
 ---
 
@@ -352,7 +355,7 @@ This document lists all **features** and **scenarios** covered by the BDD test s
 
 **Provider Payments:** Below the payee distribution, a **Provider Payments** card handles two cases:
 - **Ad-hoc payment** — select any provider, enter amount, pick account (cash/card), optional description; posts an `expense` ledger entry with description `"Provider payment: {name}"` (or custom). `POST /api/providers/:id/payment`.
-- **Session bill** — for products with `track_inventory = false` that are linked to a provider via `product_providers`, the system computes `qty_sold × unit_cost` per provider for the selected period. Each provider card shows the breakdown and a confirm button that records the payment. `GET /api/providers/session-bill?from=&to=&tz=`.
+- **Session bill** — for products with `track_inventory = false` that are linked to a provider via `product_providers`, the system computes `qty_sold × unit_cost` per provider for the selected period. Each provider card shows the breakdown with editable quantity inputs (so quantities can be adjusted before paying if actual units differ from what was recorded), and a confirm button that records the payment at the adjusted total. `GET /api/providers/session-bill?from=&to=&tz=`.
 - Untracked products are linked to providers via `PATCH /api/products/:id/provider` (admin only). Schema: `product_providers` junction table (`product_id`, `provider_id`). Products view shows a **Link Provider** / **Change Provider** control for untracked, non-supply products (admin only).
 
 | # | Scenario | Description |

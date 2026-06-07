@@ -11,6 +11,18 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+#### Delete ledger entry (admin)
+- Admin can delete manual ledger entries (`expense`, `payroll`, `account_adjustment`) from the Ledger → Entries tab.
+- Each deletable row shows a small "Delete" button. Clicking it reveals an inline "Delete this entry? / Cancel" confirmation to prevent accidental deletions.
+- `DELETE /api/ledger/entries/:id` — returns the deleted entry. Returns 404 if not found, 409 if the entry type is not deletable (e.g. `sale`, `tab_payment`, `restock`).
+- 3 BDD scenarios added (132/132 passing).
+
+#### Session Bill — editable quantities
+- Each product line in the Session Bill now shows an editable quantity input instead of a read-only count.
+- Subtotals and the provider total update live as quantities are changed, so the Pay button always reflects the adjusted amount.
+- Useful when the actual units delivered by the provider differ slightly from what the POS recorded as sold.
+- Quantities are reset when a new bill period is loaded.
+
 #### Reopen closed session (admin)
 - New `POST /register/sessions/:id/reopen` endpoint (admin only) to reopen the most recently closed register session.
 - Guards: rejects if another session is already open (409), if the target session is not the most recently closed (409), or if the session isn't found (404).
