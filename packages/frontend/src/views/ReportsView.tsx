@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { api } from '../api/client';
 import type { SalesByItem, DailyTotal, DailyRange, CloseBrief, InventoryAdjustmentItem, HistoricReport, WeekdayReport, RegisterSessionSummary, SessionReport } from '../api/client';
+import { authClient } from '../lib/auth-client';
 import ColumnChart from '../components/ColumnChart';
 import DateTimeRangeFilter from '../components/DateTimeRangeFilter';
 
@@ -174,6 +175,9 @@ function saveDate(key: string, value: string) {
 }
 
 export default function ReportsView() {
+  const { data: authSession } = authClient.useSession();
+  const isAdmin = (authSession?.user as { role?: string } | undefined)?.role === 'admin';
+
   const [tab, setTab] = useState<'sales' | 'range' | 'brief' | 'historic' | 'weekday' | 'session'>('sales');
   const [salesFrom, setSalesFrom] = useState(() => loadDate('reports-sales-from', todayDatetime().from));
   const [salesTo, setSalesTo] = useState(() => loadDate('reports-sales-to', todayDatetime().to));
@@ -193,6 +197,8 @@ export default function ReportsView() {
   const [selectedSessionId, setSelectedSessionId] = useState<number | null>(null);
   const [sessionReport, setSessionReport] = useState<SessionReport | null>(null);
   const [reportRefreshKey, setReportRefreshKey] = useState(0);
+  const [reopenLoading, setReopenLoading] = useState(false);
+  const [reopenError, setReopenError] = useState('');
 
   async function fetchSales(from = salesFrom, to = salesTo) {
     setLoading(true); setError('');
@@ -254,6 +260,16 @@ export default function ReportsView() {
     try { setSessionReport(await api.getSessionReport(id)); }
     catch (e: unknown) { setError((e as Error).message); }
     finally { setLoading(false); }
+  }
+
+  async function handleReopen(id: number) {
+    setReopenLoading(true); setReopenError('');
+    try {
+      await api.reopenSession(id);
+      await fetchSessions();
+      await fetchSessionReport(id);
+    } catch (e: unknown) { setReopenError((e as Error).message); }
+    finally { setReopenLoading(false); }
   }
 
   useEffect(() => { if (tab === 'sales') fetchSales(); }, [tab]);
@@ -550,6 +566,18 @@ export default function ReportsView() {
                             <span>Opening cash: <strong>${s.opening_cash.toFixed(2)}</strong></span>
                             {s.closing_cash != null && <span>Closing cash: <strong>${s.closing_cash.toFixed(2)}</strong></span>}
                           </div>
+                          {isAdmin && s.status === 'closed' && sessions[0]?.id === s.id && (
+                            <div style={{ marginTop: 12 }}>
+                              {reopenError && <div className="error-banner" style={{ marginBottom: 8 }}>{reopenError}</div>}
+                              <button
+                                className="btn btn--ghost btn--sm"
+                                onClick={() => handleReopen(s.id)}
+                                disabled={reopenLoading}
+                              >
+                                {reopenLoading ? 'Reopening…' : 'Reopen Session'}
+                              </button>
+                            </div>
+                          )}
                         </div>
 
                         {/* Tab exclusion notice */}

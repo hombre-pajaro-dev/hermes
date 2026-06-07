@@ -43,6 +43,8 @@ export const api = {
     req<{ ok: boolean }>(`/register/sessions/${id}/reconcile`, { method: 'PATCH', body: JSON.stringify(data) }),
   claimPayments: (sessionId: number, entry_ids: number[]) =>
     req<{ claimed: number }>(`/register/sessions/${sessionId}/claim-payments`, { method: 'POST', body: JSON.stringify({ entry_ids }) }),
+  reopenSession: (id: number) =>
+    req<RegisterSession>(`/register/sessions/${id}/reopen`, { method: 'POST' }),
 
   // Checkout
   createOrder: (items: OrderItem[]) => req<Order>('/checkout/orders', { method: 'POST', body: JSON.stringify({ items }) }),
