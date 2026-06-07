@@ -94,7 +94,7 @@ router.post('/:id/payment', requireAdmin, async (req, res) => {
   const desc = description?.trim() || `Provider payment: ${provider.name as string}`;
   const { rows: [entry] } = await db.query(
     `INSERT INTO ledger_entries (entry_type, account, amount, description, ref_id, ref_type)
-     VALUES ('expense', $1, $2, $3, $4, 'provider') RETURNING *`,
+     VALUES ('provider_expense', $1, $2, $3, $4, 'provider') RETURNING *`,
     [account.trim(), -amount, desc, provider.id],
   );
   res.status(201).json(entry);

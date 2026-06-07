@@ -117,7 +117,7 @@ router.post('/transfer', requireAdmin, async (req, res) => {
   res.status(201).json({ debit, credit });
 });
 
-const DELETABLE_TYPES = new Set(['expense', 'payroll', 'account_adjustment']);
+const DELETABLE_TYPES = new Set(['expense', 'provider_expense', 'payroll', 'account_adjustment']);
 
 router.delete('/entries/:id', requireAdmin, async (req, res) => {
   const db = await getDb();

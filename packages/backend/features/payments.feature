@@ -73,17 +73,38 @@ Feature: Payments
     Then the response status is 201
     And a ledger entry exists for "NoteStaff — Week of Apr 14" with amount -200 and type "payroll"
 
-  Scenario: Ad-hoc provider payment creates expense ledger entry
+  Scenario: Ad-hoc provider payment creates provider_expense ledger entry
     Given a provider named "AdHocProv" exists
     When I POST a provider payment of 75.00 from "cash"
     Then the response status is 201
-    And a ledger entry exists for "Provider payment: AdHocProv" with amount -75.00 and type "expense"
+    And a ledger entry exists for "Provider payment: AdHocProv" with amount -75.00 and type "provider_expense"
 
   Scenario: Ad-hoc provider payment with custom description uses custom description
     Given a provider named "CustomDescProv" exists
     When I POST a provider payment of 40.00 from "digital" with description "Monthly fee"
     Then the response status is 201
-    And a ledger entry exists for "Monthly fee" with amount -40.00 and type "expense"
+    And a ledger entry exists for "Monthly fee" with amount -40.00 and type "provider_expense"
+
+  Scenario: Provider expense linked to session does not inflate pnl expenses
+    Given a provider named "CostProv" exists
+    And a product "Espresso" costs 3.00 and sells for 5.00 with 10 units
+    And the product "Espresso" is untracked and linked to provider "CostProv"
+    And I sell 2 units of "Espresso"
+    When I POST a provider payment of 8.00 from "cash"
+    And I claim the unlinked payment "Provider payment: CostProv" to the last session
+    And I fetch the session report for the current session
+    Then the session pnl expenses is 0.00
+
+  Scenario: Provider expense linked to session overrides by_item cost
+    Given a provider named "CogsProvider" exists
+    And a product "Espresso" costs 3.00 and sells for 5.00 with 10 units
+    And the product "Espresso" is untracked and linked to provider "CogsProvider"
+    And I sell 2 units of "Espresso"
+    When I POST a provider payment of 8.00 from "cash"
+    And I claim the unlinked payment "Provider payment: CogsProvider" to the last session
+    And I fetch the session report for the current session
+    Then the session by_item for "Espresso" has cost 8.00
+    And the session pnl cogs is 8.00
 
   Scenario: Set product provider links untracked product to provider
     Given a provider named "LinkProv" exists

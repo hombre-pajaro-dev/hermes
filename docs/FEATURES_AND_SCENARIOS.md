@@ -372,8 +372,10 @@ This document lists all **features** and **scenarios** covered by the BDD test s
 | 9 | Payment creates a payroll ledger entry (E2E) | Record a payment via API; Ledger page shows a `payroll` entry. |
 | 10 | Payment creates an expense ledger entry (E2E) | Record a payment via API; Ledger page shows an `expense` entry. |
 | 11 | Payment creates a savings transfer ledger entry (E2E) | Record a payment via API; Ledger page shows a `savings transfer` entry. |
-| 12 | Ad-hoc provider payment creates expense ledger entry | `POST /api/providers/:id/payment` with amount and account; `expense` ledger entry created with negative amount and description `"Provider payment: {name}"`. |
+| 12 | Ad-hoc provider payment creates provider_expense ledger entry | `POST /api/providers/:id/payment` with amount and account; `provider_expense` ledger entry created (separate from operating `expense` entries) with negative amount and description `"Provider payment: {name}"`. |
 | 13 | Ad-hoc provider payment with custom description uses custom description | Submit with explicit `description`; ledger entry uses the provided description. |
+| 23 | Provider expense does not inflate session pnl expenses | Link untracked product to provider, sell it, pay provider, claim payment to session; `pnl.expenses` is 0 — no double-count with COGS. |
+| 24 | Provider expense linked to session overrides by_item cost | Same setup with provider payment of $8 for 2 units estimated at $3 each; `by_item[Espresso].cost = 8.00` and `pnl.cogs = 8.00` — actual payment replaces estimated COGS. |
 | 14 | Set product provider links untracked product to provider | `PATCH /api/products/:id/provider` with `provider_id`; product response includes `provider_id`. |
 | 15 | Session bill returns untracked product sales per provider | Create provider, link untracked product, sell it; `GET /api/providers/session-bill` returns that provider with `qty_sold ≥ 2`. |
 | 16 | Session bill returns empty array when no provider-linked untracked sales | No provider-linked untracked products; session bill response is `[]`. |

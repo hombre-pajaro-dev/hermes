@@ -163,7 +163,7 @@ router.get('/sessions/:id/report', async (req, res) => {
     `SELECT id, entry_type, account, amount, description, created_at
      FROM ledger_entries
      WHERE session_id IS NULL
-       AND entry_type IN ('payroll', 'expense', 'savings_transfer')
+       AND entry_type IN ('payroll', 'expense', 'provider_expense', 'savings_transfer')
        AND amount < 0
        AND created_at >= $1
        AND created_at <= COALESCE($2, NOW())
@@ -174,7 +174,7 @@ router.get('/sessions/:id/report', async (req, res) => {
   const { rows: payments } = await db.query<{ id: number; entry_type: string; account: string; amount: number; description: string; created_at: string }>(
     `SELECT id, entry_type, account, amount, description, created_at
      FROM ledger_entries
-     WHERE session_id = $1 AND entry_type IN ('payroll', 'expense', 'savings_transfer') AND amount < 0
+     WHERE session_id = $1 AND entry_type IN ('payroll', 'expense', 'provider_expense', 'savings_transfer') AND amount < 0
      ORDER BY created_at`,
     [sessionId]
   );
@@ -199,7 +199,7 @@ router.get('/sessions/:id/report', async (req, res) => {
       COALESCE((SELECT SUM(total) FROM orders WHERE session_id = $1 AND status = 'paid' AND payment_method IN ('card', 'transfer')), 0)
       + COALESCE((SELECT SUM(total) FROM tabs   WHERE session_id = $1 AND status = 'paid' AND payment_method IN ('card', 'transfer')), 0)
       + COALESCE((SELECT SUM(amount) FROM ledger_entries WHERE entry_type = 'commission_transfer' AND account = 'digital' AND ref_type = 'order' AND ref_id IN (SELECT id FROM orders WHERE session_id = $1 AND status = 'paid')), 0)
-      + COALESCE((SELECT SUM(amount) FROM ledger_entries WHERE session_id = $1 AND entry_type IN ('payroll', 'expense', 'savings_transfer') AND account = 'digital' AND amount < 0), 0)
+      + COALESCE((SELECT SUM(amount) FROM ledger_entries WHERE session_id = $1 AND entry_type IN ('payroll', 'expense', 'provider_expense', 'savings_transfer') AND account = 'digital' AND amount < 0), 0)
     AS expected_digital
   `, [sessionId]);
   const expectedDigital = Number(digitalReconRow.expected_digital);
@@ -234,8 +234,32 @@ router.get('/sessions/:id/report', async (req, res) => {
       AND le.ref_id IN (SELECT id FROM inventory_adjustments WHERE session_id = $1)
   `, [sessionId]);
 
+  // When a provider_expense is linked to this session, replace the estimated unit_cost COGS
+  // for that provider's products with the actual payment amount (Option A: keep qty sold, use real cost).
+  const { rows: providerExpenses } = await db.query<{ ref_id: number; amount: number }>(
+    `SELECT ref_id, ABS(amount) as amount FROM ledger_entries
+     WHERE session_id = $1 AND entry_type = 'provider_expense' AND ref_type = 'provider'`,
+    [sessionId]
+  );
+  for (const pe of providerExpenses) {
+    const paidAmount = Number(pe.amount);
+    const { rows: ppRows } = await db.query<{ product_id: number }>(
+      'SELECT product_id FROM product_providers WHERE provider_id = $1',
+      [pe.ref_id]
+    );
+    const providerProductIds = new Set(ppRows.map(p => p.product_id));
+    const covered = byItem.filter(item => providerProductIds.has(item.product_id));
+    if (covered.length === 0) continue;
+    const totalEstimatedCogs = covered.reduce((s, item) => s + item.cost, 0);
+    for (const item of covered) {
+      const share = totalEstimatedCogs > 0 ? item.cost / totalEstimatedCogs : 1 / covered.length;
+      item.cost = share * paidAmount;
+      item.profit = item.revenue - item.cost;
+    }
+  }
+
   const pnlRevenue    = Number(totals.revenue) + Number(tabTotalsRow.tab_revenue);
-  const pnlCogs       = Number(costRow.total_cost) + Number(tabTotalsRow.tab_cost);
+  const pnlCogs       = byItem.reduce((s, item) => s + item.cost, 0);
   const pnlGrossProfit = pnlRevenue - pnlCogs - commissionTotal;
   const pnlPayroll    = Number(pnlRow.payroll);
   const pnlExpenses   = Number(pnlRow.expenses);
@@ -369,7 +393,7 @@ router.post('/sessions/:id/claim-payments', requireAdmin, async (req, res) => {
      SET session_id = $1
      WHERE id IN (${placeholders})
        AND session_id IS NULL
-       AND entry_type IN ('payroll', 'expense', 'savings_transfer')`,
+       AND entry_type IN ('payroll', 'expense', 'provider_expense', 'savings_transfer')`,
     [sessionId, ...entry_ids]
   );
 

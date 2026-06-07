@@ -146,6 +146,23 @@ When(/^I POST \/api\/payments\/run with the payee amount ([\d.]+) from "([^"]+)"
   }
 );
 
+Then('the session pnl expenses is {float}', function (this: PosWorld, expected: number) {
+  const body = this.response.body as { pnl: { expenses: number } };
+  expect(body.pnl.expenses).to.be.closeTo(expected, 0.01);
+});
+
+Then('the session pnl cogs is {float}', function (this: PosWorld, expected: number) {
+  const body = this.response.body as { pnl: { cogs: number } };
+  expect(body.pnl.cogs).to.be.closeTo(expected, 0.01);
+});
+
+Then('the session by_item for {string} has cost {float}', function (this: PosWorld, productName: string, expected: number) {
+  const body = this.response.body as { by_item: { name: string; cost: number }[] };
+  const item = body.by_item.find(i => i.name === productName);
+  expect(item, `Expected by_item for "${productName}"`).to.exist;
+  expect(item!.cost).to.be.closeTo(expected, 0.01);
+});
+
 Then('the session report payments include {string} with amount {float}', function (this: PosWorld, description: string, amount: number) {
   const body = this.response.body as { payments: { description: string; amount: number }[] };
   const found = body.payments.find(p => p.description === description && Math.abs(p.amount - amount) < 0.01);

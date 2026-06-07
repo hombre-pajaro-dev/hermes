@@ -223,7 +223,7 @@ export default function LedgerView() {
     setLoadingId(null);
   }
 
-  const DELETABLE_TYPES = new Set(['expense', 'payroll', 'account_adjustment']);
+  const DELETABLE_TYPES = new Set(['expense', 'provider_expense', 'payroll', 'account_adjustment']);
 
   async function handleDeleteEntry(id: number) {
     setDeletingId(id);
@@ -283,6 +283,7 @@ export default function LedgerView() {
     sale: '#16a34a', tab_payment: '#2563eb', register_open: '#7c3aed',
     register_close: '#dc2626', cashout: '#d97706', restock: '#0891b2',
     adjustment: '#db2777', payroll: '#ea580c', savings_transfer: '#0d9488', expense: '#9333ea',
+    provider_expense: '#9333ea',
     account_adjustment: '#6b7280', commission: '#f59e0b', commission_transfer: '#f59e0b', transfer: '#0ea5e9',
   };
 

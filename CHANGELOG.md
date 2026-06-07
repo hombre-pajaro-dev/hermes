@@ -11,6 +11,14 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+#### Provider expense replaces COGS for untracked products
+- Session Bill payments now create a `provider_expense` ledger entry (previously `expense`), keeping them separate from payroll and other operating expenses.
+- When a `provider_expense` is linked to a session (claimed or auto-linked), the session report replaces the estimated unit-cost COGS for that provider's products with the actual payment amount. Example: 49 tacos sold at $25 estimated cost = $1,225 COGS; if you paid $1,275 for 51 tacos, the COGS updates to $1,275 — no double-counting.
+- If multiple products share the same provider, the actual payment is distributed proportionally to each product's share of the estimated COGS.
+- `pnl.expenses` excludes `provider_expense` entries; `pnl.cogs` reflects the adjusted value.
+- `provider_expense` entries appear in the session payments section and in the unlinked-payments card (claimable), are includeable in cash/digital reconciliation, and are deletable by admins.
+- 4 BDD scenarios added (134/134 passing).
+
 #### Delete ledger entry (admin)
 - Admin can delete manual ledger entries (`expense`, `payroll`, `account_adjustment`) from the Ledger → Entries tab.
 - Each deletable row shows a small "Delete" button. Clicking it reveals an inline "Delete this entry? / Cancel" confirmation to prevent accidental deletions.
