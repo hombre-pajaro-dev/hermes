@@ -34,8 +34,9 @@ export const api = {
   getSession: () => req<RegisterSession | null>('/register/session'),
   openRegister: (opening_cash: number) => req<RegisterSession>('/register/open', { method: 'POST', body: JSON.stringify({ opening_cash }) }),
   cashout: (amount: number, reason: string) => req<Cashout>('/register/cashout', { method: 'POST', body: JSON.stringify({ amount, reason }) }),
-  closeRegister: (closing_cash: number, physical_counts?: { product_id: number; units: number }[]) =>
-    req<RegisterSession>('/register/close', { method: 'POST', body: JSON.stringify({ closing_cash, physical_counts }) }),
+  closeRegister: (closing_cash: number, opts?: { actual_digital?: number; physical_counts?: { product_id: number; units: number }[] }) =>
+    req<RegisterSession>('/register/close', { method: 'POST', body: JSON.stringify({ closing_cash, ...opts }) }),
+  getClosePreview: () => req<ClosePreview>('/register/close-preview'),
   getCloseBrief: () => req<CloseBrief>('/register/close-brief'),
   getRegisterSessions: () => req<RegisterSessionSummary[]>('/register/sessions'),
   getSessionReport: (id: number) => req<SessionReport>(`/register/sessions/${id}/report`),
@@ -159,7 +160,7 @@ export interface SessionInventorySnapshot { products: InventorySnapshotEntry[]; 
 export interface SessionPayment { id: number; entry_type: string; account: string; amount: number; description: string; created_at: string; }
 export interface SessionReport {
   session: RegisterSessionSummary & { inventory_snapshot_open: SessionInventorySnapshot | null; inventory_snapshot_close: SessionInventorySnapshot | null; };
-  order_count: number; revenue: number; total_cost: number; commission_total?: number; gross_profit: number; cash_sales: number; card_sales: number; transfer_sales: number; expected_cash?: number; cash_variance?: number | null; expected_digital?: number; actual_digital?: number | null; digital_variance?: number | null;
+  order_count: number; revenue: number; total_cost: number; commission_total?: number; gross_profit: number; cash_sales: number; card_sales: number; transfer_sales: number; expected_cash?: number; cash_variance?: number | null; expected_digital?: number; actual_digital?: number | null; digital_variance?: number | null; reconciliation_summary?: ReconciliationSummary;
   active_products: { product_id: number; name: string; price: number; system_count: number | null; physical_count: number | null; delta: number | null; value: number | null }[];
   unlinked_payments: { id: number; entry_type: string; account: string; amount: number; description: string; created_at: string }[];
   pnl: { revenue: number; tab_revenue: number; tab_cash: number; tab_card: number; tab_transfer: number; cogs: number; commissions: number; gross_profit: number; payroll: number; expenses: number; writeoffs: number; inventory_adjustment: number; net: number };
@@ -169,6 +170,9 @@ export interface SessionReport {
   adjustments: { product_id: number; name: string; delta: number }[];
   payments: SessionPayment[];
 }
+export interface ClosePreviewProduct { product_id: number; name: string; system_count: number; }
+export interface ClosePreview { session_id: number; products: ClosePreviewProduct[]; }
+export interface ReconciliationSummary { net_variance: number; net_ok: boolean; cash_variance: number | null; digital_variance: number | null; inventory_shortage_value: number; diagnosis: string; }
 export interface Cashout { id: number; session_id: number; amount: number; reason: string; created_at: string; }
 export interface OrderItem { product_id: number; quantity: number; }
 export interface Order { id: number; status: string; total: number; discount_amount?: number; payment_method?: string; amount_received?: number; change_due?: number; items?: unknown[]; }

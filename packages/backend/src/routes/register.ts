@@ -5,6 +5,82 @@ import { productUsesSupplies } from '../lib/supply-utils.js';
 
 const router = Router();
 
+type Queryable = { query(text: string, values?: unknown[]): Promise<{ rows: unknown[] }> };
+
+async function applyPhysicalCounts(
+  client: Queryable,
+  sessionId: number,
+  snapshotMap: Map<number, number>,
+  physical_counts: { product_id: number; units: number }[],
+): Promise<void> {
+  for (const count of physical_counts) {
+    const { rows: [product] } = await client.query('SELECT * FROM products WHERE id = $1', [count.product_id]) as { rows: { id: number; track_inventory: boolean; cost: number; name: string; units: number }[] };
+    if (!product || product.track_inventory === false) continue;
+    const usesSupplies = await productUsesSupplies(client as Parameters<typeof productUsesSupplies>[0], count.product_id);
+    if (usesSupplies) continue;
+
+    const { rows: existing } = await client.query(
+      'SELECT * FROM inventory_adjustments WHERE session_id = $1 AND product_id = $2 ORDER BY created_at DESC LIMIT 1',
+      [sessionId, count.product_id],
+    ) as { rows: { id: number; delta: number }[] };
+    if (existing[0]) {
+      await client.query('DELETE FROM ledger_entries WHERE ref_id = $1 AND ref_type = $2', [existing[0].id, 'adjustment']);
+      await client.query('UPDATE products SET units = units - $1 WHERE id = $2', [existing[0].delta, count.product_id]);
+      await client.query('DELETE FROM inventory_adjustments WHERE id = $1', [existing[0].id]);
+    }
+
+    const systemCount = snapshotMap.get(count.product_id) ?? product.units;
+    const delta = count.units - systemCount;
+    if (delta === 0) continue;
+
+    await client.query('UPDATE products SET units = $1 WHERE id = $2', [count.units, count.product_id]);
+    const { rows: [adjRow] } = await client.query(
+      'INSERT INTO inventory_adjustments (session_id, product_id, previous_units, physical_count, delta, created_at) VALUES ($1, $2, $3, $4, $5, NOW()) RETURNING *',
+      [sessionId, count.product_id, systemCount, count.units, delta],
+    ) as { rows: { id: number }[] };
+    await client.query(
+      "INSERT INTO ledger_entries (entry_type, account, amount, description, ref_id, ref_type) VALUES ('adjustment', 'inventory_adjustment', $1, $2, $3, 'adjustment')",
+      [delta * product.cost, `Reconciliation: ${product.name} (${delta > 0 ? '+' : ''}${delta} units)`, adjRow.id],
+    );
+  }
+}
+
+function computeReconciliationSummary(
+  cashVariance: number | null,
+  digitalVariance: number | null,
+  inventoryShortageValue: number,
+): {
+  net_variance: number;
+  net_ok: boolean;
+  cash_variance: number | null;
+  digital_variance: number | null;
+  inventory_shortage_value: number;
+  diagnosis: string;
+} {
+  const cv = cashVariance ?? 0;
+  const dv = digitalVariance ?? 0;
+  const netVariance = cv + dv;
+  const netOk = netVariance >= -0.005;
+
+  const cashOver   = cv >  0.005;
+  const cashShort  = cv < -0.005;
+  const digitalOver  = dv >  0.005;
+  const digitalShort = dv < -0.005;
+  const invShort = inventoryShortageValue < -0.005;
+
+  let diagnosis: string;
+  if      (cashOver  && invShort && !digitalShort)                diagnosis = 'unrecorded_cash_sale';
+  else if (digitalOver && invShort && !cashShort)                 diagnosis = 'unrecorded_digital_sale';
+  else if (cashShort && !invShort && !digitalShort)               diagnosis = 'cash_shortage';
+  else if (cashOver  && !invShort && !digitalOver)                diagnosis = 'overcharge_or_double_payment';
+  else if (!cashOver && !cashShort && !digitalOver && !digitalShort && invShort) diagnosis = 'shrinkage';
+  else if ((cashShort || digitalShort) && invShort)               diagnosis = 'items_taken_no_payment';
+  else if (netOk && !invShort)                                    diagnosis = 'balanced';
+  else                                                            diagnosis = 'mixed_signals';
+
+  return { net_variance: netVariance, net_ok: netOk, cash_variance: cashVariance, digital_variance: digitalVariance, inventory_shortage_value: inventoryShortageValue, diagnosis };
+}
+
 async function getOpenSession() {
   const db = await getDb();
   const { rows } = await db.query("SELECT * FROM register_sessions WHERE status = 'open' LIMIT 1");
@@ -35,6 +111,28 @@ router.get('/sessions', async (_req, res) => {
     opened_at: r.opened_at,
     closed_at: r.closed_at ?? null,
   })));
+});
+
+router.get('/close-preview', async (_req, res) => {
+  const session = await getOpenSession();
+  if (!session) return res.status(403).json({ error: 'Register is not open' });
+  const db = await getDb();
+  const { rows } = await db.query<{ id: number; name: string; system_count: number }>(`
+    SELECT DISTINCT p.id, p.name, p.units AS system_count
+    FROM products p
+    WHERE p.track_inventory = true
+      AND p.id NOT IN (SELECT product_id FROM product_supplies)
+      AND p.active = true
+      AND p.id IN (
+        SELECT DISTINCT oi.product_id FROM order_items oi JOIN orders o ON o.id = oi.order_id WHERE o.session_id = $1
+        UNION
+        SELECT DISTINCT ti.product_id FROM tab_items ti JOIN tabs t ON t.id = ti.tab_id WHERE t.session_id = $1
+        UNION
+        SELECT DISTINCT ri.product_id FROM restock_items ri JOIN restock_orders ro ON ro.id = ri.restock_order_id WHERE ro.session_id = $1
+      )
+    ORDER BY p.name
+  `, [session.id]);
+  res.json({ session_id: session.id, products: rows.map(r => ({ product_id: r.id, name: r.name, system_count: Number(r.system_count) })) });
 });
 
 router.get('/sessions/:id/report', async (req, res) => {
@@ -190,8 +288,6 @@ router.get('/sessions/:id/report', async (req, res) => {
     ) AS expected_cash
   `, [sessionId]);
   const expectedCash = Number(cashReconRow.expected_cash);
-  const closingCash = session.closing_cash != null ? Number(session.closing_cash) : null;
-  const cashVariance = closingCash != null ? closingCash - expectedCash : null;
 
   // Digital reconciliation — card + transfer inflows minus commissions and digital payouts.
   const { rows: [digitalReconRow] } = await db.query(`
@@ -258,6 +354,13 @@ router.get('/sessions/:id/report', async (req, res) => {
     }
   }
 
+  const inventoryShortageValue = activeProducts.reduce((sum, p) => sum + (p.value ?? 0), 0);
+  const closingCashNum = session.closing_cash != null ? Number(session.closing_cash) : null;
+  const cashVarianceNum = closingCashNum != null ? closingCashNum - expectedCash : null;
+  const actualDigitalNum = session.actual_digital != null ? Number(session.actual_digital) : null;
+  const digitalVarianceNum = actualDigitalNum != null ? actualDigitalNum - expectedDigital : null;
+  const reconciliationSummary = computeReconciliationSummary(cashVarianceNum, digitalVarianceNum, inventoryShortageValue);
+
   const pnlRevenue    = Number(totals.revenue) + Number(tabTotalsRow.tab_revenue);
   const pnlCogs       = byItem.reduce((s, item) => s + item.cost, 0);
   const pnlGrossProfit = pnlRevenue - pnlCogs - commissionTotal;
@@ -288,9 +391,10 @@ router.get('/sessions/:id/report', async (req, res) => {
     transfer_sales: Number(totals.transfer_sales),
     expected_cash: expectedCash,
     expected_digital: expectedDigital,
-    actual_digital: session.actual_digital != null ? Number(session.actual_digital) : null,
-    digital_variance: session.actual_digital != null ? Number(session.actual_digital) - expectedDigital : null,
-    cash_variance: cashVariance,
+    actual_digital: actualDigitalNum,
+    digital_variance: digitalVarianceNum,
+    cash_variance: cashVarianceNum,
+    reconciliation_summary: reconciliationSummary,
     by_item: byItem.map(r => ({
       product_id: r.product_id, name: r.name,
       units_sold: Number(r.units_sold), revenue: Number(r.revenue),
@@ -335,38 +439,8 @@ router.patch('/sessions/:id/reconcile', requireAdmin, async (req, res) => {
   const snapshot = session.inventory_snapshot_close as { products: { id: number; units: number }[] } | null;
   const snapshotMap = new Map((snapshot?.products ?? []).map(p => [p.id, p.units]));
 
-  if (Array.isArray(physical_counts)) {
-    for (const count of physical_counts) {
-      const { rows: [product] } = await db.query('SELECT * FROM products WHERE id = $1', [count.product_id]);
-      if (!product || product.track_inventory === false) continue;
-      const usesSupplies = await productUsesSupplies(db, count.product_id);
-      if (usesSupplies) continue;
-
-      // Remove existing adjustment for this (session, product) and revert its unit change
-      const { rows: existing } = await db.query(
-        'SELECT * FROM inventory_adjustments WHERE session_id = $1 AND product_id = $2 ORDER BY created_at DESC LIMIT 1',
-        [sessionId, count.product_id]
-      );
-      if (existing[0]) {
-        await db.query('DELETE FROM ledger_entries WHERE ref_id = $1 AND ref_type = $2', [existing[0].id, 'adjustment']);
-        await db.query('UPDATE products SET units = units - $1 WHERE id = $2', [existing[0].delta, count.product_id]);
-        await db.query('DELETE FROM inventory_adjustments WHERE id = $1', [existing[0].id]);
-      }
-
-      const systemCount = snapshotMap.get(count.product_id) ?? product.units;
-      const delta = count.units - systemCount;
-      if (delta === 0) continue;
-
-      await db.query('UPDATE products SET units = $1 WHERE id = $2', [count.units, count.product_id]);
-      const { rows: [adjRow] } = await db.query(
-        'INSERT INTO inventory_adjustments (session_id, product_id, previous_units, physical_count, delta, created_at) VALUES ($1, $2, $3, $4, $5, NOW()) RETURNING *',
-        [sessionId, count.product_id, systemCount, count.units, delta]
-      );
-      await db.query(
-        "INSERT INTO ledger_entries (entry_type, account, amount, description, ref_id, ref_type) VALUES ('adjustment', 'inventory_adjustment', $1, $2, $3, 'adjustment')",
-        [delta * product.cost, `Reconciliation: ${product.name} (${delta > 0 ? '+' : ''}${delta} units)`, adjRow.id]
-      );
-    }
+  if (Array.isArray(physical_counts) && physical_counts.length > 0) {
+    await applyPhysicalCounts(db, sessionId, snapshotMap, physical_counts);
   }
 
   if (actual_digital != null) {
@@ -486,7 +560,11 @@ router.post('/sessions/:id/reopen', requireAdmin, async (req, res) => {
 router.post('/close', requireAdmin, async (req, res) => {
   const session = await getOpenSession();
   if (!session) return res.status(403).json({ error: 'Register is not open' });
-  const { closing_cash } = req.body as { closing_cash: number };
+  const { closing_cash, actual_digital, physical_counts } = req.body as {
+    closing_cash: number;
+    actual_digital?: number;
+    physical_counts?: { product_id: number; units: number }[];
+  };
   if (closing_cash == null) return res.status(400).json({ error: 'closing_cash is required' });
 
   const db = await getDb();
@@ -514,8 +592,8 @@ router.post('/close', requireAdmin, async (req, res) => {
 
     const snapshot = await captureInventorySnapshot(client as unknown as Awaited<ReturnType<typeof getDb>>);
     await client.query(
-      "UPDATE register_sessions SET status = 'closed', closing_cash = $1, closed_at = NOW(), inventory_snapshot_close = $2 WHERE id = $3",
-      [closing_cash, JSON.stringify(snapshot), session.id]
+      "UPDATE register_sessions SET status = 'closed', closing_cash = $1, closed_at = NOW(), inventory_snapshot_close = $2, actual_digital = $3 WHERE id = $4",
+      [closing_cash, JSON.stringify(snapshot), actual_digital ?? null, session.id]
     );
 
     const varianceDesc = variance === 0
@@ -529,6 +607,10 @@ router.post('/close', requireAdmin, async (req, res) => {
       [variance, varianceDesc, session.id]
     );
 
+    if (Array.isArray(physical_counts) && physical_counts.length > 0) {
+      const snapshotMap = new Map((snapshot.products as { id: number; units: number }[]).map(p => [p.id, p.units]));
+      await applyPhysicalCounts(client as unknown as Queryable, session.id, snapshotMap, physical_counts);
+    }
 
     await client.query('COMMIT');
     const { rows } = await client.query('SELECT * FROM register_sessions WHERE id = $1', [session.id]);

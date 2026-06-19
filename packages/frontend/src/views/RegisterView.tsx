@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { api } from '../api/client';
-import type { RegisterSession, Tab } from '../api/client';
+import type { RegisterSession, Tab, ClosePreviewProduct } from '../api/client';
 import { authClient } from '../lib/auth-client';
 
 export default function RegisterView() {
@@ -14,8 +14,11 @@ export default function RegisterView() {
   const [success, setSuccess] = useState('');
   const [openingCash, setOpeningCash] = useState('');
   const [closingCash, setClosingCash] = useState('');
+  const [actualDigital, setActualDigital] = useState('');
   const [cashoutAmount, setCashoutAmount] = useState('');
   const [cashoutReason, setCashoutReason] = useState('');
+  const [closePreviewProducts, setClosePreviewProducts] = useState<ClosePreviewProduct[]>([]);
+  const [physicalCounts, setPhysicalCounts] = useState<Record<number, string>>({});
 
   async function load() {
     try {
@@ -24,12 +27,20 @@ export default function RegisterView() {
       if (s) {
         const tabs = await api.getTabs();
         setOpenTabs(tabs.filter(t => t.status === 'open'));
+        try {
+          const preview = await api.getClosePreview();
+          setClosePreviewProducts(preview.products);
+        } catch {
+          setClosePreviewProducts([]);
+        }
       } else {
         setOpenTabs([]);
+        setClosePreviewProducts([]);
       }
     } catch {
       setRegisterSession(null);
       setOpenTabs([]);
+      setClosePreviewProducts([]);
     } finally {
       setLoading(false);
     }
@@ -57,8 +68,18 @@ export default function RegisterView() {
   async function handleClose() {
     setError(''); setSuccess('');
     try {
-      await api.closeRegister(Number(closingCash));
-      setSuccess('Register closed'); setClosingCash(''); load();
+      const counts = Object.entries(physicalCounts)
+        .filter(([, v]) => v !== '')
+        .map(([id, v]) => ({ product_id: Number(id), units: Number(v) }));
+      await api.closeRegister(Number(closingCash), {
+        actual_digital: actualDigital !== '' ? Number(actualDigital) : undefined,
+        physical_counts: counts.length > 0 ? counts : undefined,
+      });
+      setSuccess('Register closed');
+      setClosingCash('');
+      setActualDigital('');
+      setPhysicalCounts({});
+      load();
     } catch (e: unknown) { setError((e as Error).message); }
   }
 
@@ -146,7 +167,48 @@ export default function RegisterView() {
               <input data-testid="closing-cash-input" className="input" type="number" min="0" step="0.01"
                 placeholder="0.00" value={closingCash} onChange={e => setClosingCash(e.target.value)} />
             </div>
-            <button data-testid="close-register-btn" className="btn btn--danger"
+            <div className="field">
+              <label className="label">Actual Digital Balance ($)</label>
+              <input data-testid="actual-digital-input" className="input" type="number" min="0" step="0.01"
+                placeholder="0.00" value={actualDigital} onChange={e => setActualDigital(e.target.value)} />
+            </div>
+            {closePreviewProducts.length > 0 && (
+              <div style={{ marginTop: 12 }}>
+                <div style={{ fontSize: '0.8rem', fontWeight: 600, marginBottom: 6, color: 'var(--text-secondary)' }}>
+                  Physical Counts
+                </div>
+                <table style={{ width: '100%', fontSize: '0.85rem', borderCollapse: 'collapse' }}>
+                  <thead>
+                    <tr style={{ borderBottom: '1px solid var(--border)' }}>
+                      <th style={{ textAlign: 'left', padding: '4px 8px' }}>Product</th>
+                      <th style={{ textAlign: 'right', padding: '4px 8px' }}>System</th>
+                      <th style={{ textAlign: 'right', padding: '4px 8px' }}>Counted</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {closePreviewProducts.map(p => (
+                      <tr key={p.product_id} style={{ borderBottom: '1px solid var(--border)' }}>
+                        <td style={{ padding: '6px 8px' }}>{p.name}</td>
+                        <td style={{ padding: '6px 8px', textAlign: 'right', color: 'var(--text-secondary)' }}>
+                          {p.system_count}
+                        </td>
+                        <td style={{ padding: '6px 8px', textAlign: 'right' }}>
+                          <input
+                            type="number" min="0" step="1"
+                            data-testid={`physical-count-${p.name.toLowerCase().replace(/\s+/g, '-')}`}
+                            style={{ width: 70, textAlign: 'right', padding: '2px 4px', border: '1px solid var(--border)', borderRadius: 4 }}
+                            placeholder={String(p.system_count)}
+                            value={physicalCounts[p.product_id] ?? ''}
+                            onChange={e => setPhysicalCounts(prev => ({ ...prev, [p.product_id]: e.target.value }))}
+                          />
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+            <button data-testid="close-register-btn" className="btn btn--danger" style={{ marginTop: 12 }}
               onClick={handleClose} disabled={!closingCash || openTabs.length > 0}>
               Close Register
             </button>

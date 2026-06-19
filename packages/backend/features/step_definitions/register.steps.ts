@@ -244,3 +244,76 @@ Then('the session report active_products includes {string}', function (this: Pos
   expect(body.active_products.some(p => p.name === productName),
     `Expected active_products to include "${productName}"`).to.be.true;
 });
+
+// ── Close Reconciliation (single-step) ────────────────────────────────────────
+
+When('I close the register with closing cash {float} and physical counts',
+  async function (this: PosWorld, amount: number, table: { hashes(): { product_name: string; units: string }[] }) {
+    const rows = table.hashes();
+    const physical_counts: { product_id: number; units: number }[] = [];
+    for (const row of rows) {
+      const prodRes = await this.agent.get(`/api/products?name=${encodeURIComponent(row.product_name)}`);
+      physical_counts.push({ product_id: (prodRes.body as { id: number }).id, units: Number(row.units) });
+    }
+    this.response = await this.agent.post('/api/register/close').send({ closing_cash: amount, physical_counts });
+  }
+);
+
+When('I close the register with closing cash {float} and actual digital {float}',
+  async function (this: PosWorld, cash: number, digital: number) {
+    this.response = await this.agent.post('/api/register/close').send({ closing_cash: cash, actual_digital: digital });
+  }
+);
+
+When('I close the register with closing cash {float} and actual digital {float} and physical counts',
+  async function (this: PosWorld, cash: number, digital: number, table: { hashes(): { product_name: string; units: string }[] }) {
+    const rows = table.hashes();
+    const physical_counts: { product_id: number; units: number }[] = [];
+    for (const row of rows) {
+      const prodRes = await this.agent.get(`/api/products?name=${encodeURIComponent(row.product_name)}`);
+      physical_counts.push({ product_id: (prodRes.body as { id: number }).id, units: Number(row.units) });
+    }
+    this.response = await this.agent.post('/api/register/close').send({ closing_cash: cash, actual_digital: digital, physical_counts });
+  }
+);
+
+When('I fetch the close preview', async function (this: PosWorld) {
+  this.response = await this.agent.get('/api/register/close-preview');
+});
+
+Then('the close preview includes {string} with a system_count', function (this: PosWorld, productName: string) {
+  const body = this.response.body as { products: { name: string; system_count: number }[] };
+  const found = body.products.find(p => p.name === productName);
+  expect(found, `Expected close preview to include "${productName}"`).to.exist;
+  expect(found!.system_count, 'system_count should be a number').to.be.a('number');
+});
+
+Then('the close preview does not include {string}', function (this: PosWorld, productName: string) {
+  const body = this.response.body as { products: { name: string }[] };
+  expect(body.products.some(p => p.name === productName),
+    `Expected close preview to NOT include "${productName}"`).to.be.false;
+});
+
+Then('the session report reconciliation_summary net_ok is true', function (this: PosWorld) {
+  const body = this.response.body as { reconciliation_summary: { net_ok: boolean } };
+  expect(body.reconciliation_summary, 'reconciliation_summary missing').to.exist;
+  expect(body.reconciliation_summary.net_ok).to.be.true;
+});
+
+Then('the session report reconciliation_summary net_ok is false', function (this: PosWorld) {
+  const body = this.response.body as { reconciliation_summary: { net_ok: boolean } };
+  expect(body.reconciliation_summary, 'reconciliation_summary missing').to.exist;
+  expect(body.reconciliation_summary.net_ok).to.be.false;
+});
+
+Then('the session report reconciliation_summary diagnosis is {string}', function (this: PosWorld, diagnosis: string) {
+  const body = this.response.body as { reconciliation_summary: { diagnosis: string } };
+  expect(body.reconciliation_summary, 'reconciliation_summary missing').to.exist;
+  expect(body.reconciliation_summary.diagnosis).to.equal(diagnosis);
+});
+
+Then('the session report digital_variance is not null', function (this: PosWorld) {
+  const body = this.response.body as { digital_variance: number | null };
+  expect(body.digital_variance, 'digital_variance should not be null').to.not.be.null;
+  expect(body.digital_variance).to.be.a('number');
+});

@@ -53,6 +53,55 @@ function UnclaimedPaymentsCard({ sessionId, entries, onClaimed }: {
   );
 }
 
+const DIAGNOSIS_LABELS: Record<string, string> = {
+  balanced: 'Balanced — everything checks out.',
+  unrecorded_cash_sale: 'Likely unrecorded cash sale — cash surplus matches missing inventory.',
+  unrecorded_digital_sale: 'Likely unrecorded digital sale — digital surplus matches missing inventory.',
+  cash_shortage: 'Cash shortage — less cash than expected, no inventory variance.',
+  overcharge_or_double_payment: 'Cash surplus — possible overcharge or double payment, inventory OK.',
+  shrinkage: 'Inventory short but money reconciles — possible spoilage or shrinkage.',
+  items_taken_no_payment: 'Items missing and money short — possible theft or unpaid walkout.',
+  mixed_signals: 'Mixed signals — review manually.',
+};
+
+function ReconciliationNarrative({ report }: { report: import('../api/client').SessionReport }) {
+  const s = report.reconciliation_summary;
+  if (!s) return null;
+  const label = DIAGNOSIS_LABELS[s.diagnosis] ?? s.diagnosis;
+  const statusColor = s.net_ok ? 'var(--success, #22c55e)' : 'var(--danger, #ef4444)';
+  return (
+    <div className="card" data-testid="reconciliation-narrative" style={{ borderColor: statusColor, borderWidth: 2 }}>
+      <div className="card__title" style={{ color: statusColor }}>
+        {s.net_ok ? 'Reconciliation OK' : 'Reconciliation Issue'}
+      </div>
+      <p style={{ fontSize: '0.9rem', marginBottom: 8 }}>{label}</p>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8, fontSize: '0.85rem' }}>
+        <div>
+          <div style={{ color: 'var(--text-secondary)', fontSize: '0.75rem' }}>Cash Variance</div>
+          <div style={{ fontWeight: 700, color: (s.cash_variance ?? 0) < -0.005 ? 'var(--danger)' : (s.cash_variance ?? 0) > 0.005 ? 'var(--success)' : undefined }}>
+            {s.cash_variance != null ? `${s.cash_variance >= 0 ? '+' : ''}$${s.cash_variance.toFixed(2)}` : '—'}
+          </div>
+        </div>
+        <div>
+          <div style={{ color: 'var(--text-secondary)', fontSize: '0.75rem' }}>Digital Variance</div>
+          <div style={{ fontWeight: 700, color: (s.digital_variance ?? 0) < -0.005 ? 'var(--danger)' : (s.digital_variance ?? 0) > 0.005 ? 'var(--success)' : undefined }}>
+            {s.digital_variance != null ? `${s.digital_variance >= 0 ? '+' : ''}$${s.digital_variance.toFixed(2)}` : '—'}
+          </div>
+        </div>
+        <div>
+          <div style={{ color: 'var(--text-secondary)', fontSize: '0.75rem' }}>Inventory Value</div>
+          <div style={{ fontWeight: 700, color: s.inventory_shortage_value < -0.005 ? 'var(--danger)' : s.inventory_shortage_value > 0.005 ? 'var(--success)' : undefined }}>
+            {s.inventory_shortage_value !== 0 ? `${s.inventory_shortage_value >= 0 ? '+' : ''}$${s.inventory_shortage_value.toFixed(2)}` : '$0.00'}
+          </div>
+        </div>
+      </div>
+      <div style={{ marginTop: 8, fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
+        Net variance: <strong style={{ color: statusColor }}>{s.net_variance >= 0 ? '+' : ''}${s.net_variance.toFixed(2)}</strong>
+      </div>
+    </div>
+  );
+}
+
 function ReconciliationCard({ sessionId, report, onSaved }: { sessionId: number; report: import('../api/client').SessionReport; onSaved: () => void }) {
   const [reconDigital, setReconDigital] = useState(
     report.actual_digital != null ? String(report.actual_digital) : ''
@@ -655,7 +704,12 @@ export default function ReportsView() {
                           </div>
                         )}
 
-                        {/* Post-close reconciliation */}
+                        {/* Reconciliation narrative */}
+                        {s.status === 'closed' && sessionReport.reconciliation_summary && (
+                          <ReconciliationNarrative report={sessionReport} />
+                        )}
+
+                        {/* Post-close reconciliation (correction path) */}
                         {s.status === 'closed' && (
                           <ReconciliationCard
                             sessionId={s.id}

@@ -84,7 +84,7 @@ export default function AdminView() {
     setRegisterError(''); setRegisterSuccess('');
     try {
       const counts = closeProducts.map(p => ({ product_id: p.id, units: Number(physicalCounts[p.id] ?? p.units) }));
-      await api.closeRegister(Number(closingCash), counts);
+      await api.closeRegister(Number(closingCash), { physical_counts: counts });
       setRegisterSuccess('Register closed'); setClosingCash(''); setPhysicalCounts({}); setCloseProducts([]); loadRegister();
     } catch (e: unknown) { setRegisterError((e as Error).message); }
   }

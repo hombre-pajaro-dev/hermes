@@ -9,7 +9,25 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+---
+
+## [1.0.0] — 2026-06-19
+
 ### Added
+
+#### Single-step session close reconciliation
+- Register close now collects **cash**, **digital balance**, and **per-product physical counts** in one form — no separate post-close reconcile step needed.
+- `POST /register/close` accepts two new optional fields: `actual_digital` (bank/app balance for card + transfer payments) and `physical_counts[]` (per-product shelf counts). Physical counts create Inventory Adjustments inside the close transaction atomically, so the session report is immediately consistent after close.
+- New `GET /register/close-preview` endpoint returns the list of trackable, unit-counted products that were active during the current session (sold, tabbed, or restocked), with their current system counts. The close form uses this to pre-populate the count table.
+- `PATCH /sessions/:id/reconcile` is kept as a correction path — re-submitting counts after close still works and replaces the previous adjustment.
+
+#### Reconciliation Narrative
+- Session report now includes a `reconciliation_summary` object with `net_ok`, `net_variance`, `cash_variance`, `digital_variance`, `inventory_shortage_value`, and a `diagnosis` string classifying the session.
+- Eight diagnoses: `balanced`, `unrecorded_cash_sale`, `unrecorded_digital_sale`, `cash_shortage`, `overcharge_or_double_payment`, `shrinkage`, `items_taken_no_payment`, `mixed_signals`.
+- **Net OK** = `cash_variance + digital_variance ≥ 0` — you collected at least what was expected. Inventory shortages alone (spoilage, shrinkage) don't flag the session as problematic if money reconciles.
+- Example: extra $50 cash + 2 beers short → diagnosis `unrecorded_cash_sale`. Balanced money + short inventory → `shrinkage`.
+- Frontend shows a **Reconciliation OK / Reconciliation Issue** card in the session report with diagnosis text, cash/digital/inventory variance tiles, and net variance. Appears as soon as `actual_digital` is set.
+- 10 new backend BDD scenarios + 8 new frontend BDD scenarios (144/144 passing).
 
 #### Provider expense replaces COGS for untracked products
 - Session Bill payments now create a `provider_expense` ledger entry (previously `expense`), keeping them separate from payroll and other operating expenses.

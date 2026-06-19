@@ -228,6 +228,98 @@ Feature: Register (Open / Close / Cashout)
     Then the response status is 409
     And the response error mentions "most recently"
 
+  # ── Close Reconciliation (single-step) ──────────────────────────────────────
+
+  Scenario: Close with physical counts creates inventory adjustments atomically
+    Given the register is open with opening cash 200
+    And I have sold items
+      | product_name | quantity | payment |
+      | Espresso     | 2        | cash    |
+    When I close the register with closing cash 206.00 and physical counts
+      | product_name | units |
+      | Espresso     | 95    |
+    Then the response status is 200
+    When I fetch the session report for the last session
+    Then the session report has an adjustment for "Espresso"
+
+  Scenario: Close with actual_digital stores digital balance and computes digital_variance
+    Given the register is open with opening cash 200
+    And I have sold items
+      | product_name | quantity | payment |
+      | Espresso     | 2        | card    |
+    When I close the register with closing cash 200.00 and actual digital 10.00
+    And I fetch the session report for the last session
+    Then the session report actual_digital is 10.00
+    And the session report digital_variance is not null
+
+  Scenario: Close with all reconciliation fields is atomic — both adjustments and digital saved on success
+    Given the register is open with opening cash 200
+    And I have sold items
+      | product_name | quantity | payment |
+      | Espresso     | 2        | card    |
+    When I close the register with closing cash 200.00 and actual digital 10.00 and physical counts
+      | product_name | units |
+      | Espresso     | 95    |
+    And I fetch the session report for the last session
+    Then the session report actual_digital is 10.00
+    And the session report has an adjustment for "Espresso"
+
+  Scenario: Close preview returns trackable products active in current session
+    Given the register is open with opening cash 200
+    And I have sold items
+      | product_name | quantity | payment |
+      | Espresso     | 2        | cash    |
+    When I fetch the close preview
+    Then the close preview includes "Espresso" with a system_count
+
+  Scenario: Close preview excludes products not sold in current session
+    Given the register is open with opening cash 200
+    And I have sold items
+      | product_name | quantity | payment |
+      | Espresso     | 2        | cash    |
+    When I fetch the close preview
+    Then the close preview does not include "Croissant"
+
+  Scenario: Session report reconciliation_summary net_ok is true when net variance is zero
+    Given the register is open with opening cash 200
+    When I close the register with closing cash 200.00 and actual digital 0.00
+    And I fetch the session report for the last session
+    Then the session report reconciliation_summary net_ok is true
+
+  Scenario: Session report reconciliation_summary net_ok is true when cash is over
+    Given the register is open with opening cash 200
+    When I close the register with closing cash 210.00 and actual digital 0.00
+    And I fetch the session report for the last session
+    Then the session report reconciliation_summary net_ok is true
+
+  Scenario: Session report reconciliation_summary net_ok is false when net is short
+    Given the register is open with opening cash 200
+    When I close the register with closing cash 190.00 and actual digital 0.00
+    And I fetch the session report for the last session
+    Then the session report reconciliation_summary net_ok is false
+
+  Scenario: Session report reconciliation_summary diagnosis is unrecorded_cash_sale when cash over and inventory short
+    Given the register is open with opening cash 200
+    And I have sold items
+      | product_name | quantity | payment |
+      | Espresso     | 2        | cash    |
+    When I close the register with closing cash 230.00 and actual digital 0.00 and physical counts
+      | product_name | units |
+      | Espresso     | 90    |
+    And I fetch the session report for the last session
+    Then the session report reconciliation_summary diagnosis is "unrecorded_cash_sale"
+
+  Scenario: Session report reconciliation_summary diagnosis is shrinkage when balanced money but inventory short
+    Given the register is open with opening cash 200
+    And I have sold items
+      | product_name | quantity | payment |
+      | Espresso     | 2        | cash    |
+    When I close the register with closing cash 206.00 and actual digital 0.00 and physical counts
+      | product_name | units |
+      | Espresso     | 90    |
+    And I fetch the session report for the last session
+    Then the session report reconciliation_summary diagnosis is "shrinkage"
+
   Scenario: Session P&L net decreases when payroll is recorded
     Given the register is open with opening cash 200
     And I have sold items

@@ -38,8 +38,32 @@ The price charged to staff on at-cost tabs. Stored as `staff_price` (flat dollar
 ### At-Cost Tab
 A tab opened with `at_cost = true`. Items are priced at `staff_price` instead of `price`. Label shown in UI: `(staff)`. Discounts are disabled on at-cost tabs.
 
-### Physical Count (Post-Close)
-The act of entering actual shelf counts after a session is closed, as part of the post-close reconciliation step. Only products that were active during the session (sold, tabbed, or restocked) are shown for counting. Discrepancies create Inventory Adjustments visible in the session report and P&L. Counts are updatable — re-submitting replaces the previous entry. Physical counts are NOT collected at session close time.
+### Physical Count
+The act of entering actual shelf counts at session close, collected as part of the Close Reconciliation step. Only products that were active during the session (sold, tabbed, or restocked) and that are unit-tracked without supply dependencies are shown for counting. Discrepancies create Inventory Adjustments visible in the session report and P&L. Counts are updatable — re-submitting replaces the previous entry.
+
+### Close Reconciliation
+The single step at session close where the admin records three actuals: `closing_cash` (physical cash in drawer), `actual_digital` (bank/app balance for card + transfer payments), and per-product Physical Counts. All three are submitted together when closing the register. The backend closes the session and creates Inventory Adjustments atomically in one request. The session report then shows the Reconciliation Narrative derived from these inputs.
+
+### Reconciliation Narrative
+The interpretive analysis displayed in the session report after Close Reconciliation is submitted. Compares expected vs actual across cash, digital, and inventory, and classifies the session into one of these diagnoses:
+
+| Cash | Digital | Inventory | Diagnosis |
+|------|---------|-----------|-----------|
+| Over | balanced | Short | Likely unrecorded cash sale |
+| balanced | Over | Short | Likely unrecorded digital sale |
+| Short | balanced | balanced | Cash theft or miscounting |
+| Over | balanced | balanced | Overcharge or double payment |
+| balanced | balanced | Short | Spoilage / shrinkage — no missing money |
+| Short | balanced | Short | Items taken without payment |
+| — | — | — | Mixed signals — manual review |
+
+Overall status is **OK** when `net_variance >= 0` (you collected at least what was expected). Inventory shortages alone do not mark a session as problematic if money reconciles.
+
+### Net Variance
+`cash_variance + digital_variance`. Positive = more money collected than expected; negative = less. The primary signal used by the Reconciliation Narrative to determine if a session is financially OK.
+
+### Unrecorded Sale
+A sale that was served and collected but never entered into the POS. Inferred — never directly observable — when cash or digital is over AND inventory is short by a corresponding amount. The system flags this as a diagnosis in the Reconciliation Narrative; it does not auto-create an order.
 
 ### Session Payment
 A payment run (payroll, expense, or savings transfer) linked to a register session. Appears in the session report and in the P&L. If no session is specified when running payments, the system automatically links the entry to the currently open session. The session selector in the Distribute Payments UI allows overriding this — useful for retroactively linking a payment to a specific closed session.
