@@ -41,6 +41,7 @@ export default function AdminView() {
   const [registerSuccess, setRegisterSuccess] = useState('');
   const [openingCash, setOpeningCash] = useState('');
   const [closingCash, setClosingCash] = useState('');
+  const [actualDigital, setActualDigital] = useState('');
   const [cashoutAmount, setCashoutAmount] = useState('');
   const [cashoutReason, setCashoutReason] = useState('');
   const [closeProducts, setCloseProducts] = useState<Product[]>([]);
@@ -84,8 +85,11 @@ export default function AdminView() {
     setRegisterError(''); setRegisterSuccess('');
     try {
       const counts = closeProducts.map(p => ({ product_id: p.id, units: Number(physicalCounts[p.id] ?? p.units) }));
-      await api.closeRegister(Number(closingCash), { physical_counts: counts });
-      setRegisterSuccess('Register closed'); setClosingCash(''); setPhysicalCounts({}); setCloseProducts([]); loadRegister();
+      await api.closeRegister(Number(closingCash), {
+        actual_digital: actualDigital !== '' ? Number(actualDigital) : undefined,
+        physical_counts: counts,
+      });
+      setRegisterSuccess('Register closed'); setClosingCash(''); setActualDigital(''); setPhysicalCounts({}); setCloseProducts([]); loadRegister();
     } catch (e: unknown) { setRegisterError((e as Error).message); }
   }
 
@@ -422,6 +426,11 @@ export default function AdminView() {
                   <label className="label">Closing Cash ($)</label>
                   <input data-testid="closing-cash-input" className="input" type="number" min="0" step="0.01"
                     placeholder="0.00" value={closingCash} onChange={e => setClosingCash(e.target.value)} />
+                </div>
+                <div className="field">
+                  <label className="label">Actual Digital Balance ($)</label>
+                  <input data-testid="actual-digital-input" className="input" type="number" min="0" step="0.01"
+                    placeholder="0.00" value={actualDigital} onChange={e => setActualDigital(e.target.value)} />
                 </div>
                 {closeProducts.length > 0 && (
                   <div style={{ marginBottom: 12 }}>
