@@ -242,6 +242,18 @@ Feature: Register (Open / Close / Cashout)
     When I fetch the session report for the last session
     Then the session report has an adjustment for "Espresso"
 
+  Scenario: Reopening a session rolls back inventory adjustments from physical counts
+    Given the register is open with opening cash 200
+    And I have sold items
+      | product_name | quantity | payment |
+      | Espresso     | 2        | cash    |
+    When I close the register with closing cash 206.00 and physical counts
+      | product_name | units |
+      | Espresso     | 95    |
+    And I reopen the last closed session
+    And I fetch the product named "Espresso"
+    Then the product units is 98
+
   Scenario: Close with actual_digital stores digital balance and computes digital_variance
     Given the register is open with opening cash 200
     And I have sold items
@@ -251,6 +263,25 @@ Feature: Register (Open / Close / Cashout)
     And I fetch the session report for the last session
     Then the session report actual_digital is 10.00
     And the session report digital_variance is not null
+
+  Scenario: Closing register with actual_digital records a ledger adjustment for the digital variance
+    Given the register is open with opening cash 200
+    And I have sold items
+      | product_name | quantity | payment  |
+      | Espresso     | 2        | transfer |
+    When I close the register with closing cash 200.00 and actual digital 10.00
+    And I fetch the ledger
+    Then there is an "register_close" ledger entry with account "digital" and amount 4.00
+
+  Scenario: Digital reconciliation carries forward across sessions like cash does
+    Given the register is open with opening cash 200
+    And I have sold items
+      | product_name | quantity | payment  |
+      | Espresso     | 2        | transfer |
+    When I close the register with closing cash 200.00 and actual digital 500.00
+    And the register is open with opening cash 200
+    And I fetch the session report for the current session
+    Then the session report expected_digital is 500.00
 
   Scenario: Close with all reconciliation fields is atomic — both adjustments and digital saved on success
     Given the register is open with opening cash 200
@@ -263,6 +294,17 @@ Feature: Register (Open / Close / Cashout)
     And I fetch the session report for the last session
     Then the session report actual_digital is 10.00
     And the session report has an adjustment for "Espresso"
+
+  Scenario: Post-close reconciliation of actual_digital replaces the ledger adjustment
+    Given the register is open with opening cash 200
+    And I have sold items
+      | product_name | quantity | payment  |
+      | Espresso     | 2        | transfer |
+    When I close the register with closing cash 200.00 and actual digital 10.00
+    And I submit post-close reconciliation with actual digital 20.00
+    And I fetch the ledger
+    Then there is an "register_close" ledger entry with account "digital" and amount 14.00
+    And there are exactly 1 "register_close" ledger entries with account "digital"
 
   Scenario: Close preview returns trackable products active in current session
     Given the register is open with opening cash 200

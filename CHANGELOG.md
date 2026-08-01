@@ -9,6 +9,16 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Fixed
+
+#### Digital reconciliation now behaves like cash reconciliation
+- `POST /register/close` now books a `register_close` ledger entry on the `digital` account when `actual_digital` is submitted, mirroring the existing cash variance entry. Previously the digital variance was only ever shown in the session report and never recorded in the ledger, so it had no lasting effect.
+- `expected_digital` is now a running balance of the `digital` ledger account, the same model already used for `expected_cash`, so it carries forward across sessions instead of resetting to just the current session's card/transfer sales. Previously, entering the real bank/app balance at close (as `actual_digital` is documented to expect) against a session-scoped expected value produced large, misleading variances.
+- `PATCH /sessions/:id/reconcile` now replaces the `digital` ledger adjustment (delete + reinsert, same pattern already used for physical count corrections) when `actual_digital` is corrected post-close, keeping the ledger consistent with the stored value instead of leaving it stale.
+- Fixed a scalar-subquery bug in the session report's cash reconciliation query surfaced by the above change — it joined on `entry_type = 'register_close'` without filtering by `account`, so once a session could have both a cash and a digital `register_close` entry, the subquery returned more than one row and errored inside an untry-caught async handler, silently hanging the request instead of responding.
+- `POST /sessions/:id/reopen` now also rolls back inventory adjustments created by physical counts at close — restores `products.units` to their pre-close value and deletes the adjustment ledger entries and `inventory_adjustments` rows — and clears `actual_digital`, in addition to the existing cash rollback.
+- 4 BDD scenarios added (148/148 passing).
+
 ---
 
 ## [1.0.0] — 2026-06-19
