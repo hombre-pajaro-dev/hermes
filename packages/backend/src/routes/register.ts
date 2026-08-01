@@ -81,6 +81,15 @@ function computeReconciliationSummary(
   return { net_variance: netVariance, net_ok: netOk, cash_variance: cashVariance, digital_variance: digitalVariance, inventory_shortage_value: inventoryShortageValue, diagnosis };
 }
 
+// Running ledger balance for the digital account — mirrors how expected_cash is computed,
+// so actual_digital (the whole bank/app balance) carries forward across sessions the same way cash does.
+async function computeCurrentDigitalBalance(client: Queryable): Promise<number> {
+  const { rows: [row] } = await client.query(
+    "SELECT COALESCE(SUM(amount), 0) AS expected_digital FROM ledger_entries WHERE account = 'digital'"
+  ) as { rows: { expected_digital: number }[] };
+  return Number(row.expected_digital);
+}
+
 async function getOpenSession() {
   const db = await getDb();
   const { rows } = await db.query("SELECT * FROM register_sessions WHERE status = 'open' LIMIT 1");
@@ -282,21 +291,22 @@ router.get('/sessions/:id/report', async (req, res) => {
     SELECT COALESCE(
       (SELECT rs.closing_cash - le.amount
        FROM register_sessions rs
-       JOIN ledger_entries le ON le.ref_id = rs.id AND le.ref_type = 'session' AND le.entry_type = 'register_close'
+       JOIN ledger_entries le ON le.ref_id = rs.id AND le.ref_type = 'session' AND le.entry_type = 'register_close' AND le.account = 'cash'
        WHERE rs.id = $1),
       (SELECT COALESCE(SUM(amount), 0) FROM ledger_entries WHERE account = 'cash')
     ) AS expected_cash
   `, [sessionId]);
   const expectedCash = Number(cashReconRow.expected_cash);
 
-  // Digital reconciliation — card + transfer inflows minus commissions and digital payouts.
+  // Digital reconciliation: for closed sessions derive from stored register_close variance; for open sessions use current ledger balance.
   const { rows: [digitalReconRow] } = await db.query(`
-    SELECT
-      COALESCE((SELECT SUM(total) FROM orders WHERE session_id = $1 AND status = 'paid' AND payment_method IN ('card', 'transfer')), 0)
-      + COALESCE((SELECT SUM(total) FROM tabs   WHERE session_id = $1 AND status = 'paid' AND payment_method IN ('card', 'transfer')), 0)
-      + COALESCE((SELECT SUM(amount) FROM ledger_entries WHERE entry_type = 'commission_transfer' AND account = 'digital' AND ref_type = 'order' AND ref_id IN (SELECT id FROM orders WHERE session_id = $1 AND status = 'paid')), 0)
-      + COALESCE((SELECT SUM(amount) FROM ledger_entries WHERE session_id = $1 AND entry_type IN ('payroll', 'expense', 'provider_expense', 'savings_transfer') AND account = 'digital' AND amount < 0), 0)
-    AS expected_digital
+    SELECT COALESCE(
+      (SELECT rs.actual_digital - le.amount
+       FROM register_sessions rs
+       JOIN ledger_entries le ON le.ref_id = rs.id AND le.ref_type = 'session' AND le.entry_type = 'register_close' AND le.account = 'digital'
+       WHERE rs.id = $1),
+      (SELECT COALESCE(SUM(amount), 0) FROM ledger_entries WHERE account = 'digital')
+    ) AS expected_digital
   `, [sessionId]);
   const expectedDigital = Number(digitalReconRow.expected_digital);
 
@@ -439,15 +449,44 @@ router.patch('/sessions/:id/reconcile', requireAdmin, async (req, res) => {
   const snapshot = session.inventory_snapshot_close as { products: { id: number; units: number }[] } | null;
   const snapshotMap = new Map((snapshot?.products ?? []).map(p => [p.id, p.units]));
 
-  if (Array.isArray(physical_counts) && physical_counts.length > 0) {
-    await applyPhysicalCounts(db, sessionId, snapshotMap, physical_counts);
-  }
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
 
-  if (actual_digital != null) {
-    await db.query('UPDATE register_sessions SET actual_digital = $1 WHERE id = $2', [actual_digital, sessionId]);
-  }
+    if (Array.isArray(physical_counts) && physical_counts.length > 0) {
+      await applyPhysicalCounts(client as unknown as Queryable, sessionId, snapshotMap, physical_counts);
+    }
 
-  res.json({ ok: true });
+    if (actual_digital != null) {
+      // Replace any prior digital register_close entry so its own amount doesn't get folded into the new baseline.
+      await client.query(
+        "DELETE FROM ledger_entries WHERE entry_type = 'register_close' AND ref_type = 'session' AND ref_id = $1 AND account = 'digital'",
+        [sessionId]
+      );
+      const expectedDigital = await computeCurrentDigitalBalance(client as unknown as Queryable);
+      const digitalVariance = Number(actual_digital) - expectedDigital;
+
+      const digitalVarianceDesc = digitalVariance === 0
+        ? 'Register closed — digital balanced'
+        : digitalVariance > 0
+          ? `Register closed — digital over $${digitalVariance.toFixed(2)}`
+          : `Register closed — digital short $${Math.abs(digitalVariance).toFixed(2)}`;
+
+      await client.query(
+        "INSERT INTO ledger_entries (entry_type, account, amount, description, ref_id, ref_type) VALUES ('register_close', 'digital', $1, $2, $3, 'session')",
+        [digitalVariance, digitalVarianceDesc, sessionId]
+      );
+      await client.query('UPDATE register_sessions SET actual_digital = $1 WHERE id = $2', [actual_digital, sessionId]);
+    }
+
+    await client.query('COMMIT');
+    res.json({ ok: true });
+  } catch (err: unknown) {
+    await client.query('ROLLBACK');
+    res.status(500).json({ error: (err as Error).message });
+  } finally {
+    client.release();
+  }
 });
 
 router.post('/sessions/:id/claim-payments', requireAdmin, async (req, res) => {
@@ -544,17 +583,39 @@ router.post('/sessions/:id/reopen', requireAdmin, async (req, res) => {
     return res.status(409).json({ error: 'Only the most recently closed session can be reopened' });
   }
 
-  await db.query(
-    "DELETE FROM ledger_entries WHERE entry_type = 'register_close' AND ref_type = 'session' AND ref_id = $1",
-    [sessionId]
-  );
-  await db.query(
-    "UPDATE register_sessions SET status = 'open', closing_cash = NULL, closed_at = NULL, inventory_snapshot_close = NULL WHERE id = $1",
-    [sessionId]
-  );
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
 
-  const { rows: [updated] } = await db.query('SELECT * FROM register_sessions WHERE id = $1', [sessionId]);
-  res.json(updated);
+    const { rows: adjustments } = await client.query(
+      'SELECT id, product_id, previous_units FROM inventory_adjustments WHERE session_id = $1',
+      [sessionId]
+    ) as { rows: { id: number; product_id: number; previous_units: number }[] };
+
+    for (const adj of adjustments) {
+      await client.query('DELETE FROM ledger_entries WHERE ref_id = $1 AND ref_type = $2', [adj.id, 'adjustment']);
+      await client.query('UPDATE products SET units = $1 WHERE id = $2', [adj.previous_units, adj.product_id]);
+      await client.query('DELETE FROM inventory_adjustments WHERE id = $1', [adj.id]);
+    }
+
+    await client.query(
+      "DELETE FROM ledger_entries WHERE entry_type = 'register_close' AND ref_type = 'session' AND ref_id = $1",
+      [sessionId]
+    );
+    await client.query(
+      "UPDATE register_sessions SET status = 'open', closing_cash = NULL, closed_at = NULL, inventory_snapshot_close = NULL, actual_digital = NULL WHERE id = $1",
+      [sessionId]
+    );
+
+    await client.query('COMMIT');
+    const { rows: [updated] } = await client.query('SELECT * FROM register_sessions WHERE id = $1', [sessionId]);
+    res.json(updated);
+  } catch (err: unknown) {
+    await client.query('ROLLBACK');
+    res.status(500).json({ error: (err as Error).message });
+  } finally {
+    client.release();
+  }
 });
 
 router.post('/close', requireAdmin, async (req, res) => {
@@ -606,6 +667,22 @@ router.post('/close', requireAdmin, async (req, res) => {
       "INSERT INTO ledger_entries (entry_type, account, amount, description, ref_id, ref_type) VALUES ('register_close', 'cash', $1, $2, $3, 'session')",
       [variance, varianceDesc, session.id]
     );
+
+    if (actual_digital != null) {
+      const expectedDigital = await computeCurrentDigitalBalance(client as unknown as Queryable);
+      const digitalVariance = Number(actual_digital) - expectedDigital;
+
+      const digitalVarianceDesc = digitalVariance === 0
+        ? 'Register closed — digital balanced'
+        : digitalVariance > 0
+          ? `Register closed — digital over $${digitalVariance.toFixed(2)}`
+          : `Register closed — digital short $${Math.abs(digitalVariance).toFixed(2)}`;
+
+      await client.query(
+        "INSERT INTO ledger_entries (entry_type, account, amount, description, ref_id, ref_type) VALUES ('register_close', 'digital', $1, $2, $3, 'session')",
+        [digitalVariance, digitalVarianceDesc, session.id]
+      );
+    }
 
     if (Array.isArray(physical_counts) && physical_counts.length > 0) {
       const snapshotMap = new Map((snapshot.products as { id: number; units: number }[]).map(p => [p.id, p.units]));

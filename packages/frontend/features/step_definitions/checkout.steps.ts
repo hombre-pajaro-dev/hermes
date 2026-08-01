@@ -52,6 +52,18 @@ When('I pay with card', async function (this: PosWorld) {
   await this.page.waitForLoadState('networkidle');
 });
 
+When('I open the cart and pay with card', async function (this: PosWorld) {
+  await this.page.click('[data-testid="checkout-cart-bar"]');
+  await this.page.waitForSelector('[data-testid="pay-card-btn"]', { timeout: 5000 });
+  await this.page.click('[data-testid="pay-card-btn"]');
+  await this.page.waitForLoadState('networkidle');
+});
+
+Then('the cart panel is collapsed', async function (this: PosWorld) {
+  const cls = await this.page.locator('[data-testid="order-lines"]').getAttribute('class');
+  expect(cls ?? '').to.not.include('checkout-cart-panel--open');
+});
+
 When('I proceed to cash payment', async function (this: PosWorld) {
   await this.page.waitForSelector('[data-testid="proceed-to-cash-btn"]', { timeout: 5000 });
   await this.page.click('[data-testid="proceed-to-cash-btn"]');
@@ -95,8 +107,9 @@ When('I close the receipt modal', async function (this: PosWorld) {
 });
 
 Then('the order is cleared', async function (this: PosWorld) {
-  await this.page.locator('[data-testid="order-empty"]').waitFor({ timeout: 5000 });
-  expect(await this.page.locator('[data-testid="order-empty"]').isVisible()).to.be.true;
+  // Sticky cart bar only renders while the order has items, so its absence proves the order was cleared
+  // regardless of whether the cart panel itself is open or collapsed.
+  await this.page.locator('[data-testid="checkout-cart-bar"]').waitFor({ state: 'detached', timeout: 5000 });
 });
 
 Then('I see a payment success message', async function (this: PosWorld) {

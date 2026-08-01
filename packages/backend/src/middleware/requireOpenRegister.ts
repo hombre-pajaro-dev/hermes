@@ -5,7 +5,7 @@ export async function requireOpenRegister(req: Request, res: Response, next: Nex
   const db = await getDb();
   const { rows } = await db.query("SELECT id FROM register_sessions WHERE status = 'open' LIMIT 1");
   if (!rows[0]) {
-    res.status(403).json({ error: 'Register is not open' });
+    res.status(403).json({ error: 'Register is not open — open the register first' });
     return;
   }
   (req as Request & { sessionId: number }).sessionId = rows[0].id;

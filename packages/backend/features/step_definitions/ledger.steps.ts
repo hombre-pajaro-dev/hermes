@@ -173,6 +173,12 @@ When('I try to delete ledger entry {int}', async function (this: PosWorld, id: n
   this.response = await this.agent.delete(`/api/ledger/entries/${id}`);
 });
 
+Then('there are exactly {int} {string} ledger entries with account {string}', function (this: PosWorld, count: number, type: string, account: string) {
+  const entries = this.response.body as { entry_type: string; account: string }[];
+  const matching = entries.filter(e => e.entry_type === type && e.account === account);
+  expect(matching.length, `Expected exactly ${count} '${type}' entries with account '${account}'`).to.equal(count);
+});
+
 Then('there is an {string} ledger entry with account {string} and amount {float}', function (this: PosWorld, type: string, account: string, amount: number) {
   const entries = this.response.body as { entry_type: string; account: string; amount: number }[];
   const found = entries.find(e => e.entry_type === type && e.account === account);

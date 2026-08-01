@@ -150,6 +150,11 @@ Then('the session report transfer_sales is at least {float}', function (this: Po
   expect(body.transfer_sales).to.be.at.least(min);
 });
 
+Then('the session report expected_digital is {float}', function (this: PosWorld, expected: number) {
+  const body = this.response.body as { expected_digital: number };
+  expect(body.expected_digital, 'expected_digital missing from session report').to.be.closeTo(expected, 0.001);
+});
+
 Then('the session report expected_digital is positive', function (this: PosWorld) {
   const body = this.response.body as { expected_digital: number };
   expect(body.expected_digital, 'expected_digital missing from session report').to.be.a('number');

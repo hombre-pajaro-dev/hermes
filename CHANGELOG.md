@@ -9,6 +9,34 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Fixed
+
+#### Digital reconciliation now behaves like cash reconciliation
+- `POST /register/close` now books a `register_close` ledger entry on the `digital` account when `actual_digital` is submitted, mirroring the existing cash variance entry. Previously the digital variance was only ever shown in the session report and never recorded in the ledger, so it had no lasting effect.
+- `expected_digital` is now a running balance of the `digital` ledger account, the same model already used for `expected_cash`, so it carries forward across sessions instead of resetting to just the current session's card/transfer sales. Previously, entering the real bank/app balance at close (as `actual_digital` is documented to expect) against a session-scoped expected value produced large, misleading variances.
+- `PATCH /sessions/:id/reconcile` now replaces the `digital` ledger adjustment (delete + reinsert, same pattern already used for physical count corrections) when `actual_digital` is corrected post-close, keeping the ledger consistent with the stored value instead of leaving it stale.
+- Fixed a scalar-subquery bug in the session report's cash reconciliation query surfaced by the above change — it joined on `entry_type = 'register_close'` without filtering by `account`, so once a session could have both a cash and a digital `register_close` entry, the subquery returned more than one row and errored inside an untry-caught async handler, silently hanging the request instead of responding.
+- `POST /sessions/:id/reopen` now also rolls back inventory adjustments created by physical counts at close — restores `products.units` to their pre-close value and deletes the adjustment ledger entries and `inventory_adjustments` rows — and clears `actual_digital`, in addition to the existing cash rollback.
+- 4 BDD scenarios added (148/148 passing).
+
+#### Checkout now explains why it's blocked when the register is closed
+- Checkout previously returned a bare 403 from `POST /checkout/orders` with no visible explanation until a payment was attempted. `requireOpenRegister` now returns `"Register is not open — open the register first"`, matching the wording already used when opening a tab.
+- The Checkout view now checks register status on load and shows a banner — *"Register is closed — ask an admin to open it from the Register tab before checking out."* — immediately, instead of only surfacing an error after a failed payment attempt.
+- 1 BDD scenario added.
+
+#### Closing the receipt no longer reopens the empty cart on phone
+- On phone width, closing the receipt modal used to force the (now empty) Cart Panel back open as a full-screen overlay, requiring an extra "← Back" tap before the product picker was reachable to start the next order.
+- Closing the receipt now collapses the cart panel instead, returning straight to the product picker so the next order can start immediately.
+- Fixed the "order is cleared" BDD assertion, which had relied on the cart panel being forced open to see the empty-state message — it now checks that the sticky cart bar (which only renders while the order has items) is gone, which holds regardless of whether the panel is open or collapsed.
+- 1 BDD scenario added; 1 previously-broken scenario fixed alongside it (a pre-existing, unrelated bug where "I pay with card"/"I proceed to cash payment" never tap the sticky cart bar to expand it on phone width, so the payment buttons stay hidden — worked around locally in these two scenarios via a new step, not fixed at the source).
+
+#### Fixed horizontal overflow on mobile (Products grid, Reports date range, Admin Users)
+- Root cause was the same in all three: flex/grid items default to `min-width: auto`, so an unbreakable string (a long product name, a long email) refused to shrink and forced its container wider than the viewport instead of wrapping.
+- Products grid cards (`.product-card`) and card names (`.product-card__name`) now set `min-width: 0` and wrap long text, instead of forcing the grid track — and the whole page — into horizontal scroll.
+- Admin Users rows (`.list-item__main` / `.list-item__name`, shared by other list views too) got the same fix, so a long email no longer pushes the role selector and Remove button off-screen.
+- Reports' `DateTimeRangeFilter` (used by both the "By Item" and "Range" tabs): the From/To inputs had no explicit flex-basis or `min-width: 0`, and the Apply button was a bare flex sibling with no basis — on narrow screens this let Apply land overlapping the To input instead of cleanly below it. From/To now get `flex: '1 1 160px'` with `min-width: 0`; Apply gets `flex: '1 1 100%'` so it's always forced onto its own full-width row.
+- Verified via a scripted Playwright pass at 390px and 360px viewports (no BDD suite exists for pixel-overflow assertions in this codebase) — confirmed no element's bounding box exceeds the viewport width before/after, and screenshotted each view.
+
 ---
 
 ## [1.0.0] — 2026-06-19
