@@ -24,6 +24,12 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 - The Checkout view now checks register status on load and shows a banner — *"Register is closed — ask an admin to open it from the Register tab before checking out."* — immediately, instead of only surfacing an error after a failed payment attempt.
 - 1 BDD scenario added.
 
+#### Closing the receipt no longer reopens the empty cart on phone
+- On phone width, closing the receipt modal used to force the (now empty) Cart Panel back open as a full-screen overlay, requiring an extra "← Back" tap before the product picker was reachable to start the next order.
+- Closing the receipt now collapses the cart panel instead, returning straight to the product picker so the next order can start immediately.
+- Fixed the "order is cleared" BDD assertion, which had relied on the cart panel being forced open to see the empty-state message — it now checks that the sticky cart bar (which only renders while the order has items) is gone, which holds regardless of whether the panel is open or collapsed.
+- 1 BDD scenario added; 1 previously-broken scenario fixed alongside it (a pre-existing, unrelated bug where "I pay with card"/"I proceed to cash payment" never tap the sticky cart bar to expand it on phone width, so the payment buttons stay hidden — worked around locally in these two scenarios via a new step, not fixed at the source).
+
 ---
 
 ## [1.0.0] — 2026-06-19

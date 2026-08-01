@@ -49,9 +49,16 @@ Feature: Checkout
   Scenario: Close receipt modal to start new order
     Given I am on the Checkout page
     When I add "Espresso" to the order
-    And I pay with card
+    And I open the cart and pay with card
     And I close the receipt modal
     Then the order is cleared
+
+  Scenario: Closing the receipt returns to the product picker instead of reopening the empty cart
+    Given I am on the Checkout page
+    When I add "Espresso" to the order
+    And I open the cart and pay with card
+    And I close the receipt modal
+    Then the cart panel is collapsed
 
   Scenario: Filter products by name in checkout
     Given I am on the Checkout page

@@ -221,7 +221,7 @@ export default function CheckoutView() {
 
   function handleCloseReceipt() {
     setReceipt(null);
-    setCartOpen(true); // open empty cart so BDD "order cleared" assertion passes
+    setCartOpen(false); // return to the product picker so a new order can start right away
   }
 
   return (
