@@ -30,6 +30,13 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 - Fixed the "order is cleared" BDD assertion, which had relied on the cart panel being forced open to see the empty-state message — it now checks that the sticky cart bar (which only renders while the order has items) is gone, which holds regardless of whether the panel is open or collapsed.
 - 1 BDD scenario added; 1 previously-broken scenario fixed alongside it (a pre-existing, unrelated bug where "I pay with card"/"I proceed to cash payment" never tap the sticky cart bar to expand it on phone width, so the payment buttons stay hidden — worked around locally in these two scenarios via a new step, not fixed at the source).
 
+#### Fixed horizontal overflow on mobile (Products grid, Reports date range, Admin Users)
+- Root cause was the same in all three: flex/grid items default to `min-width: auto`, so an unbreakable string (a long product name, a long email) refused to shrink and forced its container wider than the viewport instead of wrapping.
+- Products grid cards (`.product-card`) and card names (`.product-card__name`) now set `min-width: 0` and wrap long text, instead of forcing the grid track — and the whole page — into horizontal scroll.
+- Admin Users rows (`.list-item__main` / `.list-item__name`, shared by other list views too) got the same fix, so a long email no longer pushes the role selector and Remove button off-screen.
+- Reports' `DateTimeRangeFilter` (used by both the "By Item" and "Range" tabs): the From/To inputs had no explicit flex-basis or `min-width: 0`, and the Apply button was a bare flex sibling with no basis — on narrow screens this let Apply land overlapping the To input instead of cleanly below it. From/To now get `flex: '1 1 160px'` with `min-width: 0`; Apply gets `flex: '1 1 100%'` so it's always forced onto its own full-width row.
+- Verified via a scripted Playwright pass at 390px and 360px viewports (no BDD suite exists for pixel-overflow assertions in this codebase) — confirmed no element's bounding box exceeds the viewport width before/after, and screenshotted each view.
+
 ---
 
 ## [1.0.0] — 2026-06-19

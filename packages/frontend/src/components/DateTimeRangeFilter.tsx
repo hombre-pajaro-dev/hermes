@@ -13,7 +13,7 @@ export default function DateTimeRangeFilter({ initialFrom, initialTo, onApply, l
 
   return (
     <div style={{ display: 'flex', gap: 8, marginBottom: 12, alignItems: 'flex-end', flexWrap: 'wrap' }}>
-      <div style={{ flex: 1 }}>
+      <div style={{ flex: '1 1 160px', minWidth: 0 }}>
         <label className="label">From</label>
         <input
           className="input"
@@ -22,7 +22,7 @@ export default function DateTimeRangeFilter({ initialFrom, initialTo, onApply, l
           onChange={e => setFrom(e.target.value)}
         />
       </div>
-      <div style={{ flex: 1 }}>
+      <div style={{ flex: '1 1 160px', minWidth: 0 }}>
         <label className="label">To</label>
         <input
           className="input"
@@ -36,7 +36,7 @@ export default function DateTimeRangeFilter({ initialFrom, initialTo, onApply, l
         data-testid="date-range-apply-btn"
         onClick={() => onApply(from, to)}
         disabled={loading}
-        style={{ marginBottom: 1 }}
+        style={{ flex: '1 1 100%', marginBottom: 1 }}
       >
         Apply
       </button>
