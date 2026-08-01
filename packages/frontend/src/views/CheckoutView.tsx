@@ -35,6 +35,7 @@ export default function CheckoutView() {
   const [receipt, setReceipt] = useState<Receipt | null>(null);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [registerOpen, setRegisterOpen] = useState<boolean | null>(null);
   const [viewMode, setViewMode] = useState<ViewMode>(() => {
     return (localStorage.getItem('checkout-view') as ViewMode | null) ?? 'grid';
   });
@@ -60,6 +61,7 @@ export default function CheckoutView() {
       setSoldCounts(Object.fromEntries(rows.map(r => [r.product_id, r.units_sold])));
     }).catch(() => {});
     api.getDiscounts().then(setDiscounts).catch(() => {});
+    api.getSession().then(s => setRegisterOpen(s != null)).catch(() => setRegisterOpen(null));
   }, []);
 
   function addProduct(product: Product) {
@@ -269,6 +271,11 @@ export default function CheckoutView() {
       )}
 
       {error && <div className="error-banner" data-testid="error-banner">{error}</div>}
+      {!error && registerOpen === false && (
+        <div className="error-banner" data-testid="error-banner">
+          Register is closed — ask an admin to open it from the Register tab before checking out.
+        </div>
+      )}
 
       {/* Extra bottom padding on phone when sticky bar is visible */}
       <div className="checkout-layout" style={lines.length > 0 ? { paddingBottom: 60 } : undefined}>

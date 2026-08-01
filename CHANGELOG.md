@@ -19,6 +19,11 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 - `POST /sessions/:id/reopen` now also rolls back inventory adjustments created by physical counts at close — restores `products.units` to their pre-close value and deletes the adjustment ledger entries and `inventory_adjustments` rows — and clears `actual_digital`, in addition to the existing cash rollback.
 - 4 BDD scenarios added (148/148 passing).
 
+#### Checkout now explains why it's blocked when the register is closed
+- Checkout previously returned a bare 403 from `POST /checkout/orders` with no visible explanation until a payment was attempted. `requireOpenRegister` now returns `"Register is not open — open the register first"`, matching the wording already used when opening a tab.
+- The Checkout view now checks register status on load and shows a banner — *"Register is closed — ask an admin to open it from the Register tab before checking out."* — immediately, instead of only surfacing an error after a failed payment attempt.
+- 1 BDD scenario added.
+
 ---
 
 ## [1.0.0] — 2026-06-19

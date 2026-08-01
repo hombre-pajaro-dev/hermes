@@ -26,6 +26,11 @@ Feature: Checkout
     And I pay with card
     Then I see an error message
 
+  Scenario: Checkout page shows a message immediately when register is closed
+    Given the register is closed via the API
+    And I am on the Checkout page
+    Then I see an error message
+
   Scenario: Cash payment view shows live change calculation
     Given I am on the Checkout page
     When I add "Latte" to the order
