@@ -408,8 +408,9 @@ export default function LedgerView() {
                         <tbody>
                           {items.map(item => {
                             const costChanged = e.entry_type === 'restock' && item.previous_cost != null && Math.abs(item.previous_cost - item.unit_price) > 0.0001;
+                            const rowKey = `${item.item_type ?? 'product'}-${item.product_id ?? item.supply_id}`;
                             return (
-                              <tr key={item.product_id} data-testid="ledger-item-row">
+                              <tr key={rowKey} data-testid="ledger-item-row">
                                 <td style={{ padding: '2px 0' }}>{item.name}</td>
                                 <td style={{ padding: '2px 0', textAlign: 'center' }}>{item.quantity}</td>
                                 <td style={{ padding: '2px 0', textAlign: 'right' }}>

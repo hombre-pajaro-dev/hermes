@@ -384,4 +384,21 @@ export async function applySchema(db: Pool): Promise<void> {
 
   // Post-close reconciliation: actual digital balance entered after close
   await db.query(`ALTER TABLE register_sessions ADD COLUMN IF NOT EXISTS actual_digital DOUBLE PRECISION`);
+
+  // Supply cost (ADR 0004): supplies get their own per-unit cost, set via Restock or direct admin
+  // edit. products.cost is no longer authoritative for uses_supplies=true products — it's computed
+  // on read from sum(quantity_per_unit * supply.cost); see getProductCost() in lib/supply-utils.ts.
+  await db.query(`ALTER TABLE supplies ADD COLUMN IF NOT EXISTS cost DOUBLE PRECISION NOT NULL DEFAULT 0`);
+
+  // Restock line items for supplies — parallel to restock_items (which is product-only).
+  await db.query(`
+    CREATE TABLE IF NOT EXISTS restock_supply_items (
+      id               SERIAL PRIMARY KEY,
+      restock_order_id INTEGER NOT NULL REFERENCES restock_orders(id),
+      supply_id        INTEGER NOT NULL REFERENCES supplies(id),
+      quantity         DOUBLE PRECISION NOT NULL,
+      unit_cost        DOUBLE PRECISION NOT NULL,
+      previous_cost    DOUBLE PRECISION NOT NULL
+    )
+  `);
 }

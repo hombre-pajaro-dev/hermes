@@ -88,6 +88,47 @@ Then('I see the cost-updated tag on the restock item', async function (this: Pos
   expect(await this.page.locator('[data-testid="cost-updated-tag"]').first().isVisible()).to.be.true;
 });
 
+Given('there is a supply {string} via the API', async function (this: PosWorld, name: string) {
+  const base = `${API}/api`;
+  await fetch(`${base}/supplies`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ name, unit: 'ml', quantity: 0, cost: 0 }),
+  });
+});
+
+When('I enter restock supply quantity {int} for {string}', async function (this: PosWorld, qty: number, name: string) {
+  await this.page.waitForSelector('[data-testid="restock-supply-form"]', { timeout: 5000 });
+  const testId = `restock-supply-qty-${name.toLowerCase().replace(/\s+/g, '-')}`;
+  await this.page.fill(`[data-testid="${testId}"]`, String(qty));
+});
+
+When('I enter restock supply total paid {int} for {string}', async function (this: PosWorld, amount: number, name: string) {
+  const testId = `restock-supply-total-${name.toLowerCase().replace(/\s+/g, '-')}`;
+  await this.page.fill(`[data-testid="${testId}"]`, String(amount));
+});
+
+Then('I see the supply quantity input for {string}', async function (this: PosWorld, name: string) {
+  const slug = name.toLowerCase().replace(/\s+/g, '-');
+  const el = this.page.locator(`[data-testid="restock-supply-qty-${slug}"]`);
+  await el.waitFor({ timeout: 5000 });
+  expect(await el.isVisible()).to.be.true;
+});
+
+Then('I see the supply total paid input for {string}', async function (this: PosWorld, name: string) {
+  const slug = name.toLowerCase().replace(/\s+/g, '-');
+  const el = this.page.locator(`[data-testid="restock-supply-total-${slug}"]`);
+  await el.waitFor({ timeout: 5000 });
+  expect(await el.isVisible()).to.be.true;
+});
+
+Then('I see the supply cost-change warning for {string}', async function (this: PosWorld, name: string) {
+  const slug = name.toLowerCase().replace(/\s+/g, '-');
+  const el = this.page.locator(`[data-testid="supply-cost-change-warning-${slug}"]`);
+  await el.waitFor({ timeout: 5000 });
+  expect(await el.isVisible()).to.be.true;
+});
+
 Then('each product row shows a unit cost', async function (this: PosWorld) {
   await this.page.waitForSelector('[data-testid="restock-form"]', { timeout: 5000 });
   const rows = this.page.locator('[data-testid="restock-form"] .list-item__sub');

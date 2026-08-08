@@ -322,6 +322,17 @@ export default function ProductsView() {
   }
 
   function renderEditableField(p: Product, field: EditField, value: number, locked: boolean) {
+    if (field === 'cost' && p.uses_supplies) {
+      return (
+        <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+          <span data-testid={`product-${field}`}>${value.toFixed(2)}</span>
+          <span data-testid={`cost-computed-badge-${p.id}`} title="Computed from supply ingredients"
+            style={{ fontSize: '0.65rem', color: 'var(--text-secondary)' }}>
+            Σ computed
+          </span>
+        </div>
+      );
+    }
     if (!isAdmin) {
       return (
         <span style={{ fontWeight: field === 'price' ? 700 : 400 }} data-testid={`product-${field}`}>

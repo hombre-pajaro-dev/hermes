@@ -2,7 +2,7 @@ import { Router } from 'express';
 import { getDb, pool } from '../db/database.js';
 import { requireOpenRegister } from '../middleware/requireOpenRegister.js';
 import { isDiscountEligibleNow, computeDiscountAmount } from '../lib/discount-engine.js';
-import { getProductAvailableUnits, deductProductStock } from '../lib/supply-utils.js';
+import { getProductAvailableUnits, deductProductStock, getProductCost } from '../lib/supply-utils.js';
 import { actorEmail } from '../lib/actor.js';
 import { applyCardCommission } from '../lib/commission-utils.js';
 
@@ -35,11 +35,12 @@ router.post('/orders', requireOpenRegister, async (req, res) => {
     const insertedItems = [];
     for (const item of items) {
       const { rows: [product] } = await client.query('SELECT * FROM products WHERE id = $1', [item.product_id]);
+      const cost = await getProductCost(client, item.product_id);
       const subtotal = product.price * item.quantity;
       total += subtotal;
       const { rows: [itemRow] } = await client.query(
         'INSERT INTO order_items (order_id, product_id, quantity, unit_price, unit_cost, subtotal) VALUES ($1, $2, $3, $4, $5, $6) RETURNING *',
-        [orderId, item.product_id, item.quantity, product.price, product.cost, subtotal]
+        [orderId, item.product_id, item.quantity, product.price, cost, subtotal]
       );
       await deductProductStock(client, item.product_id, item.quantity);
       insertedItems.push(itemRow);

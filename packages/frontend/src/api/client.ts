@@ -90,8 +90,8 @@ export const api = {
     req<WeekdayReport>(`/reports/by-weekday?tz=${encodeURIComponent(tz)}${year ? `&year=${year}` : ''}`),
 
   // Restock
-  restock: (items: RestockItem[], meta?: { provider_id?: number; payment_account?: string }) =>
-    req<RestockOrder>('/restock', { method: 'POST', body: JSON.stringify({ items, ...meta }) }),
+  restock: (items: RestockItem[], supplyItems: RestockSupplyItem[], meta?: { provider_id?: number; payment_account?: string }) =>
+    req<RestockOrder>('/restock', { method: 'POST', body: JSON.stringify({ items, supply_items: supplyItems, ...meta }) }),
 
   // Providers
   getProviders: () => req<Provider[]>('/providers'),
@@ -120,13 +120,11 @@ export const api = {
 
   // Supplies
   getSupplies: () => req<Supply[]>('/supplies'),
-  createSupply: (body: { name: string; unit: string; quantity: number }) =>
+  createSupply: (body: { name: string; unit: string; quantity: number; cost?: number }) =>
     req<Supply>('/supplies', { method: 'POST', body: JSON.stringify(body) }),
-  updateSupply: (id: number, body: Partial<{ name: string; unit: string; quantity: number }>) =>
+  updateSupply: (id: number, body: Partial<{ name: string; unit: string; quantity: number; cost: number }>) =>
     req<Supply>(`/supplies/${id}`, { method: 'PATCH', body: JSON.stringify(body) }),
   deleteSupply: (id: number) => req<{ ok: true }>(`/supplies/${id}`, { method: 'DELETE' }),
-  restockSupply: (id: number, quantity: number) =>
-    req<Supply>(`/supplies/${id}/restock`, { method: 'POST', body: JSON.stringify({ quantity }) }),
   setProductSupplies: (productId: number, supply_ingredients: { supply_id: number; quantity_per_unit: number }[]) =>
     req<Product>(`/products/${productId}/supplies`, { method: 'PATCH', body: JSON.stringify({ supply_ingredients }) }),
 
@@ -151,7 +149,7 @@ export const api = {
 // Types
 export interface SupplyIngredient { supply_id: number; quantity_per_unit: number; supply_name: string; unit: string; }
 export interface Product { id: number; name: string; description: string; cost: number; price: number; staff_price: number; units: number; image?: string | null; active: boolean; track_inventory: boolean; uses_supplies: boolean; supply_ingredients: SupplyIngredient[]; provider_id?: number | null; provider_name?: string | null; }
-export interface Supply { id: number; name: string; unit: string; quantity: number; created_at: string; }
+export interface Supply { id: number; name: string; unit: string; quantity: number; cost: number; created_at: string; }
 export interface RegisterSession { id: number; status: string; opening_cash: number; closing_cash?: number; opened_at: string; closed_at?: string; }
 export interface RegisterSessionSummary { id: number; status: string; opening_cash: number; closing_cash: number | null; opened_at: string; closed_at: string | null; }
 export interface InventorySnapshotEntry { id: number; name: string; units: number; }
@@ -167,6 +165,7 @@ export interface SessionReport {
   by_item: { product_id: number; name: string; units_sold: number; revenue: number; cost: number; profit: number }[];
   cashouts: { id: number; amount: number; reason: string; created_at: string }[];
   restocked: { product_id: number; name: string; units_restocked: number }[];
+  supplies_restocked: { supply_id: number; name: string; unit: string; quantity_restocked: number }[];
   adjustments: { product_id: number; name: string; delta: number }[];
   payments: SessionPayment[];
 }
@@ -180,8 +179,9 @@ export interface Tab { id: number; name: string; status: string; at_cost: number
 export interface TabItem { id: number; product_id: number; name?: string; quantity: number; unit_price: number; unit_cost: number; subtotal: number; added_by?: string | null; added_at?: string | null; }
 export interface TabsSummary { open_count: number; total_amount: number; }
 export interface LedgerEntry { id: number; entry_type: string; account?: string; amount: number; description: string; ref_id?: number; ref_type?: string; created_at: string; discount_name?: string; discount_amount?: number; created_by?: string | null; tab_at_cost?: number | null; tab_opened_by?: string | null; }
-export interface LedgerEntryItem { product_id: number; name: string; quantity: number; unit_price: number; subtotal: number; previous_cost?: number | null; }
+export interface LedgerEntryItem { product_id: number | null; supply_id?: number | null; name: string; quantity: number; unit_price: number; subtotal: number; previous_cost?: number | null; item_type?: 'product' | 'supply'; unit?: string | null; }
 export interface RestockItem { product_id: number; quantity: number; unit_cost: number; }
+export interface RestockSupplyItem { supply_id: number; quantity: number; unit_cost: number; }
 export interface Account { id: number; name: string; label: string; }
 export interface Balance { account: string; balance: number; }
 export interface SalesByItem { product_id: number; name: string; units_sold: number; revenue: number; cost: number; }
@@ -190,7 +190,7 @@ export interface DailyRange { date: string; revenue: number; cost: number; order
 export interface TopProduct { product_id: number; units_sold: number; }
 export interface InventoryAdjustmentItem { product_id: number; name: string; adjustment_count: number; total_delta: number; total_cost_impact: number; }
 export interface CloseBrief { session_id: number; revenue: number; total_cost: number; commission_total?: number; gross_profit: number; expected_cash?: number; cash_variance?: number | null; most_sold?: { name: string; units_sold: number } | null; most_profitable?: { name: string; profit: number } | null; by_item: SalesByItem[]; }
-export interface RestockOrder { id: number; session_id: number; provider_id?: number | null; payment_amount?: number | null; payment_account?: string | null; items: { product_id: number; name: string; quantity: number; new_units: number }[]; }
+export interface RestockOrder { id: number; session_id: number; provider_id?: number | null; payment_amount?: number | null; payment_account?: string | null; items: { product_id: number; name: string; quantity: number; new_units: number }[]; supply_items: { supply_id: number; name: string; quantity: number; new_quantity: number }[]; }
 export interface Provider { id: number; name: string; created_at: string; }
 export interface ProviderBillItem { product_id: number; product_name: string; qty_sold: number; unit_cost: number; subtotal: number; }
 export interface ProviderBill { provider_id: number; provider_name: string; products: ProviderBillItem[]; total: number; }

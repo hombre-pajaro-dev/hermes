@@ -11,6 +11,15 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+#### Supply and untracked-product costs no longer double-count in reports
+- Supply-based products (e.g. a latte made from milk, beans, cups) had a flat, hand-typed `cost` used for COGS at sale time, completely disconnected from what was actually paid for ingredients — restocking a supply only bumped its quantity, recording no price and touching no product's cost. A product's accrued cost was a permanent guess.
+- `supplies` now has its own `cost`, kept honest going forward the same way tracked-product cost already is: restocking a supply with a quantity and total paid derives and updates its unit cost, and admins can also set a supply's cost directly (Admin → Supplies) to seed an accurate value without needing to change quantity on hand.
+- A supply-based product's `cost` is no longer stored or manually editable — it's computed as `sum(quantity_per_unit × supply.cost)` across its ingredients, evaluated wherever cost is read (product listing, checkout, tabs, Markup %). `PATCH /products/:id/cost` now returns 409 for these products.
+- Restock (`POST /api/restock`) now accepts supplies alongside products in the same purchase — one provider, one payment account, one combined ledger entry — instead of supplies being restocked through a separate, ungated, cost-less endpoint (`POST /supplies/:id/restock`, now removed). The Ledger drill-down and the session report's restocked-items list show supply lines alongside product lines (`supplies_restocked`).
+- Also fixed a related inconsistency for untracked products (`track_inventory = false`): `GET /sessions/:id/report` already replaced their estimated COGS with the real amount once a provider was paid (Session Bill), but only inside `pnl.cogs` — the top-level `total_cost`/`gross_profit` fields in the same response still used the unreconciled estimate. Both now read from the same reconciled figures.
+- See `docs/adr/0004-computed-recipe-cost-for-supply-based-products.md` for the full rationale.
+- 7 new backend BDD scenarios added (154/154 passing); 3 new frontend BDD scenarios added.
+
 #### Digital reconciliation now behaves like cash reconciliation
 - `POST /register/close` now books a `register_close` ledger entry on the `digital` account when `actual_digital` is submitted, mirroring the existing cash variance entry. Previously the digital variance was only ever shown in the session report and never recorded in the ledger, so it had no lasting effect.
 - `expected_digital` is now a running balance of the `digital` ledger account, the same model already used for `expected_cash`, so it carries forward across sessions instead of resetting to just the current session's card/transfer sales. Previously, entering the real bank/app balance at close (as `actual_digital` is documented to expect) against a session-scoped expected value produced large, misleading variances.

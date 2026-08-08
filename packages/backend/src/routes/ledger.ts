@@ -51,14 +51,21 @@ router.get('/entries/:id/items', async (req, res) => {
   }
 
   if (entry.ref_type === 'restock') {
-    const { rows: items } = await db.query(
-      `SELECT ri.product_id, p.name, ri.quantity, ri.unit_cost AS unit_price,
-              (ri.quantity * ri.unit_cost) AS subtotal, ri.previous_cost
+    const { rows: productItems } = await db.query(
+      `SELECT ri.product_id, NULL::int AS supply_id, p.name, ri.quantity, ri.unit_cost AS unit_price,
+              (ri.quantity * ri.unit_cost) AS subtotal, ri.previous_cost, 'product' AS item_type, NULL::text AS unit
        FROM restock_items ri JOIN products p ON p.id = ri.product_id
        WHERE ri.restock_order_id = $1`,
       [entry.ref_id]
     );
-    return res.json(items);
+    const { rows: supplyItems } = await db.query(
+      `SELECT NULL::int AS product_id, rsi.supply_id, s.name, rsi.quantity, rsi.unit_cost AS unit_price,
+              (rsi.quantity * rsi.unit_cost) AS subtotal, rsi.previous_cost, 'supply' AS item_type, s.unit
+       FROM restock_supply_items rsi JOIN supplies s ON s.id = rsi.supply_id
+       WHERE rsi.restock_order_id = $1`,
+      [entry.ref_id]
+    );
+    return res.json([...productItems, ...supplyItems]);
   }
 
   res.json([]);

@@ -8,12 +8,15 @@ const router = Router();
 
 router.post('/', requireAdmin, requireOpenRegister, async (req, res) => {
   const sessionId = (req as typeof req & { sessionId: number }).sessionId;
-  const { items, provider_id, payment_account } = req.body as {
-    items: { product_id: number; quantity: number; unit_cost?: number | null }[];
+  const { items, supply_items, provider_id, payment_account } = req.body as {
+    items?: { product_id: number; quantity: number; unit_cost?: number | null }[];
+    supply_items?: { supply_id: number; quantity: number; unit_cost?: number | null }[];
     provider_id?: number | null;
     payment_account?: string | null;
   };
-  if (!items || items.length === 0) return res.status(400).json({ error: 'items are required' });
+  if ((!items || items.length === 0) && (!supply_items || supply_items.length === 0)) {
+    return res.status(400).json({ error: 'items or supply_items are required' });
+  }
 
   const client = await pool.connect();
   try {
@@ -34,8 +37,9 @@ router.post('/', requireAdmin, requireOpenRegister, async (req, res) => {
     );
     const restockId = orderRow.id;
     const resultItems = [];
+    const resultSupplyItems = [];
 
-    for (const item of items) {
+    for (const item of items ?? []) {
       const { rows: [product] } = await client.query('SELECT * FROM products WHERE id = $1', [item.product_id]);
       if (!product) throw new Error(`Product ${item.product_id} not found`);
       const usesSupplies = await productUsesSupplies(client, item.product_id);
@@ -68,6 +72,36 @@ router.post('/', requireAdmin, requireOpenRegister, async (req, res) => {
       });
     }
 
+    for (const item of supply_items ?? []) {
+      const { rows: [supply] } = await client.query('SELECT * FROM supplies WHERE id = $1', [item.supply_id]);
+      if (!supply) throw new Error(`Supply ${item.supply_id} not found`);
+
+      const previousCost: number = supply.cost;
+      const newCost: number = (item.unit_cost != null && item.unit_cost > 0) ? item.unit_cost : previousCost;
+
+      if (newCost !== previousCost) {
+        await client.query('UPDATE supplies SET cost = $1 WHERE id = $2', [newCost, item.supply_id]);
+      }
+
+      await client.query(
+        'INSERT INTO restock_supply_items (restock_order_id, supply_id, quantity, unit_cost, previous_cost) VALUES ($1, $2, $3, $4, $5)',
+        [restockId, item.supply_id, item.quantity, newCost, previousCost]
+      );
+      await client.query('UPDATE supplies SET quantity = quantity + $1 WHERE id = $2', [item.quantity, item.supply_id]);
+      const { rows: [updated] } = await client.query('SELECT quantity FROM supplies WHERE id = $1', [item.supply_id]);
+
+      totalPayment += item.quantity * newCost;
+      resultSupplyItems.push({
+        supply_id: item.supply_id,
+        name: supply.name,
+        quantity: item.quantity,
+        unit_cost: newCost,
+        previous_cost: previousCost,
+        cost_changed: newCost !== previousCost,
+        new_quantity: updated.quantity,
+      });
+    }
+
     // Store calculated total on the order
     await client.query('UPDATE restock_orders SET payment_amount = $1 WHERE id = $2', [totalPayment, restockId]);
 
@@ -87,6 +121,7 @@ router.post('/', requireAdmin, requireOpenRegister, async (req, res) => {
       payment_amount: totalPayment,
       payment_account: payment_account ?? null,
       items: resultItems,
+      supply_items: resultSupplyItems,
     });
   } catch (err: unknown) {
     await client.query('ROLLBACK');

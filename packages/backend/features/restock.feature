@@ -59,3 +59,54 @@ Feature: Restock inventory
     And I fetch the ledger
     Then the restock ledger entry has items
     And the restock items include "Espresso" with quantity 12
+
+  Scenario: Restocking a supply updates its cost and increases quantity
+    Given a supply "Milk" with unit "ml" and quantity 0 exists
+    When I submit a restock order with supply items
+      | supply_name | quantity | unit_cost |
+      | Milk        | 1000     | 0.05      |
+    Then the response status is 201
+    And the supply "Milk" cost is updated to 0.05
+    And the supply "Milk" quantity increased by 1000
+
+  Scenario: Restocking a supply updates a supply-based product's computed cost
+    Given a supply "Milk" with unit "ml" and quantity 0 exists
+    And a product "Oat Latte" using 200 "Milk" per unit exists
+    When I submit a restock order with supply items
+      | supply_name | quantity | unit_cost |
+      | Milk        | 1000     | 0.05      |
+    Then the product "Oat Latte" cost is updated to 10.00
+
+  Scenario: Combined restock of products and supplies creates one ledger entry
+    Given a provider named "MixCo" exists
+    And a supply "Milk" with unit "ml" and quantity 0 exists
+    When I submit a combined restock order with provider "MixCo" from "cash"
+      | kind    | name     | quantity | unit_cost |
+      | product | Espresso | 10       | 1.00      |
+      | supply  | Milk     | 500      | 0.05      |
+    Then the response status is 201
+    And there is exactly one "restock" ledger entry
+    And the ledger has a "restock" entry with amount -35.00
+    And the restock ledger items include both "Espresso" and "Milk"
+
+  Scenario: Cannot restock a supply-based product directly as a product item
+    Given a supply "Milk" with unit "ml" and quantity 0 exists
+    And a product "Oat Latte" using 200 "Milk" per unit exists
+    When I try to submit a restock order with items
+      | product_name | quantity |
+      | Oat Latte    | 5        |
+    Then the response status is 404
+    And the response error mentions "supply-based"
+
+  Scenario: Cannot edit cost directly on a supply-based product
+    Given a supply "Milk" with unit "ml" and quantity 0 exists
+    And a product "Oat Latte" using 200 "Milk" per unit exists
+    When I try to set the product "Oat Latte" cost to 3.00
+    Then the response status is 409
+
+  Scenario: Session report includes supplies restocked during the session
+    Given a supply "Milk" with unit "ml" and quantity 0 exists
+    When I submit a restock order with supply items
+      | supply_name | quantity | unit_cost |
+      | Milk        | 1000     | 0.05      |
+    Then the session report supplies_restocked includes "Milk" with quantity 1000

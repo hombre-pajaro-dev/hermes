@@ -79,3 +79,15 @@ The admin-only act of voiding a tab that has items on it — used when a custome
 
 ### Markup %
 Displayed on each product in ProductsView, admin-only. Computed as `(price - cost) / cost × 100`. Answers "how much above cost is the selling price?" Distinct from the staff price markup, which is `(staff_price - cost) / cost × 100`.
+
+### Restock
+The act of purchasing new units of unit-tracked products and/or Supplies from a Provider, recorded as one `restock_orders` row via `POST /api/restock`: one provider, one payment account, one combined ledger expense, even when the purchase mixes product line items and supply line items. Restocking a product updates its `cost` going forward (from real $ paid ÷ quantity) — see [[supply-cost]]. Untracked products (`track_inventory = false`) cannot be restocked this way — see [[session-bill]].
+
+### Supply Cost
+A Supply's own per-unit `cost`, set either by [[restock]] (quantity + total paid → derived unit cost, updates `cost` going forward) or by direct admin edit in the Supplies screen — the latter exists so an accurate starting cost can be set at rollout without needing to change quantity on hand. Distinct from [[recipe-cost]], which is derived from it.
+
+### Recipe Cost
+For a supply-based product (`uses_supplies = true`, i.e. it has `product_supplies` rows), `cost` is not stored or manually editable — it is computed as `sum(quantity_per_unit × supply.cost)` across its ingredients, evaluated wherever product cost is read (listings, checkout/tab sale-time snapshot, Markup %). Because it's derived from real [[supply-cost]] rather than guessed, it needs no retroactive correction — contrast with [[session-bill]] reconciliation, which exists precisely because untracked-product cost *is* a guess. See ADR 0004.
+
+### Session Bill / Provider Payment
+The mechanism for untracked products (`track_inventory = false`): `cost` is a manually-set estimate snapshotted onto `order_items.unit_cost` at sale time, same as any product. Because untracked products are sold first and settled with the Provider periodically (not pre-purchased like Restock), the real cost isn't known until later. `GET /providers/session-bill` totals what's owed per provider for units sold in a date range; `POST /providers/:id/payment` records the real payment. The session report then retroactively replaces the estimated COGS for that provider's products with the real amount paid, split proportionally across products by their share of estimated cost. This reconciliation is applied consistently everywhere the session report reports cost (`total_cost`, `gross_profit`, and `pnl.cogs`/`pnl.gross_profit` all agree) — see ADR 0004.

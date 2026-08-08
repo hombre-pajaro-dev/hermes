@@ -192,12 +192,6 @@ router.get('/sessions/:id/report', async (req, res) => {
     FROM orders WHERE session_id = $1 AND status = 'paid'
   `, [sessionId]);
 
-  const { rows: [costRow] } = await db.query(`
-    SELECT COALESCE(SUM(oi.quantity * oi.unit_cost), 0) as total_cost
-    FROM order_items oi JOIN orders o ON o.id = oi.order_id
-    WHERE o.session_id = $1 AND o.status = 'paid'
-  `, [sessionId]);
-
   const { rows: cashouts } = await db.query(
     'SELECT id, amount, reason, created_at FROM cashouts WHERE session_id = $1 ORDER BY created_at',
     [sessionId]
@@ -210,6 +204,15 @@ router.get('/sessions/:id/report', async (req, res) => {
     JOIN products p ON p.id = ri.product_id
     WHERE ro.session_id = $1
     GROUP BY p.id, p.name
+  `, [sessionId]);
+
+  const { rows: suppliesRestocked } = await db.query(`
+    SELECT s.id as supply_id, s.name, s.unit, SUM(rsi.quantity) as quantity_restocked
+    FROM restock_supply_items rsi
+    JOIN restock_orders ro ON ro.id = rsi.restock_order_id
+    JOIN supplies s ON s.id = rsi.supply_id
+    WHERE ro.session_id = $1
+    GROUP BY s.id, s.name, s.unit
   `, [sessionId]);
 
   const { rows: adjustments } = await db.query(`
@@ -393,9 +396,9 @@ router.get('/sessions/:id/report', async (req, res) => {
     },
     order_count: totals.order_count,
     revenue: Number(totals.revenue),
-    total_cost: Number(costRow.total_cost),
+    total_cost: pnlCogs,
     commission_total: commissionTotal,
-    gross_profit: Number(totals.revenue) - Number(costRow.total_cost) - commissionTotal,
+    gross_profit: pnlGrossProfit,
     cash_sales: Number(totals.cash_sales),
     card_sales: Number(totals.card_sales),
     transfer_sales: Number(totals.transfer_sales),
@@ -412,6 +415,7 @@ router.get('/sessions/:id/report', async (req, res) => {
     })),
     cashouts: cashouts.map(c => ({ id: c.id, amount: Number(c.amount), reason: c.reason, created_at: c.created_at })),
     restocked: restocked.map(r => ({ product_id: r.product_id, name: r.name, units_restocked: Number(r.units_restocked) })),
+    supplies_restocked: suppliesRestocked.map(r => ({ supply_id: r.supply_id, name: r.name, unit: r.unit, quantity_restocked: Number(r.quantity_restocked) })),
     adjustments: adjustments.map(a => ({ product_id: a.product_id, name: a.name, delta: Number(a.delta) })),
     payments: payments.map(p => ({ id: p.id, entry_type: p.entry_type, account: p.account, amount: Number(p.amount), description: p.description, created_at: p.created_at })),
     active_products: activeProducts,

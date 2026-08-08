@@ -1,12 +1,13 @@
 import { Router } from 'express';
 import { getDb, pool } from '../db/database.js';
+import { productUsesSupplies } from '../lib/supply-utils.js';
 
 const router = Router();
 
 // Shared SELECT that computes units from supplies when applicable and includes supply_ingredients.
 const PRODUCT_SELECT = `
   SELECT
-    p.id, p.name, p.description, p.cost, p.price, p.staff_price, p.image, p.active, p.track_inventory,
+    p.id, p.name, p.description, p.price, p.staff_price, p.image, p.active, p.track_inventory,
     CASE
       WHEN EXISTS(SELECT 1 FROM product_supplies ps WHERE ps.product_id = p.id)
       THEN COALESCE((
@@ -17,6 +18,16 @@ const PRODUCT_SELECT = `
       ), 0)
       ELSE p.units
     END AS units,
+    CASE
+      WHEN EXISTS(SELECT 1 FROM product_supplies ps WHERE ps.product_id = p.id)
+      THEN COALESCE((
+        SELECT SUM(ps.quantity_per_unit * s.cost)
+        FROM product_supplies ps
+        JOIN supplies s ON s.id = ps.supply_id
+        WHERE ps.product_id = p.id
+      ), 0)
+      ELSE p.cost
+    END AS cost,
     EXISTS(SELECT 1 FROM product_supplies ps WHERE ps.product_id = p.id) AS uses_supplies,
     COALESCE((
       SELECT json_agg(json_build_object(
@@ -164,6 +175,10 @@ router.patch('/:id/cost', async (req, res) => {
   const db = await getDb();
   const { rows: existing } = await db.query('SELECT * FROM products WHERE id = $1', [req.params.id]);
   if (!existing[0]) return res.status(404).json({ error: 'Product not found' });
+  const usesSupplies = await productUsesSupplies(db, Number(req.params.id));
+  if (usesSupplies) {
+    return res.status(409).json({ error: 'Cost is computed from supply ingredients — edit the supplies instead' });
+  }
   const { rows: openTab } = await db.query(
     `SELECT COUNT(*)::int as count FROM tab_items ti JOIN tabs t ON t.id = ti.tab_id WHERE ti.product_id = $1 AND t.status = 'open'`,
     [req.params.id],

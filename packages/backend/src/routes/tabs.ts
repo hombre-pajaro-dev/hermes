@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { getDb, pool } from '../db/database.js';
 import { isDiscountEligibleNow, computeDiscountAmount } from '../lib/discount-engine.js';
-import { getProductAvailableUnits, deductProductStock, restoreProductStock } from '../lib/supply-utils.js';
+import { getProductAvailableUnits, deductProductStock, restoreProductStock, getProductCost } from '../lib/supply-utils.js';
 import { requireAdmin } from '../middleware/require-admin.js';
 import { actorEmail } from '../lib/actor.js';
 import { applyCardCommission } from '../lib/commission-utils.js';
@@ -82,14 +82,15 @@ router.post('/:id/items', async (req, res) => {
     for (const item of items) {
       const { rows: [product] } = await client.query('SELECT * FROM products WHERE id = $1', [item.product_id]);
       if (!product) throw new Error(`Product ${item.product_id} not found`);
-      const unitPrice = tab.at_cost ? (product.staff_price ?? product.cost) : product.price;
+      const cost = await getProductCost(client, item.product_id);
+      const unitPrice = tab.at_cost ? (product.staff_price ?? cost) : product.price;
       const subtotal = unitPrice * item.quantity;
       additionalTotal += subtotal;
       const { rows: [existing] } = await client.query('SELECT id FROM tab_items WHERE tab_id = $1 AND product_id = $2', [tab.id, item.product_id]);
       if (existing) {
         await client.query('UPDATE tab_items SET quantity = quantity + $1, subtotal = subtotal + $2 WHERE id = $3', [item.quantity, subtotal, existing.id]);
       } else {
-        await client.query('INSERT INTO tab_items (tab_id, product_id, quantity, unit_price, unit_cost, subtotal, added_by, added_at) VALUES ($1, $2, $3, $4, $5, $6, $7, NOW())', [tab.id, item.product_id, item.quantity, unitPrice, product.cost, subtotal, actor]);
+        await client.query('INSERT INTO tab_items (tab_id, product_id, quantity, unit_price, unit_cost, subtotal, added_by, added_at) VALUES ($1, $2, $3, $4, $5, $6, $7, NOW())', [tab.id, item.product_id, item.quantity, unitPrice, cost, subtotal, actor]);
       }
       await deductProductStock(client, item.product_id, item.quantity);
     }

@@ -39,6 +39,30 @@ export async function getProductAvailableUnits(db: Queryable, product_id: number
 }
 
 /**
+ * Returns a product's cost.
+ * For supply-based products: sum(quantity_per_unit * supply.cost) across product_supplies.
+ * For all other products: the stored products.cost column.
+ */
+export async function getProductCost(db: Queryable, product_id: number): Promise<number> {
+  const { rows } = await db.query(
+    `SELECT
+       CASE
+         WHEN EXISTS(SELECT 1 FROM product_supplies ps WHERE ps.product_id = $1)
+         THEN COALESCE((
+           SELECT SUM(ps.quantity_per_unit * s.cost)
+           FROM product_supplies ps
+           JOIN supplies s ON s.id = ps.supply_id
+           WHERE ps.product_id = $1
+         ), 0)
+         ELSE p.cost
+       END AS cost
+     FROM products p WHERE p.id = $1`,
+    [product_id],
+  );
+  return Number(rows[0]?.cost ?? 0);
+}
+
+/**
  * Deducts `quantity` product units from supplies (if supply-based) or product.units.
  * No-op for non-tracked products. Must be called inside a transaction client.
  */

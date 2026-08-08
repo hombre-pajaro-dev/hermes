@@ -245,7 +245,7 @@ export default function AdminView() {
   const [suppliesError, setSuppliesError] = useState('');
   const [showSupplyForm, setShowSupplyForm] = useState(false);
   const [editingSupplyId, setEditingSupplyId] = useState<number | null>(null);
-  const [supplyForm, setSupplyForm] = useState({ name: '', unit: 'units', quantity: '0' });
+  const [supplyForm, setSupplyForm] = useState({ name: '', unit: 'units', quantity: '0', cost: '0' });
 
   async function loadSupplies() {
     if (!isAdmin) return;
@@ -257,14 +257,14 @@ export default function AdminView() {
 
   function openNewSupplyForm() {
     setEditingSupplyId(null);
-    setSupplyForm({ name: '', unit: 'units', quantity: '0' });
+    setSupplyForm({ name: '', unit: 'units', quantity: '0', cost: '0' });
     setSuppliesError('');
     setShowSupplyForm(true);
   }
 
   function openEditSupplyForm(s: Supply) {
     setEditingSupplyId(s.id);
-    setSupplyForm({ name: s.name, unit: s.unit, quantity: String(s.quantity) });
+    setSupplyForm({ name: s.name, unit: s.unit, quantity: String(s.quantity), cost: String(s.cost) });
     setSuppliesError('');
     setShowSupplyForm(true);
   }
@@ -272,12 +272,14 @@ export default function AdminView() {
   async function handleSaveSupply() {
     setSuppliesError('');
     const qty = Number(supplyForm.quantity);
+    const cost = Number(supplyForm.cost);
     if (isNaN(qty) || qty < 0) { setSuppliesError('Quantity must be ≥ 0'); return; }
+    if (isNaN(cost) || cost < 0) { setSuppliesError('Cost must be ≥ 0'); return; }
     try {
       if (editingSupplyId != null) {
-        await api.updateSupply(editingSupplyId, { name: supplyForm.name, unit: supplyForm.unit, quantity: qty });
+        await api.updateSupply(editingSupplyId, { name: supplyForm.name, unit: supplyForm.unit, quantity: qty, cost });
       } else {
-        await api.createSupply({ name: supplyForm.name, unit: supplyForm.unit, quantity: qty });
+        await api.createSupply({ name: supplyForm.name, unit: supplyForm.unit, quantity: qty, cost });
       }
       setShowSupplyForm(false);
       setEditingSupplyId(null);
@@ -698,18 +700,18 @@ export default function AdminView() {
                 <div className="list-item" key={s.id}>
                   <div className="list-item__main">
                     <div className="list-item__name">{s.name}</div>
-                    <div className="list-item__sub">{s.quantity} {s.unit}</div>
+                    <div className="list-item__sub">{s.quantity} {s.unit} · Cost: ${s.cost.toFixed(2)}</div>
                   </div>
                   <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
-                    <button className="btn btn--sm btn--ghost" onClick={() => openEditSupplyForm(s)}>Edit</button>
-                    <button className="btn btn--sm btn--danger" onClick={() => handleDeleteSupply(s.id)}>Delete</button>
+                    <button data-testid={`edit-supply-${s.id}`} className="btn btn--sm btn--ghost" onClick={() => openEditSupplyForm(s)}>Edit</button>
+                    <button data-testid={`delete-supply-${s.id}`} className="btn btn--sm btn--danger" onClick={() => handleDeleteSupply(s.id)}>Delete</button>
                   </div>
                 </div>
               ))
             )}
 
             {!showSupplyForm && (
-              <button className="btn btn--primary" style={{ marginTop: 12 }} onClick={openNewSupplyForm}>
+              <button data-testid="add-supply-btn" className="btn btn--primary" style={{ marginTop: 12 }} onClick={openNewSupplyForm}>
                 + Add Supply
               </button>
             )}
@@ -720,31 +722,38 @@ export default function AdminView() {
 
                 <div className="field">
                   <label className="label">Name</label>
-                  <input className="input" placeholder="e.g. Coffee grounds"
+                  <input data-testid="supply-name-input" className="input" placeholder="e.g. Coffee grounds"
                     value={supplyForm.name}
                     onChange={e => setSupplyForm(f => ({ ...f, name: e.target.value }))} />
                 </div>
 
                 <div className="field">
                   <label className="label">Unit</label>
-                  <input className="input" placeholder="e.g. g, ml, units"
+                  <input data-testid="supply-unit-input" className="input" placeholder="e.g. g, ml, units"
                     value={supplyForm.unit}
                     onChange={e => setSupplyForm(f => ({ ...f, unit: e.target.value }))} />
                 </div>
 
                 <div className="field">
                   <label className="label">Initial quantity</label>
-                  <input className="input" type="number" min="0" step="0.01"
+                  <input data-testid="supply-quantity-input" className="input" type="number" min="0" step="0.01"
                     value={supplyForm.quantity}
                     onChange={e => setSupplyForm(f => ({ ...f, quantity: e.target.value }))} />
                 </div>
 
+                <div className="field">
+                  <label className="label">Cost per unit</label>
+                  <input data-testid="supply-cost-input" className="input" type="number" min="0" step="0.01"
+                    value={supplyForm.cost}
+                    onChange={e => setSupplyForm(f => ({ ...f, cost: e.target.value }))} />
+                </div>
+
                 <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
-                  <button className="btn btn--ghost" style={{ flex: 1 }}
+                  <button data-testid="cancel-supply-btn" className="btn btn--ghost" style={{ flex: 1 }}
                     onClick={() => { setShowSupplyForm(false); setEditingSupplyId(null); }}>
                     Cancel
                   </button>
-                  <button className="btn btn--primary" style={{ flex: 1 }}
+                  <button data-testid="save-supply-btn" className="btn btn--primary" style={{ flex: 1 }}
                     onClick={handleSaveSupply}
                     disabled={!supplyForm.name || !supplyForm.unit}>
                     {editingSupplyId != null ? 'Save Changes' : 'Create Supply'}

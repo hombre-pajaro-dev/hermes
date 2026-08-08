@@ -13,6 +13,7 @@ export default function RestockView() {
   const [productQtys, setProductQtys] = useState<Record<number, string>>({});
   const [productTotals, setProductTotals] = useState<Record<number, string>>({});
   const [supplyQtys, setSupplyQtys] = useState<Record<number, string>>({});
+  const [supplyTotals, setSupplyTotals] = useState<Record<number, string>>({});
   const [tabReserved, setTabReserved] = useState<Record<number, number>>({});
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
@@ -82,6 +83,8 @@ export default function RestockView() {
     return sum + (Number(productTotals[p.id]) || 0);
   }, 0);
 
+  const computedSupplyTotal = supplies.reduce((sum, s) => sum + (Number(supplyTotals[s.id]) || 0), 0);
+
   async function handleRestock() {
     setError(''); setSuccess('');
 
@@ -99,7 +102,12 @@ export default function RestockView() {
 
     const supplyItems = Object.entries(supplyQtys)
       .filter(([, q]) => Number(q) > 0)
-      .map(([id, q]) => ({ supply_id: Number(id), quantity: Number(q) }));
+      .map(([id, q]) => {
+        const qty = Number(q);
+        const total = Number(supplyTotals[Number(id)]) || 0;
+        const unit_cost = qty > 0 && total > 0 ? total / qty : (supplies.find(s => s.id === Number(id))?.cost ?? 0);
+        return { supply_id: Number(id), quantity: qty, unit_cost };
+      });
 
     if (productItems.length === 0 && supplyItems.length === 0) {
       setError('No quantities entered');
@@ -107,19 +115,15 @@ export default function RestockView() {
     }
 
     try {
-      if (productItems.length > 0) {
-        await api.restock(productItems, {
-          provider_id: selectedProvider.id,
-          payment_account: paymentAccount,
-        });
-      }
-      for (const si of supplyItems) {
-        await api.restockSupply(si.supply_id, si.quantity);
-      }
+      await api.restock(productItems, supplyItems, {
+        provider_id: selectedProvider.id,
+        payment_account: paymentAccount,
+      });
       setSuccess('Restock completed');
       setProductQtys({});
       setProductTotals({});
       setSupplyQtys({});
+      setSupplyTotals({});
       setProviderInput('');
       setSelectedProvider(null);
       await load();
@@ -290,23 +294,66 @@ export default function RestockView() {
 
       {/* Supplies */}
       {supplies.length > 0 && (
-        <div className="card" style={{ marginTop: 12 }}>
+        <div className="card" data-testid="restock-supply-form" style={{ marginTop: 12 }}>
           <div className="card__title">Supplies</div>
-          {supplies.map(s => (
-            <div className="list-item" key={s.id}>
-              <div className="list-item__main">
-                <div className="list-item__name">{s.name}</div>
-                <div className="list-item__sub">Current: {s.quantity} {s.unit}</div>
+          {supplies.map(s => {
+            const qty = Number(supplyQtys[s.id]) || 0;
+            const total = Number(supplyTotals[s.id]) || 0;
+            const derivedUnitCost = qty > 0 && total > 0 ? total / qty : null;
+            const costChanged = derivedUnitCost !== null && derivedUnitCost !== s.cost;
+            const slug = s.name.toLowerCase().replace(/\s+/g, '-');
+            return (
+              <div key={s.id} style={{ borderBottom: '1px solid var(--border)', padding: '10px 0' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                  <div style={{ flex: 1, minWidth: 120 }}>
+                    <div className="list-item__name">{s.name}</div>
+                    <div className="list-item__sub">Current: {s.quantity} {s.unit} · Cost: ${s.cost.toFixed(2)}</div>
+                  </div>
+                  <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexShrink: 0 }}>
+                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 2 }}>
+                      <label style={{ fontSize: '0.7rem', color: 'var(--text-secondary)' }}>Qty</label>
+                      <input
+                        data-testid={`restock-supply-qty-${slug}`}
+                        className="input" type="number" min="0" step="0.001" placeholder="0"
+                        style={{ width: 72 }}
+                        value={supplyQtys[s.id] ?? ''}
+                        onChange={e => setSupplyQtys(prev => ({ ...prev, [s.id]: e.target.value }))}
+                      />
+                    </div>
+                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 2 }}>
+                      <label style={{ fontSize: '0.7rem', color: 'var(--text-secondary)' }}>Total paid ($)</label>
+                      <input
+                        data-testid={`restock-supply-total-${slug}`}
+                        className="input" type="number" min="0.01" step="0.01" placeholder="0.00"
+                        style={{ width: 88, borderColor: costChanged ? 'var(--warning, #d97706)' : undefined }}
+                        value={supplyTotals[s.id] ?? ''}
+                        onChange={e => setSupplyTotals(prev => ({ ...prev, [s.id]: e.target.value }))}
+                      />
+                    </div>
+                  </div>
+                </div>
+                {derivedUnitCost !== null && (
+                  <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginTop: 4 }}>
+                    Unit cost: ${derivedUnitCost.toFixed(2)}
+                  </div>
+                )}
+                {costChanged && (
+                  <div data-testid={`supply-cost-change-warning-${slug}`}
+                    style={{ fontSize: '0.75rem', color: 'var(--warning, #d97706)', marginTop: 2 }}>
+                    ⚠ cost will update: ${s.cost.toFixed(2)} → ${derivedUnitCost!.toFixed(2)}
+                  </div>
+                )}
               </div>
-              <input
-                data-testid={`restock-supply-${s.name.toLowerCase().replace(/\s+/g, '-')}`}
-                className="input" type="number" min="0" placeholder="0"
-                style={{ width: 80 }}
-                value={supplyQtys[s.id] ?? ''}
-                onChange={e => setSupplyQtys(prev => ({ ...prev, [s.id]: e.target.value }))}
-              />
+            );
+          })}
+          {computedSupplyTotal > 0 && (
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 12, paddingTop: 12, borderTop: '1px solid var(--border)' }}>
+              <span style={{ fontWeight: 600 }}>Total</span>
+              <span data-testid="restock-supply-computed-total" style={{ fontWeight: 700, fontSize: '1.05rem' }}>
+                ${computedSupplyTotal.toFixed(2)}
+              </span>
             </div>
-          ))}
+          )}
         </div>
       )}
 
