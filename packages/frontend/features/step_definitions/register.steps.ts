@@ -116,6 +116,61 @@ Then('the close form does not show a physical count input for {string}', async f
   expect(count).to.equal(0);
 });
 
+// ── Close Reconciliation draft persistence ──────────────────────────────────
+
+Then('the closing cash input shows {int}', async function (this: PosWorld, amount: number) {
+  const el = this.page.locator('[data-testid="closing-cash-input"]');
+  await el.waitFor({ timeout: 5000 });
+  expect(await el.inputValue()).to.equal(String(amount));
+});
+
+Then('the closing cash input shows nothing', async function (this: PosWorld) {
+  const el = this.page.locator('[data-testid="closing-cash-input"]');
+  await el.waitFor({ timeout: 5000 });
+  expect(await el.inputValue()).to.equal('');
+});
+
+Then('the actual digital balance input shows {int}', async function (this: PosWorld, amount: number) {
+  const el = this.page.locator('[data-testid="actual-digital-input"]');
+  await el.waitFor({ timeout: 5000 });
+  expect(await el.inputValue()).to.equal(String(amount));
+});
+
+Then('the physical count for {string} shows {int}', async function (this: PosWorld, name: string, count: number) {
+  const slug = name.toLowerCase().replace(/\s+/g, '-');
+  const el = this.page.locator(`[data-testid="physical-count-${slug}"]`);
+  await el.waitFor({ timeout: 5000 });
+  expect(await el.inputValue()).to.equal(String(count));
+});
+
+Then('I see the closing cash restored warning', async function (this: PosWorld) {
+  const el = this.page.locator('[data-testid="closing-cash-restored-warning"]');
+  await el.waitFor({ timeout: 5000 });
+  expect(await el.isVisible()).to.be.true;
+});
+
+Then('I see the actual digital balance restored warning', async function (this: PosWorld) {
+  const el = this.page.locator('[data-testid="actual-digital-restored-warning"]');
+  await el.waitFor({ timeout: 5000 });
+  expect(await el.isVisible()).to.be.true;
+});
+
+Then('I do not see the closing cash restored warning', async function (this: PosWorld) {
+  const count = await this.page.locator('[data-testid="closing-cash-restored-warning"]').count();
+  expect(count).to.equal(0);
+});
+
+Given('a stale close reconciliation draft for a different session is stored', async function (this: PosWorld) {
+  await this.page.evaluate(() => {
+    localStorage.setItem('close-reconciliation-draft', JSON.stringify({
+      sessionId: -1,
+      closingCash: '999',
+      actualDigital: '',
+      physicalCounts: {},
+    }));
+  });
+});
+
 When('I have closed the register with cash {int} digital {int} and physical count for {string} of {int}',
   async function (this: PosWorld, cash: number, digital: number, name: string, count: number) {
     const productsRes = await fetch(`${API}/api/products?name=${encodeURIComponent(name)}`);

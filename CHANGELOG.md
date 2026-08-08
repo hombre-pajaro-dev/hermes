@@ -11,6 +11,14 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+#### Close Reconciliation no longer loses typed values when you have to leave the form
+- The register won't close while tabs are open, so closing the register often means navigating away to `/tabs` to pay them off first — which unmounts the Close Register form and wiped `closing_cash`, `actual_digital`, and every typed physical count.
+- These now persist to `localStorage`, keyed to the currently open session, and are restored automatically on return. A draft belonging to a different (or no longer open) session is ignored.
+- Physical counts restore silently — paying off a tab doesn't change what's on the shelf. `closing_cash` and `actual_digital` restore too, but are flagged "restored from an earlier attempt — please re-verify," since paying a tab in cash or digitally changes the real drawer/balance already counted, and Close Reconciliation exists specifically to catch discrepancies like that. The flag on a field clears as soon as that field is edited; it never blocks the Close button.
+- The draft is cleared after a successful close.
+- See `CONTEXT.md` → Close Reconciliation Draft for the full rationale.
+- 3 new frontend BDD scenarios added.
+
 #### Supply and untracked-product costs no longer double-count in reports
 - Supply-based products (e.g. a latte made from milk, beans, cups) had a flat, hand-typed `cost` used for COGS at sale time, completely disconnected from what was actually paid for ingredients — restocking a supply only bumped its quantity, recording no price and touching no product's cost. A product's accrued cost was a permanent guess.
 - `supplies` now has its own `cost`, kept honest going forward the same way tracked-product cost already is: restocking a supply with a quantity and total paid derives and updates its unit cost, and admins can also set a supply's cost directly (Admin → Supplies) to seed an accurate value without needing to change quantity on hand.

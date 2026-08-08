@@ -67,6 +67,39 @@ Feature: Register
     Then I see a success message
     And the register shows as closed
 
+  Scenario: Close Reconciliation form persists when navigating away and back
+    Given the register is open via the API with 200
+    And Espresso has been sold in the current session
+    And I am on the Register page
+    When I fill in closing cash as 200
+    And I fill in actual digital balance as 50
+    And I fill in physical count for "Espresso" as 95
+    And I am on the Tabs page
+    And I am on the Register page
+    Then the closing cash input shows 200
+    And the actual digital balance input shows 50
+    And the physical count for "Espresso" shows 95
+    And I see the closing cash restored warning
+    And I see the actual digital balance restored warning
+
+  Scenario: Editing a restored field clears its own re-verify warning
+    Given the register is open via the API with 200
+    And I am on the Register page
+    When I fill in closing cash as 200
+    And I am on the Tabs page
+    And I am on the Register page
+    Then I see the closing cash restored warning
+    When I fill in closing cash as 210
+    Then I do not see the closing cash restored warning
+
+  Scenario: A draft from a different session is not restored
+    Given the register is open via the API with 200
+    And I am on the Register page
+    And a stale close reconciliation draft for a different session is stored
+    When I am on the Tabs page
+    And I am on the Register page
+    Then the closing cash input shows nothing
+
   Scenario: Session report shows reconciliation narrative after single-step close
     Given the register is open via the API with 200
     And Espresso has been sold in the current session

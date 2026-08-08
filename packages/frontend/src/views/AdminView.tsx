@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { api } from '../api/client';
 import type { AuthorizedUser, CommissionSettings, Discount, Product, RegisterSession, Supply } from '../api/client';
 import { authClient } from '../lib/auth-client';
@@ -30,6 +30,30 @@ const emptyForm: DiscountForm = {
   max_redemptions: '', product_ids: [], active: true,
 };
 
+const CLOSE_DRAFT_KEY = 'close-reconciliation-draft';
+
+interface CloseDraft {
+  sessionId: number;
+  closingCash: string;
+  actualDigital: string;
+  physicalCounts: Record<number, string>;
+}
+
+function loadCloseDraft(): CloseDraft | null {
+  try {
+    const raw = localStorage.getItem(CLOSE_DRAFT_KEY);
+    return raw ? JSON.parse(raw) as CloseDraft : null;
+  } catch { return null; }
+}
+
+function saveCloseDraft(draft: CloseDraft) {
+  try { localStorage.setItem(CLOSE_DRAFT_KEY, JSON.stringify(draft)); } catch { /* ignore */ }
+}
+
+function clearCloseDraft() {
+  try { localStorage.removeItem(CLOSE_DRAFT_KEY); } catch { /* ignore */ }
+}
+
 export default function AdminView() {
   const { data: session } = authClient.useSession();
   const isAdmin = (session?.user as { role?: string } | undefined)?.role === 'admin';
@@ -46,8 +70,15 @@ export default function AdminView() {
   const [cashoutReason, setCashoutReason] = useState('');
   const [closeProducts, setCloseProducts] = useState<Product[]>([]);
   const [physicalCounts, setPhysicalCounts] = useState<Record<number, string>>({});
+  const [restoredCashFields, setRestoredCashFields] = useState({ closing_cash: false, actual_digital: false });
+  // Guards the persist effect below from firing on the intermediate render that happens
+  // between `setRegisterSession(s)` and the later `await api.getProducts()` resolving —
+  // without this, that render's effect would overwrite the stored draft with blank fields
+  // before loadRegister() ever gets to read (or restore) it.
+  const hasRestoredRef = useRef(false);
 
   async function loadRegister() {
+    hasRestoredRef.current = false;
     try {
       const s = await api.getSession();
       setRegisterSession(s);
@@ -55,14 +86,33 @@ export default function AdminView() {
         const products = await api.getProducts();
         const active = products.filter(p => p.active && p.track_inventory && !p.uses_supplies);
         setCloseProducts(active);
-        setPhysicalCounts(Object.fromEntries(active.map(p => [p.id, String(p.units)])));
+        const defaults = Object.fromEntries(active.map(p => [p.id, String(p.units)]));
+
+        const draft = loadCloseDraft();
+        if (draft && draft.sessionId === s.id) {
+          setPhysicalCounts({ ...defaults, ...draft.physicalCounts });
+          if (draft.closingCash) setClosingCash(draft.closingCash);
+          if (draft.actualDigital) setActualDigital(draft.actualDigital);
+          setRestoredCashFields({
+            closing_cash: !!draft.closingCash,
+            actual_digital: !!draft.actualDigital,
+          });
+        } else {
+          setPhysicalCounts(defaults);
+        }
       }
+      hasRestoredRef.current = true;
     }
-    catch { setRegisterSession(null); }
+    catch { setRegisterSession(null); hasRestoredRef.current = true; }
     finally { setRegisterLoading(false); }
   }
 
   useEffect(() => { loadRegister(); }, []);
+
+  useEffect(() => {
+    if (!registerSession || !hasRestoredRef.current) return;
+    saveCloseDraft({ sessionId: registerSession.id, closingCash, actualDigital, physicalCounts });
+  }, [registerSession, closingCash, actualDigital, physicalCounts]);
 
   async function handleOpenRegister() {
     setRegisterError(''); setRegisterSuccess('');
@@ -89,7 +139,10 @@ export default function AdminView() {
         actual_digital: actualDigital !== '' ? Number(actualDigital) : undefined,
         physical_counts: counts,
       });
-      setRegisterSuccess('Register closed'); setClosingCash(''); setActualDigital(''); setPhysicalCounts({}); setCloseProducts([]); loadRegister();
+      clearCloseDraft();
+      setRegisterSuccess('Register closed'); setClosingCash(''); setActualDigital(''); setPhysicalCounts({}); setCloseProducts([]);
+      setRestoredCashFields({ closing_cash: false, actual_digital: false });
+      loadRegister();
     } catch (e: unknown) { setRegisterError((e as Error).message); }
   }
 
@@ -427,12 +480,24 @@ export default function AdminView() {
                 <div className="field">
                   <label className="label">Closing Cash ($)</label>
                   <input data-testid="closing-cash-input" className="input" type="number" min="0" step="0.01"
-                    placeholder="0.00" value={closingCash} onChange={e => setClosingCash(e.target.value)} />
+                    placeholder="0.00" value={closingCash}
+                    onChange={e => { setClosingCash(e.target.value); setRestoredCashFields(prev => ({ ...prev, closing_cash: false })); }} />
+                  {restoredCashFields.closing_cash && (
+                    <div data-testid="closing-cash-restored-warning" style={{ fontSize: '0.75rem', color: 'var(--warning, #d97706)', marginTop: 2 }}>
+                      ⚠ Restored from an earlier attempt — please re-verify
+                    </div>
+                  )}
                 </div>
                 <div className="field">
                   <label className="label">Actual Digital Balance ($)</label>
                   <input data-testid="actual-digital-input" className="input" type="number" min="0" step="0.01"
-                    placeholder="0.00" value={actualDigital} onChange={e => setActualDigital(e.target.value)} />
+                    placeholder="0.00" value={actualDigital}
+                    onChange={e => { setActualDigital(e.target.value); setRestoredCashFields(prev => ({ ...prev, actual_digital: false })); }} />
+                  {restoredCashFields.actual_digital && (
+                    <div data-testid="actual-digital-restored-warning" style={{ fontSize: '0.75rem', color: 'var(--warning, #d97706)', marginTop: 2 }}>
+                      ⚠ Restored from an earlier attempt — please re-verify
+                    </div>
+                  )}
                 </div>
                 {closeProducts.length > 0 && (
                   <div style={{ marginBottom: 12 }}>
